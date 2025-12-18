@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Frog {
+  id           Int        @id @default(autoincrement())
+  tokenId      Int        @unique
+  name         String
+  ownerAddress String
+  birthday     DateTime
+  totalTravels Int        @default(0)
+  status       FrogStatus @default(Idle)
+  xp           Int        @default(0)
+  level        Int        @default(1)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  souvenirs    Souvenir[]
+  travels      Travel[]
+
+  @@index([ownerAddress])
+}
+
+model Travel {
+  id                 Int                 @id @default(autoincrement())
+  frogId             Int
+  targetWallet       String
+  chainId            Int                 @default(1) // Default Ethereum Mainnet
+  startTime          DateTime
+  endTime            DateTime
+  status             TravelStatus        @default(Active)
+  observedTxCount    Int?
+  observedTotalValue String?
+  journalHash        String?
+  journalContent     String?
+  souvenirId         Int?
+  completedAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  frog               Frog                @relation(fields: [frogId], references: [id])
+  souvenir           Souvenir?           @relation(fields: [souvenirId], references: [id])
+  observations       WalletObservation[]
+
+  @@index([frogId])
+  @@index([status])
+  @@index([endTime])
+}
+
+model Souvenir {
+  id          Int      @id @default(autoincrement())
+  tokenId     Int      @unique
+  frogId      Int
+  name        String
+  rarity      Rarity
+  metadataUri String?
+  mintedAt    DateTime
+  createdAt   DateTime @default(now())
+  frog        Frog     @relation(fields: [frogId], references: [id])
+  travels     Travel[]
+
+  @@index([frogId])
+}
+
+model WalletObservation {
+  id            Int      @id @default(autoincrement())
+  travelId      Int
+  walletAddress String
+  chainId       Int
+  transactions  Json
+  totalTxCount  Int
+  totalValueWei String
+  notableEvents Json?
+  observedFrom  DateTime
+  observedTo    DateTime
+  createdAt     DateTime @default(now())
+  travel        Travel   @relation(fields: [travelId], references: [id])
+
+  @@index([travelId])
+  @@index([walletAddress])
+}
+
+enum FrogStatus {
+  Idle
+  Traveling
+  Returning
+}
+
+enum TravelStatus {
+  Active
+  Processing
+  Completed
+  Cancelled
+  Failed
+}
+
+enum Rarity {
+  Common
+  Uncommon
+  Rare
+}

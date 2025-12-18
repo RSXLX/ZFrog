@@ -1,0 +1,205 @@
+import { motion } from 'framer-motion';
+import { useAccount } from 'wagmi';
+import { ConnectButton } from '../components/wallet/ConnectButton';
+import { FrogMint } from '../components/frog/FrogMint';
+import { FrogPet } from '../components/frog/FrogPet';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Button } from '../components/common/Button';
+import { apiService } from '../services/api';
+
+export function Home() {
+  const { isConnected, address } = useAccount();
+  const [hasFrogs, setHasFrogs] = useState(false);
+  const [checkLoading, setCheckLoading] = useState(false);
+  const [showMint, setShowMint] = useState(false);
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('mint') === 'true') {
+      setShowMint(true);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (isConnected && address) {
+      setCheckLoading(true);
+      apiService.getFrogsByOwner(address)
+        .then(frogs => {
+          setHasFrogs(frogs.length > 0);
+        })
+        .catch(console.error)
+        .finally(() => setCheckLoading(false));
+    }
+  }, [isConnected, address]);
+  
+  return (
+    <div className="max-w-4xl mx-auto">
+      {/* Hero Section */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center mb-12"
+      >
+        <h1 className="text-5xl font-bold text-green-600 mb-4">
+          🐸 ZetaFrog
+        </h1>
+        <p className="text-xl text-gray-600 mb-2">
+          你的跨链桌面宠物
+        </p>
+        <p className="text-gray-500">
+          铸造一只青蛙，派它去探索区块链钱包，
+          获得 AI 生成的旅行故事！
+        </p>
+      </motion.div>
+      
+      {/* Demo Frog */}
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ delay: 0.2, type: 'spring' }}
+        className="flex justify-center mb-12"
+      >
+        <FrogPet
+          frogId={0}
+          name="示例青蛙"
+          status="Idle"
+        />
+      </motion.div>
+      
+      {/* Connect / Mint Section */}
+      {!isConnected ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="text-center"
+        >
+          <p className="text-gray-600 mb-4">
+            连接钱包开始你的冒险
+          </p>
+          <ConnectButton />
+        </motion.div>
+      ) : checkLoading ? (
+        <div className="text-center py-12">
+          <p className="text-gray-500">正在检查账户...</p>
+        </div>
+      ) : hasFrogs && !showMint ? (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-2xl shadow-xl p-8 max-w-md mx-auto text-center"
+        >
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">
+            欢迎回来，旅行者！🎒
+          </h2>
+          <p className="text-gray-600 mb-8">
+            你的青蛙正在等待新的冒险。
+          </p>
+          <div className="space-y-4">
+            <Link to="/my-frogs" className="block w-full">
+              <Button className="w-full text-lg py-4">
+                进入我的青蛙控制台
+              </Button>
+            </Link>
+            <p className="text-sm text-gray-500">
+              或者 <button 
+                onClick={() => setShowMint(true)} 
+                className="text-green-600 hover:underline cursor-pointer"
+              >
+                去铸造更多青蛙
+              </button>
+            </p>
+          </div>
+        </motion.div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <FrogMint
+            onSuccess={() => {
+              window.location.href = '/my-frogs';
+            }}
+          />
+        </motion.div>
+      )}
+      
+      {/* Features */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.6 }}
+        className="grid md:grid-cols-3 gap-6 mt-16"
+      >
+        <FeatureCard
+          emoji="🎨"
+          title="独特 NFT"
+          description="每只 ZetaFrog 都是 ZetaChain 上独一无二的 NFT"
+        />
+        <FeatureCard
+          emoji="🔍"
+          title="钱包探索"
+          description="派你的青蛙去观察任意以太坊钱包"
+        />
+        <FeatureCard
+          emoji="📖"
+          title="AI 故事"
+          description="收获 AI 生成的旅行日记和纪念品"
+        />
+      </motion.div>
+      
+      {/* How it works */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.8 }}
+        className="mt-16 text-center"
+      >
+        <h2 className="text-2xl font-bold text-gray-800 mb-8">
+          如何玩？
+        </h2>
+        <div className="grid md:grid-cols-4 gap-4">
+          <StepCard step={1} title="连接钱包" icon="🔗" />
+          <StepCard step={2} title="铸造青蛙" icon="🐸" />
+          <StepCard step={3} title="派它旅行" icon="✈️" />
+          <StepCard step={4} title="收获故事" icon="📜" />
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function FeatureCard({ emoji, title, description }: {
+  emoji: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <motion.div
+      whileHover={{ y: -5 }}
+      className="bg-white/50 backdrop-blur rounded-xl p-6 text-center shadow-lg"
+    >
+      <div className="text-4xl mb-3">{emoji}</div>
+      <h3 className="font-bold text-lg mb-2">{title}</h3>
+      <p className="text-gray-600 text-sm">{description}</p>
+    </motion.div>
+  );
+}
+
+function StepCard({ step, title, icon }: {
+  step: number;
+  title: string;
+  icon: string;
+}) {
+  return (
+    <div className="bg-white rounded-xl p-4 shadow">
+      <div className="w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center font-bold text-sm mb-2 mx-auto">
+        {step}
+      </div>
+      <div className="text-2xl mb-1">{icon}</div>
+      <p className="text-sm font-medium text-gray-700">{title}</p>
+    </div>
+  );
+}

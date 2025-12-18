@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+target/
+.history/
+backend/dist/
+frontend/dist/
+contracts/artifacts/
+contracts/cache/
+contracts/node_modules/
+backend/node_modules/
+frontend/node_modules/
