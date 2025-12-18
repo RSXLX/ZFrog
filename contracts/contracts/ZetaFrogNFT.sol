@@ -22,8 +22,7 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
     // ============ Enums ============
     enum FrogStatus {
         Idle,
-        Traveling,
-        Returning
+        Traveling
     }
 
     // ============ Structs ============
@@ -46,23 +45,22 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
 
     // ============ State Variables ============
     uint256 private _tokenIdCounter;
-    
     mapping(uint256 => Frog) public frogs;
     mapping(uint256 => Travel) public activeTravels;
     mapping(uint256 => uint64) public lastTravelEnd;
     mapping(uint256 => string[]) public travelJournals;
-    
+
     address public souvenirNFT;
     address public travelManager;
-    
+
     // ============ Events ============
     event FrogMinted(
-        address indexed owner, 
-        uint256 indexed tokenId, 
+        address indexed owner,
+        uint256 indexed tokenId,
         string name,
         uint256 timestamp
     );
-    
+
     event TravelStarted(
         uint256 indexed tokenId,
         address indexed targetWallet,
@@ -70,16 +68,15 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
         uint64 startTime,
         uint64 endTime
     );
-    
+
     event TravelCompleted(
         uint256 indexed tokenId,
         string journalHash,
         uint256 souvenirId,
         uint256 timestamp
     );
-    
+
     event TravelCancelled(uint256 indexed tokenId, uint256 timestamp);
-    
     event LevelUp(uint256 indexed tokenId, uint256 newLevel, uint256 timestamp);
 
     // ============ Modifiers ============
@@ -87,7 +84,7 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
         require(msg.sender == travelManager, "Not travel manager");
         _;
     }
-    
+
     modifier onlyFrogOwner(uint256 tokenId) {
         require(ownerOf(tokenId) == msg.sender, "Not frog owner");
         _;
@@ -103,35 +100,39 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
         require(_manager != address(0), "Invalid address");
         travelManager = _manager;
     }
-    
+
     function setSouvenirNFT(address _souvenir) external onlyOwner {
         require(_souvenir != address(0), "Invalid address");
         souvenirNFT = _souvenir;
     }
-    
+
     function pause() external onlyOwner {
         _pause();
     }
-    
+
     function unpause() external onlyOwner {
         _unpause();
     }
 
     // ============ Core Functions ============
-    
+
     /**
      * @notice Mint a new frog NFT
      * @param name Frog name (2-16 characters)
      */
-    function mintFrog(string calldata name) external whenNotPaused nonReentrant returns (uint256) {
+    function mintFrog(string calldata name)
+        external
+        whenNotPaused
+        nonReentrant
+        returns (uint256)
+    {
         bytes memory nameBytes = bytes(name);
         require(nameBytes.length >= 2 && nameBytes.length <= 16, "Name: 2-16 chars");
         require(_tokenIdCounter < MAX_SUPPLY, "Max supply reached");
-        
+
         uint256 tokenId = _tokenIdCounter++;
-        
         _safeMint(msg.sender, tokenId);
-        
+
         frogs[tokenId] = Frog({
             name: name,
             birthday: uint64(block.timestamp),
@@ -140,15 +141,14 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
             xp: 0,
             level: 1
         });
-        
+
         string memory uri = _generateInitialURI(tokenId, name);
         _setTokenURI(tokenId, uri);
-        
+
         emit FrogMinted(msg.sender, tokenId, name, block.timestamp);
-        
         return tokenId;
     }
-    
+
     /**
      * @notice Start a travel journey
      * @param tokenId Frog NFT ID
@@ -162,7 +162,6 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
         uint256 targetChainId
     ) external whenNotPaused nonReentrant onlyFrogOwner(tokenId) {
         Frog storage frog = frogs[tokenId];
-        
         require(frog.status == FrogStatus.Idle, "Frog is busy");
         require(targetWallet != address(0), "Invalid target");
         require(duration >= MIN_TRAVEL_DURATION, "Duration too short");
@@ -171,12 +170,12 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
             block.timestamp >= lastTravelEnd[tokenId] + COOLDOWN_PERIOD,
             "Still in cooldown"
         );
-        
+
         frog.status = FrogStatus.Traveling;
-        
+
         uint64 startTime = uint64(block.timestamp);
         uint64 endTime = uint64(block.timestamp + duration);
-        
+
         activeTravels[tokenId] = Travel({
             startTime: startTime,
             endTime: endTime,
@@ -184,10 +183,10 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
             targetChainId: targetChainId,
             completed: false
         });
-        
+
         emit TravelStarted(tokenId, targetWallet, targetChainId, startTime, endTime);
     }
-    
+
     /**
      * @notice Complete a travel (called by backend)
      * @param tokenId Frog NFT ID
@@ -201,21 +200,28 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
     ) external onlyTravelManager nonReentrant {
         Frog storage frog = frogs[tokenId];
         Travel storage travel = activeTravels[tokenId];
-        
+
         require(frog.status == FrogStatus.Traveling, "Not traveling");
         require(!travel.completed, "Already completed");
-        require(block.timestamp >= travel.endTime, "Travel not ended");
-        
+        require(block.timestamp >= travel.startTime, "Travel not started");
+
         frog.status = FrogStatus.Idle;
         frog.totalTravels++;
         travel.completed = true;
         lastTravelEnd[tokenId] = uint64(block.timestamp);
-        
+
         travelJournals[tokenId].push(journalHash);
-        
+
+        // Add XP reward
+        uint256 xpReward = 50; // Base reward
+        if (block.timestamp >= travel.endTime) {
+            xpReward += 50; // Bonus for completing full journey
+        }
+        _addExperience(tokenId, xpReward);
+
         emit TravelCompleted(tokenId, journalHash, souvenirId, block.timestamp);
     }
-    
+
     /**
      * @notice Cancel ongoing travel (emergency)
      * @param tokenId Frog NFT ID
@@ -223,87 +229,134 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
     function cancelTravel(uint256 tokenId) external onlyFrogOwner(tokenId) {
         Frog storage frog = frogs[tokenId];
         require(frog.status == FrogStatus.Traveling, "Not traveling");
-        
+
         frog.status = FrogStatus.Idle;
         activeTravels[tokenId].completed = true;
-        lastTravelEnd[tokenId] = uint64(block.timestamp);
         
+        // Apply cooldown penalty for cancellation
+        lastTravelEnd[tokenId] = uint64(block.timestamp + COOLDOWN_PERIOD);
+
         emit TravelCancelled(tokenId, block.timestamp);
     }
 
     /**
-     * @notice Add experience to a frog
-     * @param tokenId Frog NFT ID
-     * @param xpAmount Amount of XP to add
+     * @notice Add experience to a frog (internal with external wrapper)
      */
-    function addExperience(uint256 tokenId, uint256 xpAmount) external onlyTravelManager {
-        require(tokenId < _tokenIdCounter, "Frog does not exist");
+    function _addExperience(uint256 tokenId, uint256 xpAmount) internal {
         Frog storage frog = frogs[tokenId];
-        
         frog.xp += xpAmount;
-        
+
         // Simple leveling logic: Every 100 XP = 1 Level
         uint256 newLevel = (frog.xp / 100) + 1;
-        
         if (newLevel > frog.level) {
             frog.level = newLevel;
             emit LevelUp(tokenId, newLevel, block.timestamp);
         }
     }
 
+    /**
+     * @notice Add experience to a frog (public interface)
+     * @param tokenId Frog NFT ID
+     * @param xpAmount Amount of XP to add
+     */
+    function addExperience(uint256 tokenId, uint256 xpAmount)
+        external
+        onlyTravelManager
+    {
+        require(tokenId < _tokenIdCounter, "Frog does not exist");
+        _addExperience(tokenId, xpAmount);
+    }
+
     // ============ View Functions ============
-    
-    function getFrog(uint256 tokenId) external view returns (
-        string memory name,
-        uint64 birthday,
-        uint32 totalTravels,
-        FrogStatus status,
-        uint256 xp,
-        uint256 level
-    ) {
+
+    function getFrog(uint256 tokenId)
+        external
+        view
+        returns (
+            string memory name,
+            uint64 birthday,
+            uint32 totalTravels,
+            FrogStatus status,
+            uint256 xp,
+            uint256 level
+        )
+    {
         Frog memory frog = frogs[tokenId];
-        return (frog.name, frog.birthday, frog.totalTravels, frog.status, frog.xp, frog.level);
+        return (
+            frog.name,
+            frog.birthday,
+            frog.totalTravels,
+            frog.status,
+            frog.xp,
+            frog.level
+        );
     }
-    
-    function getActiveTravel(uint256 tokenId) external view returns (
-        uint64 startTime,
-        uint64 endTime,
-        address targetWallet,
-        uint256 targetChainId,
-        bool completed
-    ) {
+
+    function getActiveTravel(uint256 tokenId)
+        external
+        view
+        returns (
+            uint64 startTime,
+            uint64 endTime,
+            address targetWallet,
+            uint256 targetChainId,
+            bool completed
+        )
+    {
         Travel memory travel = activeTravels[tokenId];
-        return (travel.startTime, travel.endTime, travel.targetWallet, travel.targetChainId, travel.completed);
+        return (
+            travel.startTime,
+            travel.endTime,
+            travel.targetWallet,
+            travel.targetChainId,
+            travel.completed
+        );
     }
-    
-    function getTravelJournals(uint256 tokenId) external view returns (string[] memory) {
+
+    function getTravelJournals(uint256 tokenId)
+        external
+        view
+        returns (string[] memory)
+    {
         return travelJournals[tokenId];
     }
-    
+
     function canTravel(uint256 tokenId) external view returns (bool) {
         if (tokenId >= _tokenIdCounter) return false;
         Frog memory frog = frogs[tokenId];
         if (frog.status != FrogStatus.Idle) return false;
-        if (block.timestamp < lastTravelEnd[tokenId] + COOLDOWN_PERIOD) return false;
+        if (block.timestamp < lastTravelEnd[tokenId] + COOLDOWN_PERIOD)
+            return false;
         return true;
     }
-    
+
     function totalSupply() external view returns (uint256) {
         return _tokenIdCounter;
     }
 
     // ============ Internal Functions ============
-    
-    function _generateInitialURI(uint256 tokenId, string memory name) internal pure returns (string memory) {
-        return string(abi.encodePacked(
-            "data:application/json,",
-            '{"name":"', name, '",',
-            '"description":"A ZetaFrog Desktop Pet",',
-            '"image":"ipfs://placeholder",',
-            '"attributes":[{"trait_type":"ID","value":"', _toString(tokenId), '"}]}'
-        ));
+
+    function _generateInitialURI(uint256 tokenId, string memory name)
+        internal
+        pure
+        returns (string memory)
+    {
+        return
+            string(
+                abi.encodePacked(
+                    "data:application/json,",
+                    '{"name":"',
+                    name,
+                    '",',
+                    '"description":"A ZetaFrog Desktop Pet",',
+                    '"image":"ipfs://placeholder",',
+                    '"attributes":[{"trait_type":"ID","value":"',
+                    _toString(tokenId),
+                    '"}]}'
+                )
+            );
     }
-    
+
     function _toString(uint256 value) internal pure returns (string memory) {
         if (value == 0) return "0";
         uint256 temp = value;
