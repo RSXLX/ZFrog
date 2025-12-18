@@ -12,15 +12,23 @@ const zetachainAthens = {
     id: 7001,
     name: 'ZetaChain Athens Testnet',
     nativeCurrency: { name: 'ZETA', symbol: 'ZETA', decimals: 18 },
-    rpcUrls: {
-        default: { http: [config.ZETACHAIN_RPC_URL] },
-    },
+    rpcUrls: { default: { http: [config.ZETACHAIN_RPC_URL] } },
 } as const;
 
 const publicClient = createPublicClient({
     chain: zetachainAthens,
     transport: http(config.ZETACHAIN_RPC_URL),
 });
+
+// 定义合约返回类型 (与 Solidity Frog struct 对应)
+type FrogData = readonly [
+    name: string,      // name
+    bigint,            // birthday
+    number,            // totalTravels
+    status: number,    // status (enum)
+    bigint,            // experience
+    level: bigint      // level
+];
 
 /**
  * GET /api/frogs/:tokenId
@@ -29,7 +37,7 @@ const publicClient = createPublicClient({
 router.get('/:tokenId', async (req, res) => {
     try {
         const tokenId = parseInt(req.params.tokenId);
-        
+
         // 从数据库获取
         let frog = await prisma.frog.findUnique({
             where: { tokenId },
@@ -41,7 +49,7 @@ router.get('/:tokenId', async (req, res) => {
                 souvenirs: true,
             },
         });
-        
+
         // 如果数据库没有且合约已配置，尝试从链上获取
         if (!frog && config.ZETAFROG_NFT_ADDRESS) {
             try {
@@ -50,17 +58,20 @@ router.get('/:tokenId', async (req, res) => {
                     abi: ZETAFROG_ABI,
                     functionName: 'getFrog',
                     args: [BigInt(tokenId)],
-                }) as [string, bigint, number, number];
-                
+                }) as unknown as FrogData;
+
                 if (onChainData && onChainData[0]) {
+                    // 解构 6 元素元组: [name, birthday, totalTravels, status, experience, level]
+                    const [name, birthday, totalTravels, status] = onChainData;
+                    
                     frog = await prisma.frog.create({
                         data: {
                             tokenId,
-                            name: onChainData[0],
+                            name: name,
                             ownerAddress: '',
-                            birthday: new Date(Number(onChainData[1]) * 1000),
-                            totalTravels: Number(onChainData[2]),
-                            status: ['Idle', 'Traveling', 'Returning'][Number(onChainData[3])] as any,
+                            birthday: new Date(Number(birthday) * 1000),
+                            totalTravels: Number(totalTravels),
+                            status: ['Idle', 'Traveling', 'Returning'][status] as any,
                         },
                         include: {
                             travels: true,
@@ -72,13 +83,12 @@ router.get('/:tokenId', async (req, res) => {
                 console.error('Error fetching from chain:', error);
             }
         }
-        
+
         if (!frog) {
             return res.status(404).json({ error: 'Frog not found' });
         }
-        
+
         res.json(frog);
-        
     } catch (error) {
         console.error('Error fetching frog:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -92,7 +102,7 @@ router.get('/:tokenId', async (req, res) => {
 router.get('/owner/:address', async (req, res) => {
     try {
         const { address } = req.params;
-        
+
         const frogs = await prisma.frog.findMany({
             where: { ownerAddress: address.toLowerCase() },
             include: {
@@ -103,9 +113,8 @@ router.get('/owner/:address', async (req, res) => {
                 souvenirs: true,
             },
         });
-        
+
         res.json(frogs);
-        
     } catch (error) {
         console.error('Error fetching frogs:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -119,36 +128,23 @@ router.get('/owner/:address', async (req, res) => {
 router.post('/sync', async (req, res) => {
     try {
         const { tokenId } = req.body;
+
         if (tokenId === undefined) {
             return res.status(400).json({ error: 'Token ID required' });
         }
 
-        // Use eventListener's sync method
-        // Note: We need to import eventListener from workers/eventListener
-        // But here we are in routes. Let's rely on the dynamic logical flow or import it properly.
-        // To avoid circular dependency issues if any, we can dynamically import or just import at top.
-        // Since eventListener is exported from workers/eventListener, we can import it.
-        
-        // However, typescript might complain if not imported. 
-        // Let's assume we will add the import at the top in a separate edit or assume it's available.
-        // But wait, I must check imports.
-        
-        // Actually, let's just use the logic I created in EventListener.
-        // Importing Singleton...
         const { eventListener } = require('../../workers/eventListener');
         const success = await eventListener.syncFrog(Number(tokenId));
-        
+
         if (success) {
             res.json({ success: true });
         } else {
             res.status(404).json({ error: 'Frog not found on chain or sync failed' });
         }
-        
     } catch (error) {
         console.error('Error syncing frog:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-
-export default router;
+export default router;  

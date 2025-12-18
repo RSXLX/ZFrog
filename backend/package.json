@@ -12,6 +12,7 @@
     "db:migrate": "prisma migrate dev"
   },
   "dependencies": {
+    "@pinata/sdk": "^2.1.0",
     "@prisma/client": "^5.7.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

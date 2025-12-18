@@ -1,7 +1,7 @@
 // frontend/src/hooks/useZetaFrog.ts
 
-import { useReadContract, useReadContracts } from 'wagmi';
-import { ZETAFROG_ADDRESS, ZETAFROG_ABI, SOUVENIR_ADDRESS, SOUVENIR_ABI } from '../config/contracts';
+import { useReadContract } from 'wagmi';
+import { ZETAFROG_ADDRESS, ZETAFROG_ABI } from '../config/contracts';
 
 /**
  * 获取青蛙数据
@@ -74,11 +74,11 @@ export function useActiveTravel(tokenId: number) {
     // 如果 startTime 为 0，表示没有活跃旅行
     const hasActiveTravel = travel && travel.startTime.getTime() > 0 && !travel.completed;
 
-    return { 
-        travel: hasActiveTravel ? travel : null, 
+    return {
+        travel: hasActiveTravel ? travel : null,
         rawTravel: travel,
-        isLoading, 
-        refetch 
+        isLoading,
+        refetch
     };
 }
 
@@ -96,10 +96,10 @@ export function useTravelJournals(tokenId: number) {
         },
     });
 
-    return { 
-        journals: (data as string[]) || [], 
-        isLoading, 
-        refetch 
+    return {
+        journals: (data as string[]) || [],
+        isLoading,
+        refetch
     };
 }
 
@@ -154,115 +154,22 @@ export function useUserFrogBalance(address: string | undefined) {
 }
 
 /**
- * 获取合约常量
+ * 获取青蛙状态（简化版，用于 FrogPetAnimated）
  */
-export function useContractConstants() {
-    const { data, isLoading } = useReadContracts({
-        contracts: [
-            {
-                address: ZETAFROG_ADDRESS,
-                abi: ZETAFROG_ABI,
-                functionName: 'MAX_SUPPLY',
-            },
-            {
-                address: ZETAFROG_ADDRESS,
-                abi: ZETAFROG_ABI,
-                functionName: 'MIN_TRAVEL_DURATION',
-            },
-            {
-                address: ZETAFROG_ADDRESS,
-                abi: ZETAFROG_ABI,
-                functionName: 'MAX_TRAVEL_DURATION',
-            },
-            {
-                address: ZETAFROG_ADDRESS,
-                abi: ZETAFROG_ABI,
-                functionName: 'COOLDOWN_PERIOD',
-            },
-        ],
+export function useFrogStatus(frogId: number | undefined) {
+    const { data, isLoading } = useReadContract({
+        address: ZETAFROG_ADDRESS,
+        abi: ZETAFROG_ABI,
+        functionName: 'getFrog',
+        args: frogId !== undefined ? [BigInt(frogId)] : undefined,
         query: {
-            enabled: !!ZETAFROG_ADDRESS,
+            enabled: frogId !== undefined && !!ZETAFROG_ADDRESS,
         },
     });
 
-    return {
-        maxSupply: data?.[0]?.result ? Number(data[0].result) : 1000,
-        minTravelDuration: data?.[1]?.result ? Number(data[1].result) : 60,
-        maxTravelDuration: data?.[2]?.result ? Number(data[2].result) : 86400,
-        cooldownPeriod: data?.[3]?.result ? Number(data[3].result) : 600,
-        isLoading,
-    };
-}
+    const status = (data && Array.isArray(data))
+        ? (['Idle', 'Traveling', 'Returning'] as const)[Number(data[3])]
+        : 'Idle';
 
-/**
- * 获取青蛙的纪念品列表
- */
-export function useFrogSouvenirs(frogId: number) {
-    const { data, isLoading, refetch } = useReadContract({
-        address: SOUVENIR_ADDRESS,
-        abi: SOUVENIR_ABI,
-        functionName: 'getFrogSouvenirs',
-        args: [BigInt(frogId)],
-        query: {
-            enabled: frogId >= 0 && !!SOUVENIR_ADDRESS,
-        },
-    });
-
-    const souvenirIds = (data as bigint[])?.map(id => Number(id)) || [];
-
-    return { souvenirIds, isLoading, refetch };
-}
-
-/**
- * 获取单个纪念品详情
- */
-export function useSouvenirData(souvenirId: number) {
-    const { data, isLoading, error } = useReadContract({
-        address: SOUVENIR_ADDRESS,
-        abi: SOUVENIR_ABI,
-        functionName: 'getSouvenir',
-        args: [BigInt(souvenirId)],
-        query: {
-            enabled: souvenirId >= 0 && !!SOUVENIR_ADDRESS,
-        },
-    });
-
-    // 合约返回: [name, rarity, frogId, mintTime, metadataURI]
-    const souvenir = (data && Array.isArray(data)) ? {
-        name: data[0] as string,
-        rarity: Number(data[1]),
-        frogId: Number(data[2]),
-        mintTime: new Date(Number(data[3]) * 1000),
-        metadataURI: data[4] as string,
-    } : null;
-
-    return { souvenir, isLoading, error };
-}
-
-/**
- * 综合 Hook：获取青蛙完整状态
- */
-export function useFrogFullStatus(tokenId: number) {
-    const { frog, isLoading: frogLoading, refetch: refetchFrog } = useFrogData(tokenId);
-    const { canTravel, isLoading: canTravelLoading } = useCanTravel(tokenId);
-    const { travel, isLoading: travelLoading, refetch: refetchTravel } = useActiveTravel(tokenId);
-    const { journals, isLoading: journalsLoading } = useTravelJournals(tokenId);
-    const { owner, isLoading: ownerLoading } = useFrogOwner(tokenId);
-
-    const isLoading = frogLoading || canTravelLoading || travelLoading || journalsLoading || ownerLoading;
-
-    const refetch = () => {
-        refetchFrog();
-        refetchTravel();
-    };
-
-    return {
-        frog,
-        owner,
-        canTravel,
-        activeTravel: travel,
-        journals,
-        isLoading,
-        refetch,
-    };
+    return { status, isLoading };
 }

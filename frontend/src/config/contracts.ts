@@ -7,8 +7,8 @@ const getAddress = (envVar: string | undefined): `0x${string}` | undefined => {
   return envVar as `0x${string}`;
 };
 
-export const ZETAFROG_ADDRESS = getAddress(import.meta.env.VITE_ZETAFROG_NFT_ADDRESS);
-export const SOUVENIR_ADDRESS = getAddress(import.meta.env.VITE_SOUVENIR_NFT_ADDRESS);
+export const ZETAFROG_ADDRESS = getAddress(import.meta.env.VITE_ZETAFROG_ADDRESS);
+export const SOUVENIR_ADDRESS = getAddress(import.meta.env.VITE_SOUVENIR_ADDRESS);
 
 // ZetaFrogNFT ABI (与合约完全匹配)
 export const ZETAFROG_ABI = [
