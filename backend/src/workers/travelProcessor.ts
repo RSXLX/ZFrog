@@ -1,10 +1,10 @@
 // backend/src/workers/travelProcessor.ts
 
-import { PrismaClient, TravelStatus, FrogStatus, Travel, Frog } from '@prisma/client';
-import { createWalletClient, http, createPublicClient, defineChain } from 'viem';
+import { PrismaClient, TravelStatus, FrogStatus } from '@prisma/client';
+import { createWalletClient, http, createPublicClient } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { observerService } from '../services/observer.service';
-import { aiService, GeneratedJournal } from '../services/ai.service';
+import { aiService } from '../services/ai.service';
 import { ipfsService } from '../services/ipfs.service';
 import { config } from '../config';
 import { logger } from '../utils/logger';
@@ -12,399 +12,440 @@ import { ZETAFROG_ABI, SOUVENIR_ABI } from '../config/contracts';
 import type { Server } from 'socket.io';
 
 // 定义 ZetaChain Athens Testnet
-const zetachainAthens = defineChain({
-  id: 7001,
-  name: 'ZetaChain Athens Testnet',
-  nativeCurrency: { name: 'ZETA', symbol: 'ZETA', decimals: 18 },
-  rpcUrls: {
-    default: { http: [config.ZETACHAIN_RPC_URL] },
-  },
-});
+const zetachainAthens = {
+    id: 7001,
+    name: 'ZetaChain Athens Testnet',
+    nativeCurrency: {
+        name: 'ZETA',
+        symbol: 'ZETA',
+        decimals: 18
+    },
+    rpcUrls: {
+        default: { http: [config.ZETACHAIN_RPC_URL] },
+    },
+} as const;
 
 const prisma = new PrismaClient();
 
-// 🔧 修复：定义旅行数据类型
-interface TravelWithFrog extends Travel {
-  frog: Frog;
-}
-
 class TravelProcessor {
-  private walletClient: ReturnType<typeof createWalletClient> | null = null;
-  private publicClient: ReturnType<typeof createPublicClient> | null = null;
-  private account: ReturnType<typeof privateKeyToAccount> | null = null;
-  private isInitialized = false;
-  private io: Server | null = null;
-  // 🔧 修复：添加正在处理的旅行锁，防止重复处理
-  private processingTravels: Set<number> = new Set();
+    private walletClient: any;
+    private publicClient: any;
+    private account: any;
+    private isInitialized = false;
+    private io: Server | null = null;
+    private isProcessing = false;
 
-  constructor() {
-    this.initialize();
-  }
-
-  setIo(ioInstance: Server) {
-    this.io = ioInstance;
-  }
-
-  private initialize() {
-    if (!config.RELAYER_PRIVATE_KEY) {
-      logger.warn('RELAYER_PRIVATE_KEY not configured, travel processor will run in mock mode');
-      return;
+    constructor() {
+        this.initialize();
     }
 
-    try {
-      let privateKey = config.RELAYER_PRIVATE_KEY;
-      if (!privateKey.startsWith('0x')) {
-        privateKey = `0x${privateKey}`;
-      }
-
-      this.account = privateKeyToAccount(privateKey as `0x${string}`);
-
-      this.publicClient = createPublicClient({
-        chain: zetachainAthens,
-        transport: http(config.ZETACHAIN_RPC_URL),
-      });
-
-      this.walletClient = createWalletClient({
-        account: this.account,
-        chain: zetachainAthens,
-        transport: http(config.ZETACHAIN_RPC_URL),
-      });
-
-      this.isInitialized = true;
-      logger.info('Travel processor initialized successfully');
-    } catch (error) {
-      logger.error('Failed to initialize travel processor:', error);
+    setIo(ioInstance: Server) {
+        this.io = ioInstance;
     }
-  }
 
-  /**
-   * 主处理循环
-   */
-  start() {
-    logger.info('Travel processor started');
-
-    // 每 30 秒检查一次
-    setInterval(() => this.processCompletedTravels(), 30 * 1000);
-
-    // 立即执行一次
-    this.processCompletedTravels();
-  }
-
-  /**
-   * 处理已完成的旅行
-   */
-  async processCompletedTravels() {
-    try {
-      // 查找到期但未处理的旅行
-      const pendingTravels = await prisma.travel.findMany({
-        where: {
-          status: TravelStatus.Active,
-          endTime: {
-            lte: new Date(),
-          },
-        },
-        include: {
-          frog: true,
-        },
-        take: 10,
-      });
-
-      if (pendingTravels.length === 0) {
-        return;
-      }
-
-      logger.info(`Processing ${pendingTravels.length} completed travels`);
-
-      for (const travel of pendingTravels) {
-        // 🔧 修复：检查是否正在处理中
-        if (this.processingTravels.has(travel.id)) {
-          logger.info(`Travel ${travel.id} is already being processed, skipping`);
-          continue;
+    private initialize() {
+        if (!config.RELAYER_PRIVATE_KEY) {
+            logger.warn('RELAYER_PRIVATE_KEY not configured, travel processor will run in mock mode');
+            return;
         }
 
-        await this.processSingleTravel(travel as TravelWithFrog);
-      }
-    } catch (error) {
-      logger.error('Error in processCompletedTravels:', error);
-    }
-  }
-
-  /**
-   * 处理单个旅行
-   */
-  private async processSingleTravel(travel: TravelWithFrog) {
-    const { id: travelId, frog, targetWallet, startTime, endTime, chainId } = travel;
-
-    // 🔧 修复：加锁防止重复处理
-    if (this.processingTravels.has(travelId)) {
-      return;
-    }
-    this.processingTravels.add(travelId);
-
-    logger.info(`Processing travel ${travelId} for frog ${frog.tokenId}`);
-
-    try {
-      // 🔧 修复：发送处理中状态通知
-      this.emitProgress(frog.tokenId, 'observing', '正在观察钱包活动...');
-
-      // 更新状态为处理中
-      await prisma.travel.update({
-        where: { id: travelId },
-        data: { status: TravelStatus.Processing },
-      });
-
-      // 🔧 修复：使用正确的 chainId
-      const observationChainId = chainId || 1;
-      
-      // 观察钱包活动
-      const observation = await observerService.observeWallet(
-        targetWallet,
-        startTime,
-        endTime,
-        observationChainId
-      );
-
-      // 保存观察数据
-      await prisma.walletObservation.create({
-        data: {
-          travelId,
-          walletAddress: targetWallet,
-          chainId: observationChainId,
-          transactions: observation.transactions as any,
-          totalTxCount: observation.totalTxCount,
-          totalValueWei: observation.totalValueWei.toString(),
-          notableEvents: observation.notableEvents as any,
-          observedFrom: startTime,
-          observedTo: endTime,
-        },
-      });
-
-      // 🔧 修复：发送生成故事通知
-      this.emitProgress(frog.tokenId, 'generating_story', '正在生成旅行日记...');
-
-      // 生成 AI 故事
-      const durationHours = Math.ceil(
-        (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60)
-      );
-
-      const journal = await aiService.generateJournal(
-        frog.name,
-        observation,
-        durationHours
-      );
-
-      // 计算 XP: 10 XP/小时 + 50 XP/重要事件
-      const xpGained = (durationHours * 10) + (observation.notableEvents.length * 50);
-      logger.info(`Frog ${frog.tokenId} gained ${xpGained} XP`);
-
-      // 🔧 修复：发送上传通知
-      this.emitProgress(frog.tokenId, 'uploading', '正在保存到 IPFS...');
-
-      // 上传到 IPFS
-      const journalHash = await ipfsService.uploadJournal(
-        frog.name,
-        frog.tokenId,
-        journal,
-        durationHours
-      );
-
-      // 🔧 修复：发送铸造通知
-      this.emitProgress(frog.tokenId, 'minting', '正在铸造纪念品...');
-
-      // 如果配置了合约，则在链上完成旅行
-      let souvenirId = 0;
-      if (this.isInitialized && config.ZETAFROG_NFT_ADDRESS && config.SOUVENIR_NFT_ADDRESS) {
         try {
-          souvenirId = await this.mintSouvenir(frog.ownerAddress, frog.tokenId);
-          await this.completeOnChain(frog.tokenId, journalHash, souvenirId);
-          await this.addExperienceOnChain(frog.tokenId, xpGained);
+            let privateKey = config.RELAYER_PRIVATE_KEY;
+            if (!privateKey.startsWith('0x')) {
+                privateKey = `0x${privateKey}`;
+            }
+
+            this.account = privateKeyToAccount(privateKey as `0x${string}`);
+
+            this.publicClient = createPublicClient({
+                chain: zetachainAthens,
+                transport: http(config.ZETACHAIN_RPC_URL),
+            });
+
+            this.walletClient = createWalletClient({
+                account: this.account,
+                chain: zetachainAthens,
+                transport: http(config.ZETACHAIN_RPC_URL),
+            });
+
+            this.isInitialized = true;
+            logger.info(`Travel processor initialized with account: ${this.account.address}`);
+
         } catch (error) {
-          logger.error('On-chain completion failed:', error);
-          // 🔧 修复：链上失败不应该阻止数据库更新
+            logger.error('Failed to initialize travel processor:', error);
         }
-      }
-
-      // 🔧 修复：计算新等级
-      const newXp = frog.xp + xpGained;
-      const newLevel = Math.floor(newXp / 100) + 1;
-
-      // 更新数据库
-      await prisma.travel.update({
-        where: { id: travelId },
-        data: {
-          status: TravelStatus.Completed,
-          journalHash,
-          journalContent: JSON.stringify(journal),
-          observedTxCount: observation.totalTxCount,
-          observedTotalValue: observation.totalValueWei.toString(),
-          completedAt: new Date(),
-          souvenirId: souvenirId > 0 ? souvenirId : null,
-        },
-      });
-
-      // 更新青蛙状态
-      await prisma.frog.update({
-        where: { id: frog.id },
-        data: {
-          status: FrogStatus.Idle,
-          totalTravels: { increment: 1 },
-          xp: newXp,
-          level: newLevel,
-        },
-      });
-
-      // 🔧 修复：发送完整的完成通知
-      if (this.io) {
-        this.io.to(`frog:${frog.tokenId}`).emit('travel:completed', {
-          frogId: frog.tokenId,
-          travelId,
-          journalHash,
-          souvenirId,
-          journal: {
-            title: journal.title,
-            content: journal.content,
-            mood: journal.mood,
-            highlights: journal.highlights,
-          },
-          xpGained,
-          newLevel,
-          timestamp: Date.now(),
-        });
-        logger.info(`WebSocket event sent for frog ${frog.tokenId}`);
-      }
-
-      logger.info(`Travel ${travelId} completed successfully`);
-    } catch (error) {
-      logger.error(`Failed to process travel ${travelId}:`, error);
-
-      // 更新状态为失败
-      await prisma.travel.update({
-        where: { id: travelId },
-        data: { status: TravelStatus.Failed },
-      });
-
-      // 🔧 修复：恢复青蛙状态为 Idle（避免卡在 Traveling）
-      await prisma.frog.update({
-        where: { id: frog.id },
-        data: { status: FrogStatus.Idle },
-      });
-
-      // 发送失败通知
-      if (this.io) {
-        this.io.to(`frog:${frog.tokenId}`).emit('travel:failed', {
-          frogId: frog.tokenId,
-          travelId,
-          error: 'Travel processing failed',
-          timestamp: Date.now(),
-        });
-      }
-    } finally {
-      // 🔧 修复：释放锁
-      this.processingTravels.delete(travelId);
-    }
-  }
-
-  /**
-   * 🔧 新增：发送进度通知
-   */
-  private emitProgress(frogId: number, phase: string, message: string) {
-    if (this.io) {
-      this.io.to(`frog:${frogId}`).emit('travel:progress', {
-        frogId,
-        phase,
-        message,
-        timestamp: Date.now(),
-      });
-    }
-  }
-
-  /**
-   * 铸造纪念品 NFT
-   */
-  private async mintSouvenir(ownerAddress: string, frogId: number): Promise<number> {
-    if (!this.isInitialized || !this.publicClient || !this.walletClient || !config.SOUVENIR_NFT_ADDRESS) {
-      return 0;
     }
 
-    try {
-      const rarityRoll = Math.floor(Math.random() * 100);
+    /**
+     * 主处理循环
+     */
+    async start() {
+        logger.info('Travel processor started');
 
-      const { request } = await this.publicClient.simulateContract({
-        address: config.SOUVENIR_NFT_ADDRESS as `0x${string}`,
-        abi: SOUVENIR_ABI,
-        functionName: 'mintSouvenir',
-        args: [ownerAddress as `0x${string}`, BigInt(frogId), BigInt(rarityRoll)],
-        account: this.account!,
-      });
+        // 每 30 秒检查一次
+        setInterval(() => this.processCompletedTravels(), 30 * 1000);
 
-      const hash = await this.walletClient.writeContract(request);
-      await this.publicClient.waitForTransactionReceipt({ hash });
-
-      const totalSupply = await this.publicClient.readContract({
-        address: config.SOUVENIR_NFT_ADDRESS as `0x${string}`,
-        abi: SOUVENIR_ABI,
-        functionName: 'totalSupply',
-      });
-
-      return Number(totalSupply) - 1;
-    } catch (error) {
-      logger.error('Failed to mint souvenir:', error);
-      return 0;
-    }
-  }
-
-  /**
-   * 在链上完成旅行
-   */
-  private async completeOnChain(
-    frogId: number,
-    journalHash: string,
-    souvenirId: number
-  ) {
-    if (!this.isInitialized || !this.publicClient || !this.walletClient || !config.ZETAFROG_NFT_ADDRESS) {
-      return;
+        // 立即执行一次
+        this.processCompletedTravels();
     }
 
-    const { request } = await this.publicClient.simulateContract({
-      address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
-      abi: ZETAFROG_ABI,
-      functionName: 'completeTravel',
-      args: [BigInt(frogId), journalHash, BigInt(souvenirId)],
-      account: this.account!,
-    });
+    /**
+     * 处理已完成的旅行
+     */
+    async processCompletedTravels() {
+        // 防止并发处理
+        if (this.isProcessing) {
+            logger.debug('Already processing travels, skipping...');
+            return;
+        }
 
-    const hash = await this.walletClient.writeContract(request);
-    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+        this.isProcessing = true;
 
-    logger.info(`Travel completed on-chain: ${hash}`);
-    return receipt;
-  }
+        try {
+            // 查找到期但未处理的旅行
+            const pendingTravels = await prisma.travel.findMany({
+                where: {
+                    status: TravelStatus.Active,
+                    endTime: {
+                        lte: new Date(),
+                    },
+                },
+                include: {
+                    frog: true,
+                },
+                orderBy: {
+                    endTime: 'asc',
+                },
+                take: 5, // 每次最多处理 5 个
+            });
 
-  /**
-   * 添加经验值到链上
-   */
-  private async addExperienceOnChain(frogId: number, xpAmount: number) {
-    if (!this.isInitialized || !this.publicClient || !this.walletClient || !config.ZETAFROG_NFT_ADDRESS) {
-      return;
+            if (pendingTravels.length === 0) {
+                this.isProcessing = false;
+                return;
+            }
+
+            logger.info(`Processing ${pendingTravels.length} completed travels`);
+
+            for (const travel of pendingTravels) {
+                try {
+                    await this.processSingleTravel(travel);
+                } catch (error) {
+                    logger.error(`Error processing travel ${travel.id}:`, error);
+                    // 继续处理其他旅行
+                }
+            }
+
+        } catch (error) {
+            logger.error('Error in processCompletedTravels:', error);
+        } finally {
+            this.isProcessing = false;
+        }
     }
 
-    try {
-      const { request } = await this.publicClient.simulateContract({
-        address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
-        abi: ZETAFROG_ABI,
-        functionName: 'addExperience',
-        args: [BigInt(frogId), BigInt(xpAmount)],
-        account: this.account!,
-      });
+    /**
+     * 处理单个旅行
+     */
+    private async processSingleTravel(travel: any) {
+        const { id: travelId, frog, targetWallet, startTime, endTime, chainId } = travel;
+        logger.info(`Processing travel ${travelId} for frog ${frog.tokenId} (chain: ${chainId})`);
 
-      const hash = await this.walletClient.writeContract(request);
-      await this.publicClient.waitForTransactionReceipt({ hash });
+        try {
+            // 更新状态为处理中
+            await prisma.travel.update({
+                where: { id: travelId },
+                data: { status: TravelStatus.Processing },
+            });
 
-      logger.info(`Added ${xpAmount} XP to frog ${frogId} on-chain: ${hash}`);
-    } catch (error) {
-      logger.error(`Failed to add experience on-chain:`, error);
+            // 观察钱包活动
+            const observation = await observerService.observeWallet(
+                targetWallet,
+                startTime,
+                endTime,
+                chainId || 1
+            );
+
+            // 保存观察数据
+            await prisma.walletObservation.create({
+                data: {
+                    travelId,
+                    walletAddress: targetWallet,
+                    chainId: chainId || 1,
+                    transactions: observation.transactions as any,
+                    totalTxCount: observation.totalTxCount,
+                    totalValueWei: observation.totalValueWei.toString(),
+                    notableEvents: observation.notableEvents as any,
+                    observedFrom: startTime,
+                    observedTo: endTime,
+                },
+            });
+
+            // 生成 AI 故事
+            const durationHours = Math.ceil(
+                (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60)
+            );
+
+            const journal = await aiService.generateJournal(
+                frog.name,
+                observation,
+                durationHours
+            );
+
+            // 计算经验值: 10 XP 每小时 + 50 XP 每个特殊事件
+            const xpGained = Math.max(10, (durationHours * 10) + (observation.notableEvents.length * 50));
+            logger.info(`Frog ${frog.tokenId} gained ${xpGained} XP`);
+
+            // 上传到 IPFS
+            const journalHash = await ipfsService.uploadJournal(
+                frog.name,
+                frog.tokenId,
+                journal,
+                durationHours
+            );
+
+            // 如果配置了合约，则在链上完成旅行
+            let souvenirId = 0;
+
+            if (this.isInitialized && config.ZETAFROG_NFT_ADDRESS) {
+                try {
+                    // 1. 先铸造纪念品
+                    if (config.SOUVENIR_NFT_ADDRESS) {
+                        souvenirId = await this.mintSouvenir(frog.ownerAddress, frog.tokenId);
+                        logger.info(`Minted souvenir ${souvenirId} for frog ${frog.tokenId}`);
+                    }
+
+                    // 2. 在链上完成旅行
+                    await this.completeOnChain(frog.tokenId, journalHash, souvenirId);
+
+                    // 3. 添加经验值
+                    await this.addExperienceOnChain(frog.tokenId, xpGained);
+
+                } catch (error) {
+                    logger.error('On-chain completion failed:', error);
+                    // 继续更新数据库，即使链上操作失败
+                }
+            }
+
+            // 计算新等级
+            const newXp = frog.xp + xpGained;
+            const newLevel = Math.floor(newXp / 100) + 1;
+
+            // 更新数据库 - 旅行记录
+            await prisma.travel.update({
+                where: { id: travelId },
+                data: {
+                    status: TravelStatus.Completed,
+                    journalHash,
+                    journalContent: JSON.stringify(journal),
+                    observedTxCount: observation.totalTxCount,
+                    observedTotalValue: observation.totalValueWei.toString(),
+                    completedAt: new Date(),
+                    souvenirId: souvenirId > 0 ? souvenirId : null,
+                },
+            });
+
+            // 更新数据库 - 青蛙状态
+            await prisma.frog.update({
+                where: { id: frog.id },
+                data: {
+                    status: FrogStatus.Idle,
+                    totalTravels: { increment: 1 },
+                    xp: newXp,
+                    level: newLevel,
+                },
+            });
+
+            // 如果铸造了纪念品，保存到数据库
+            if (souvenirId > 0) {
+                const rarityNames = ['Common', 'Uncommon', 'Rare'];
+                const rarity = this.calculateRarity();
+
+                await prisma.souvenir.create({
+                    data: {
+                        tokenId: souvenirId,
+                        frogId: frog.id,
+                        name: this.getSouvenirName(rarity),
+                        rarity: rarity as any,
+                        mintedAt: new Date(),
+                    },
+                });
+            }
+
+            // 发送 WebSocket 通知
+            if (this.io) {
+                this.io.to(`frog:${frog.tokenId}`).emit('travel:completed', {
+                    frogId: frog.tokenId,
+                    travelId,
+                    journalHash,
+                    journal,
+                    souvenirId,
+                    xpGained,
+                    newLevel,
+                });
+                logger.info(`WebSocket event sent for frog ${frog.tokenId}`);
+            } else {
+                logger.warn('WebSocket not available, event not sent');
+            }
+
+            logger.info(`Travel ${travelId} completed successfully`);
+
+        } catch (error) {
+            logger.error(`Failed to process travel ${travelId}:`, error);
+
+            await prisma.travel.update({
+                where: { id: travelId },
+                data: { status: TravelStatus.Failed },
+            });
+
+            // 恢复青蛙状态
+            await prisma.frog.update({
+                where: { id: travel.frog.id },
+                data: { status: FrogStatus.Idle },
+            });
+        }
     }
-  }
+
+    /**
+     * 铸造纪念品 NFT
+     */
+    private async mintSouvenir(ownerAddress: string, frogId: number): Promise<number> {
+        if (!this.isInitialized || !config.SOUVENIR_NFT_ADDRESS) {
+            return 0;
+        }
+
+        try {
+            const rarityRoll = Math.floor(Math.random() * 100);
+
+            const { request } = await this.publicClient.simulateContract({
+                address: config.SOUVENIR_NFT_ADDRESS as `0x${string}`,
+                abi: SOUVENIR_ABI,
+                functionName: 'mintSouvenir',
+                args: [ownerAddress as `0x${string}`, BigInt(frogId), BigInt(rarityRoll)],
+                account: this.account,
+            });
+
+            const hash = await this.walletClient.writeContract(request);
+            logger.info(`Minting souvenir, tx: ${hash}`);
+
+            const receipt = await this.publicClient.waitForTransactionReceipt({ 
+                hash,
+                timeout: 60_000, // 60 秒超时
+            });
+
+            if (receipt.status !== 'success') {
+                throw new Error('Souvenir minting transaction failed');
+            }
+
+            // 获取最新的 tokenId
+            const totalSupply = await this.publicClient.readContract({
+                address: config.SOUVENIR_NFT_ADDRESS as `0x${string}`,
+                abi: SOUVENIR_ABI,
+                functionName: 'totalSupply',
+            });
+
+            return Number(totalSupply) - 1;
+
+        } catch (error) {
+            logger.error('Failed to mint souvenir:', error);
+            return 0;
+        }
+    }
+
+    /**
+     * 在链上完成旅行
+     */
+    private async completeOnChain(
+        frogId: number,
+        journalHash: string,
+        souvenirId: number
+    ) {
+        if (!this.isInitialized || !config.ZETAFROG_NFT_ADDRESS) {
+            return;
+        }
+
+        try {
+            const { request } = await this.publicClient.simulateContract({
+                address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+                abi: ZETAFROG_ABI,
+                functionName: 'completeTravel',
+                args: [BigInt(frogId), journalHash, BigInt(souvenirId)],
+                account: this.account,
+            });
+
+            const hash = await this.walletClient.writeContract(request);
+            logger.info(`Completing travel on-chain, tx: ${hash}`);
+
+            const receipt = await this.publicClient.waitForTransactionReceipt({ 
+                hash,
+                timeout: 60_000,
+            });
+
+            if (receipt.status !== 'success') {
+                throw new Error('Complete travel transaction failed');
+            }
+
+            logger.info(`Travel completed on-chain: ${hash}`);
+            return receipt;
+
+        } catch (error) {
+            logger.error('Failed to complete travel on-chain:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 在链上添加经验值
+     */
+    private async addExperienceOnChain(frogId: number, xpAmount: number) {
+        if (!this.isInitialized || !config.ZETAFROG_NFT_ADDRESS) {
+            return;
+        }
+
+        try {
+            const { request } = await this.publicClient.simulateContract({
+                address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+                abi: ZETAFROG_ABI,
+                functionName: 'addExperience',
+                args: [BigInt(frogId), BigInt(xpAmount)],
+                account: this.account,
+            });
+
+            const hash = await this.walletClient.writeContract(request);
+            logger.info(`Adding XP on-chain, tx: ${hash}`);
+
+            await this.publicClient.waitForTransactionReceipt({ 
+                hash,
+                timeout: 60_000,
+            });
+
+            logger.info(`Added ${xpAmount} XP to frog ${frogId} on-chain: ${hash}`);
+
+        } catch (error) {
+            logger.error('Failed to add experience on-chain:', error);
+            // 不抛出错误，因为这不是关键操作
+        }
+    }
+
+    /**
+     * 计算纪念品稀有度
+     */
+    private calculateRarity(): 'Common' | 'Uncommon' | 'Rare' {
+        const roll = Math.random() * 100;
+        if (roll < 70) return 'Common';
+        if (roll < 95) return 'Uncommon';
+        return 'Rare';
+    }
+
+    /**
+     * 获取纪念品名称
+     */
+    private getSouvenirName(rarity: string): string {
+        const names: Record<string, string> = {
+            'Common': 'Ethereum Postcard',
+            'Uncommon': 'Gas Fee Receipt',
+            'Rare': 'Blockchain Snowglobe',
+        };
+        return names[rarity] || 'Mysterious Souvenir';
+    }
 }
 
 export const travelProcessor = new TravelProcessor();
