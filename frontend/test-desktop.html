@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZetaFrog 桌面宠物测试</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/framer-motion@10/dist/framer-motion.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .frog-container {
+            width: 200px;
+            height: 200px;
+            position: relative;
+            cursor: pointer;
+        }
+        
+        .frog-sprite {
+            font-size: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            user-select: none;
+        }
+        
+        .speech-bubble {
+            position: absolute;
+            bottom: 110%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 8px 12px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            white-space: nowrap;
+            font-size: 14px;
+        }
+        
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: white;
+        }
+        
+        .particle {
+            position: absolute;
+            font-size: 24px;
+            pointer-events: none;
+            animation: particle-float 1s ease-out forwards;
+        }
+        
+        @keyframes particle-float {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(var(--x), var(--y)) scale(0.5);
+            }
+        }
+        
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            background: white;
+            padding: 12px;
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .event-panel {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            width: 300px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 16px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .event-item {
+            padding: 8px;
+            margin: 4px 0;
+            border-radius: 8px;
+            font-size: 14px;
+            border-left: 4px solid;
+        }
+        
+        .event-buy {
+            background: #f0fdf4;
+            border-color: #22c55e;
+        }
+        
+        .event-sell {
+            background: #fef2f2;
+            border-color: #ef4444;
+        }
+        
+        .event-whale {
+            background: #eff6ff;
+            border-color: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const { motion, AnimatePresence } = Motion;
+        
+        // 模拟链上事件
+        const mockEvents = [
+            { type: 'large_buy', token: 'ZETA', value: 150000, icon: '🟢', label: '大单买入' },
+            { type: 'large_sell', token: 'ETH', value: 200000, icon: '🔴', label: '大单卖出' },
+            { type: 'whale_transfer', token: 'BTC', value: 5000000, icon: '🐋', label: '鲸鱼转账' },
+        ];
+        
+        // 青蛙组件
+        function FrogPet() {
+            const [state, setState] = useState('idle');
+            const [speech, setSpeech] = useState('');
+            const [mood, setMood] = useState('😐');
+            const [energy, setEnergy] = useState(80);
+            const [clickCount, setClickCount] = useState(0);
+            const speechTimeout = useRef(null);
+            
+            // 清除对话
+            const clearSpeech = () => {
+                if (speechTimeout.current) {
+                    clearTimeout(speechTimeout.current);
+                }
+                setSpeech('');
+            };
+            
+            // 显示对话
+            const showSpeech = (text, duration = 3000) => {
+                clearSpeech();
+                setSpeech(text);
+                speechTimeout.current = setTimeout(clearSpeech, duration);
+            };
+            
+            // 创建粒子效果
+            const createParticles = (emoji, count = 5) => {
+                const container = document.querySelector('.frog-container');
+                if (!container) return;
+                
+                for (let i = 0; i < count; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.textContent = emoji;
+                    particle.style.setProperty('--x', `${(Math.random() - 0.5) * 100}px`);
+                    particle.style.setProperty('--y', `${-Math.random() * 100 - 50}px`);
+                    container.appendChild(particle);
+                    
+                    setTimeout(() => particle.remove(), 1000);
+                }
+            };
+            
+            // 处理点击
+            const handleClick = () => {
+                const newCount = clickCount + 1;
+                setClickCount(newCount);
+                
+                if (newCount > 10) {
+                    setState('angry');
+                    setMood('😠');
+                    showSpeech('别戳了！生气了！😤');
+                } else if (newCount > 5) {
+                    setState('happy');
+                    setMood('😊');
+                    showSpeech('嘿嘿，好痒！🤭');
+                    createParticles('❤️', 5);
+                } else {
+                    const reactions = [
+                        { state: 'happy', text: '你好呀！👋', mood: '😊', particles: { emoji: '❤️', count: 3 } },
+                        { state: 'jumping', text: '呱呱！🐸', mood: '🤗', particles: { emoji: '⭐', count: 4 } },
+                        { state: 'curious', text: '嗯？有什么事？🤔', mood: '🤔', particles: null },
+                    ];
+                    const reaction = reactions[Math.floor(Math.random() * reactions.length)];
+                    setState(reaction.state);
+                    setMood(reaction.mood);
+                    showSpeech(reaction.text);
+                    if (reaction.particles) {
+                        createParticles(reaction.particles.emoji, reaction.particles.count);
+                    }
+                }
+                
+                // 3秒后恢复
+                setTimeout(() => {
+                    setState('idle');
+                    setMood('😐');
+                    setClickCount(0);
+                }, 3000);
+            };
+            
+            // 处理链上事件
+            const handleChainEvent = (event) => {
+                switch (event.type) {
+                    case 'large_buy':
+                        setState('excited');
+                        setMood('🤩');
+                        showSpeech(`哇！有人买了 ${formatValue(event.value)} ${event.token}！🚀`);
+                        createParticles('⭐', 8);
+                        break;
+                    case 'large_sell':
+                        setState('scared');
+                        setMood('😱');
+                        showSpeech(`啊！大单卖出 ${formatValue(event.value)} ${event.token}！`);
+                        createParticles('💦', 3);
+                        break;
+                    case 'whale_transfer':
+                        setState('rich');
+                        setMood('🤑');
+                        showSpeech(`巨鲸出动！${formatValue(event.value)} ${event.token}！🐋`);
+                        createParticles('🪙', 10);
+                        break;
+                }
+                
+                // 5秒后恢复
+                setTimeout(() => {
+                    setState('idle');
+                    setMood('😐');
+                }, 5000);
+            };
+            
+            // 格式化金额
+            const formatValue = (value) => {
+                if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+                if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
+                return `$${value.toFixed(2)}`;
+            };
+            
+            // 获取青蛙动画
+            const getFrogAnimation = () => {
+                switch (state) {
+                    case 'jumping':
+                        return { y: [0, -30, 0], transition: { duration: 0.5 } };
+                    case 'excited':
+                        return { scale: [1, 1.2, 1], transition: { duration: 0.3 } };
+                    case 'scared':
+                        return { x: [-5, 5, -5, 5, 0], transition: { duration: 0.5 } };
+                    case 'happy':
+                        return { rotate: [0, -10, 10, 0], transition: { duration: 0.5 } };
+                    default:
+                        return { y: [0, -3, 0], transition: { duration: 2, repeat: Infinity } };
+                }
+            };
+            
+            return (
+                <motion.div 
+                    className="frog-container"
+                    onClick={handleClick}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                >
+                    <motion.div 
+                        className="frog-sprite"
+                        animate={getFrogAnimation()}
+                    >
+                        🐸
+                    </motion.div>
+                    
+                    {/* 心情显示 */}
+                    <div className="absolute top-0 right-0 text-2xl">
+                        {mood}
+                    </div>
+                    
+                    {/* 精力条 */}
+                    <div className="absolute bottom-0 left-0 right-0 mx-4 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <motion.div 
+                            className="h-full bg-green-500"
+                            animate={{ width: `${energy}%` }}
+                        />
+                    </div>
+                    
+                    {/* 对话气泡 */}
+                    <AnimatePresence>
+                        {speech && (
+                            <motion.div
+                                className="speech-bubble"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                            >
+                                {speech}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </motion.div>
+            );
+        }
+        
+        // 事件面板组件
+        function EventPanel() {
+            const [events, setEvents] = useState([]);
+            
+            // 模拟接收链上事件
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    if (Math.random() > 0.8) {
+                        const event = mockEvents[Math.floor(Math.random() * mockEvents.length)];
+                        setEvents(prev => [event, ...prev.slice(0, 9)]);
+                        
+                        // 触发青蛙反应
+                        const frogEvent = new CustomEvent('chainEvent', { detail: event });
+                        window.dispatchEvent(frogEvent);
+                    }
+                }, 3000);
+                
+                return () => clearInterval(interval);
+            }, []);
+            
+            return (
+                <div className="event-panel">
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                        ⛓️ 链上监控
+                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    </h3>
+                    <div className="space-y-2">
+                        {events.length === 0 ? (
+                            <div className="text-center py-8 text-gray-400">
+                                <div className="text-4xl mb-2">🐸</div>
+                                <p>暂无事件</p>
+                                <p className="text-xs">青蛙正在监控中...</p>
+                            </div>
+                        ) : (
+                            events.map((event, index) => (
+                                <motion.div
+                                    key={index}
+                                    className={`event-item event-${event.type.split('_')[0]}`}
+                                    initial={{ opacity: 0, y: -20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg">{event.icon}</span>
+                                        <div className="flex-1">
+                                            <div className="font-medium text-gray-800">
+                                                {event.label}
+                                            </div>
+                                            <div className="text-sm text-gray-600">
+                                                {formatValue(event.value)} {event.token}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            );
+        }
+        
+        // 控制面板组件
+        function ControlPanel() {
+            const handleFeed = () => {
+                const event = new CustomEvent('feed', { detail: { food: 'fly' } });
+                window.dispatchEvent(event);
+            };
+            
+            const handleTravel = () => {
+                const event = new CustomEvent('travel', { detail: { destination: 'forest' } });
+                window.dispatchEvent(event);
+            };
+            
+            return (
+                <div className="controls">
+                    <button
+                        onClick={handleFeed}
+                        className="px-4 py-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition-colors"
+                    >
+                        🍽️ 喂食
+                    </button>
+                    <button
+                        onClick={handleTravel}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors"
+                    >
+                        🎒 旅行
+                    </button>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors"
+                    >
+                        🔄 重置
+                    </button>
+                </div>
+            );
+        }
+        
+        // 主应用组件
+        function App() {
+            const [events, setEvents] = useState([]);
+            
+            // 监听链上事件
+            useEffect(() => {
+                const handleChainEvent = (e) => {
+                    setEvents(prev => [e.detail, ...prev.slice(0, 4)]);
+                };
+                
+                window.addEventListener('chainEvent', handleChainEvent);
+                return () => window.removeEventListener('chainEvent', handleChainEvent);
+            }, []);
+            
+            return (
+                <div className="min-h-screen bg-gradient-to-b from-sky-200 via-green-100 to-green-200 relative overflow-hidden">
+                    {/* 背景装饰 */}
+                    <div className="absolute inset-0 pointer-events-none">
+                        <div className="absolute top-10 left-10 text-6xl opacity-50">☁️</div>
+                        <div className="absolute top-20 right-20 text-4xl opacity-40">☁️</div>
+                        <div className="absolute top-5 left-1/2 text-5xl opacity-45">☁️</div>
+                        <div className="absolute top-10 right-10 text-6xl">☀️</div>
+                    </div>
+                    
+                    {/* 顶部导航 */}
+                    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-200">
+                        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <span className="text-3xl">🐸</span>
+                                <span className="font-bold text-xl text-gray-800">ZetaFrog Desktop</span>
+                            </div>
+                            <div className="text-sm text-gray-600">
+                                {new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                        </div>
+                    </nav>
+                    
+                    {/* 主要内容 */}
+                    <main className="pt-24 pb-12 px-6 relative z-10">
+                        <div className="max-w-7xl mx-auto">
+                            <div className="text-center mb-8">
+                                <h1 className="text-3xl font-bold text-gray-800 mb-2">
+                                    欢迎来到 ZetaFrog 桌面宠物世界！
+                                </h1>
+                                <p className="text-gray-600">
+                                    点击青蛙进行互动，观察链上事件，享受 Web3 养成乐趣！
+                                </p>
+                            </div>
+                            
+                            {/* 青蛙区域 */}
+                            <div className="flex justify-center items-center min-h-[60vh]">
+                                <FrogPet />
+                            </div>
+                        </div>
+                    </main>
+                    
+                    {/* 组件 */}
+                    <EventPanel />
+                    <ControlPanel />
+                </div>
+            );
+        }
+        
+        // 渲染应用
+        ReactDOM.render(<App />, document.getElementById('root'));
+        
+        // 辅助函数
+        function formatValue(value) {
+            if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+            if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
+            return `$${value.toFixed(2)}`;
+        }
+    </script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</body>
+</html>
