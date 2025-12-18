@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { useAccount } from 'wagmi';
+import { FrogState } from '../types/frogAnimation';
 import { ConnectButton } from '../components/wallet/ConnectButton';
+import { AccountCard } from '../components/wallet/AccountCard';
 import { FrogMint } from '../components/frog/FrogMint';
 import { FrogPet } from '../components/frog/FrogPet';
 import { useState, useEffect } from 'react';
@@ -34,13 +36,16 @@ export function Home() {
   }, [isConnected, address]);
   
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Hero Section */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-12"
-      >
+    <div className="max-w-6xl mx-auto px-4">
+      <div className={isConnected ? "grid lg:grid-cols-3 gap-8" : "flex flex-col items-center"}>
+        {/* 主要内容 */}
+        <div className={isConnected ? "lg:col-span-2" : "w-full max-w-4xl"}>
+          {/* Hero Section */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center mb-12"
+          >
         <h1 className="text-5xl font-bold text-green-600 mb-4">
           🐸 ZetaFrog
         </h1>
@@ -63,7 +68,7 @@ export function Home() {
         <FrogPet
           frogId={0}
           name="示例青蛙"
-          status="Idle"
+          initialState={FrogState.IDLE}
         />
       </motion.div>
       
@@ -127,46 +132,81 @@ export function Home() {
       )}
       
       {/* Features */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        className="grid md:grid-cols-3 gap-6 mt-16"
-      >
-        <FeatureCard
-          emoji="🎨"
-          title="独特 NFT"
-          description="每只 ZetaFrog 都是 ZetaChain 上独一无二的 NFT"
-        />
-        <FeatureCard
-          emoji="🔍"
-          title="钱包探索"
-          description="派你的青蛙去观察任意以太坊钱包"
-        />
-        <FeatureCard
-          emoji="📖"
-          title="AI 故事"
-          description="收获 AI 生成的旅行日记和纪念品"
-        />
-      </motion.div>
-      
-      {/* How it works */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.8 }}
-        className="mt-16 text-center"
-      >
-        <h2 className="text-2xl font-bold text-gray-800 mb-8">
-          如何玩？
-        </h2>
-        <div className="grid md:grid-cols-4 gap-4">
-          <StepCard step={1} title="连接钱包" icon="🔗" />
-          <StepCard step={2} title="铸造青蛙" icon="🐸" />
-          <StepCard step={3} title="派它旅行" icon="✈️" />
-          <StepCard step={4} title="收获故事" icon="📜" />
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="grid md:grid-cols-3 gap-6 mt-16"
+          >
+            <FeatureCard
+              emoji="🎨"
+              title="独特 NFT"
+              description="每只 ZetaFrog 都是 ZetaChain 上独一无二的 NFT"
+            />
+            <FeatureCard
+              emoji="🔍"
+              title="钱包探索"
+              description="派你的青蛙去观察任意以太坊钱包"
+            />
+            <FeatureCard
+              emoji="📖"
+              title="AI 故事"
+              description="收获 AI 生成的旅行日记和纪念品"
+            />
+          </motion.div>
+          
+          {/* How it works */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="mt-16 text-center"
+          >
+            <h2 className="text-2xl font-bold text-gray-800 mb-8">
+              如何玩？
+            </h2>
+            <div className="grid md:grid-cols-4 gap-4">
+              <StepCard step={1} title="连接钱包" icon="🔗" />
+              <StepCard step={2} title="铸造青蛙" icon="🐸" />
+              <StepCard step={3} title="派它旅行" icon="✈️" />
+              <StepCard step={4} title="收获故事" icon="📜" />
+            </div>
+          </motion.div>
         </div>
-      </motion.div>
+        
+        {/* 侧边栏 */}
+        {isConnected && (
+          <div className="lg:col-span-1">
+            <div className="sticky top-24 space-y-6">
+              {/* 账户卡片 */}
+              <AccountCard />
+              
+              {/* 快速操作 */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="bg-white rounded-2xl shadow-lg p-6"
+              >
+                <h3 className="font-bold text-gray-800 mb-4">快速操作</h3>
+                <div className="space-y-3">
+                  <Link
+                    to="/my-frogs"
+                    className="block w-full text-center py-2 px-4 bg-green-100 hover:bg-green-200 text-green-700 rounded-xl font-medium transition-colors"
+                  >
+                    我的青蛙
+                  </Link>
+                  <button
+                    onClick={() => window.open('https://athens.explorer.zetachain.com/', '_blank')}
+                    className="block w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
+                  >
+                    区块链浏览器
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

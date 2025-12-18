@@ -1,18 +1,21 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { WagmiProvider } from 'wagmi';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { wagmiConfig } from './config/wagmi';
 import { Home } from './pages/Home';
 import { MyFrogs } from './pages/MyFrogs';
 import { FrogDetail } from './pages/FrogDetail';
+import { Desktop } from './pages/Desktop';
 import { Navbar } from './components/common/Navbar';
 import { FrogPet } from './components/frog/FrogPet';
+import { useWalletConnect } from './hooks/useWalletConnect';
 import { useEffect, useState } from 'react';
-
-const queryClient = new QueryClient();
 
 // Helper to check if running in Tauri
 const isTauri = () => !!(window as any).__TAURI_INTERNALS__;
+
+// 钱包连接初始化组件
+function WalletInitializer() {
+  useWalletConnect();
+  return null;
+}
 
 export function App() {
   const [isFrogWindow, setIsFrogWindow] = useState(false);
@@ -44,36 +47,35 @@ export function App() {
 
   if (isFrogWindow) {
     return (
-      <WagmiProvider config={wagmiConfig}>
-        <QueryClientProvider client={queryClient}>
-             <FrogPet />
-        </QueryClientProvider>
-      </WagmiProvider>
+      <>
+        <WalletInitializer />
+        <FrogPet frogId={0} name="Desktop Frog" />
+      </>
     );
   }
 
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50">
-            <Navbar />
-            <main className="container mx-auto px-4 py-8">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/my-frogs" element={<MyFrogs />} />
-                <Route path="/frog/:id" element={<FrogDetail />} />
-              </Routes>
-            </main>
-            
-            {/* Footer */}
-            <footer className="py-8 text-center text-gray-500 text-sm">
-              <p>🐸 ZetaFrog - Hop Across Chains, Collect Stories</p>
-              <p className="mt-1">Built with ❤️ on ZetaChain</p>
-            </footer>
-          </div>
-        </BrowserRouter>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <>
+      <WalletInitializer />
+      <BrowserRouter>
+        <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50">
+          <Navbar />
+          <main className="container mx-auto px-4 py-8">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/my-frogs" element={<MyFrogs />} />
+              <Route path="/frog/:id" element={<FrogDetail />} />
+              <Route path="/desktop" element={<Desktop />} />
+            </Routes>
+          </main>
+          
+          {/* Footer */}
+          <footer className="py-8 text-center text-gray-500 text-sm">
+            <p>🐸 ZetaFrog - Hop Across Chains, Collect Stories</p>
+            <p className="mt-1">Built with ❤️ on ZetaChain</p>
+          </footer>
+        </div>
+      </BrowserRouter>
+    </>
   );
 }
