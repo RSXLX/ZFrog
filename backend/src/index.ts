@@ -23,7 +23,7 @@ const io = initializeWebSocket(httpServer);
 // Middleware
 app.use(helmet());
 app.use(cors({ 
-  origin: config.FRONTEND_URL,
+  origin: [config.FRONTEND_URL, 'http://localhost:5174'],
   credentials: true 
 }));
 app.use(express.json());
