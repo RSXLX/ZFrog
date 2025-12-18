@@ -200,11 +200,12 @@ export const TRAVEL_DURATIONS = [
 ] as const;
 
 // 支持的链
+// 支持的链 (测试网)
 export const SUPPORTED_CHAINS = [
-  { id: 1, name: 'Ethereum', symbol: 'ETH', icon: '⟠' },
-  { id: 137, name: 'Polygon', symbol: 'MATIC', icon: '⬡' },
-  { id: 56, name: 'BSC', symbol: 'BNB', icon: '◆' },
-  { id: 7001, name: 'ZetaChain', symbol: 'ZETA', icon: '⚡' },
+    { id: 11155111, name: 'Sepolia', symbol: 'ETH', icon: '⟠', testnet: true },
+    { id: 80002, name: 'Polygon Amoy', symbol: 'MATIC', icon: '⬡', testnet: true },
+    { id: 97, name: 'BSC Testnet', symbol: 'tBNB', icon: '◆', testnet: true },
+    { id: 7001, name: 'ZetaChain Athens', symbol: 'ZETA', icon: '⚡', testnet: true },
 ] as const;
 
 // 稀有度配置
