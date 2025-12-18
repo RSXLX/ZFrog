@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WalletConnect 测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 0;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .account-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐸 ZetaFrog WalletConnect 测试</h1>
+        
+        <div id="status" class="status info">
+            正在初始化...
+        </div>
+        
+        <div class="wallet-section">
+            <button id="connectBtn" onclick="connectWallet()">
+                连接钱包
+            </button>
+            <button id="disconnectBtn" onclick="disconnectWallet()" style="display: none;">
+                断开连接
+            </button>
+        </div>
+        
+        <div id="accountInfo" class="account-info" style="display: none;">
+            <h3>账户信息</h3>
+            <p><strong>地址:</strong> <code id="address"></code></p>
+            <p><strong>链ID:</strong> <code id="chainId"></code></p>
+            <p><strong>余额:</strong> <code id="balance"></code></p>
+        </div>
+        
+        <div class="test-section">
+            <h3>功能测试</h3>
+            <button onclick="testSwitchChain()" id="switchChainBtn" disabled>
+                切换到 ZetaChain
+            </button>
+            <button onclick="testTransaction()" id="transactionBtn" disabled>
+                测试交易
+            </button>
+        </div>
+        
+        <div id="logs">
+            <h3>日志</h3>
+            <div id="logContent" style="background: #f8f9fa; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto;">
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        let account = null;
+        let provider = null;
+        
+        function log(message) {
+            const logContent = document.getElementById('logContent');
+            const time = new Date().toLocaleTimeString();
+            logContent.innerHTML += `[${time}] ${message}\n`;
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        window.connectWallet = async function() {
+            try {
+                updateStatus('正在连接钱包...', 'info');
+                log('开始连接钱包...');
+                
+                // 检查是否有 MetaMask
+                if (typeof window.ethereum !== 'undefined') {
+                    provider = window.ethereum;
+                    
+                    // 请求连接
+                    const accounts = await provider.request({ 
+                        method: 'eth_requestAccounts' 
+                    });
+                    
+                    account = accounts[0];
+                    
+                    // 监听账户变化
+                    provider.on('accountsChanged', (accounts) => {
+                        if (accounts.length === 0) {
+                            disconnectWallet();
+                        } else {
+                            account = accounts[0];
+                            updateAccountInfo();
+                        }
+                    });
+                    
+                    // 监听链变化
+                    provider.on('chainChanged', (chainId) => {
+                        log(`链已切换到: ${chainId}`);
+                        updateAccountInfo();
+                    });
+                    
+                    updateAccountInfo();
+                    updateStatus('钱包连接成功！', 'success');
+                    log(`钱包连接成功: ${account}`);
+                    
+                } else {
+                    throw new Error('未检测到钱包插件（如 MetaMask）');
+                }
+                
+            } catch (error) {
+                updateStatus(`连接失败: ${error.message}`, 'error');
+                log(`连接错误: ${error.message}`);
+            }
+        };
+        
+        window.disconnectWallet = function() {
+            account = null;
+            provider = null;
+            
+            document.getElementById('connectBtn').style.display = 'block';
+            document.getElementById('disconnectBtn').style.display = 'none';
+            document.getElementById('accountInfo').style.display = 'none';
+            document.getElementById('switchChainBtn').disabled = true;
+            document.getElementById('transactionBtn').disabled = true;
+            
+            updateStatus('钱包已断开连接', 'info');
+            log('钱包已断开连接');
+        };
+        
+        function updateAccountInfo() {
+            if (!account || !provider) return;
+            
+            document.getElementById('connectBtn').style.display = 'none';
+            document.getElementById('disconnectBtn').style.display = 'block';
+            document.getElementById('accountInfo').style.display = 'block';
+            document.getElementById('switchChainBtn').disabled = false;
+            document.getElementById('transactionBtn').disabled = false;
+            
+            document.getElementById('address').textContent = account;
+            
+            // 获取链ID
+            provider.request({ method: 'eth_chainId' }).then(chainId => {
+                document.getElementById('chainId').textContent = chainId;
+            });
+            
+            // 获取余额
+            provider.request({ 
+                method: 'eth_getBalance',
+                params: [account, 'latest']
+            }).then(balance => {
+                const ethBalance = parseInt(balance, 16) / Math.pow(10, 18);
+                document.getElementById('balance').textContent = `${ethBalance.toFixed(4)} ETH`;
+            });
+        }
+        
+        window.testSwitchChain = async function() {
+            try {
+                updateStatus('正在切换到 ZetaChain...', 'info');
+                log('请求切换到 ZetaChain (ID: 7001)');
+                
+                await provider.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x1B59' }], // 7001 in hex
+                });
+                
+                updateStatus('已切换到 ZetaChain！', 'success');
+                log('成功切换到 ZetaChain');
+                
+            } catch (error) {
+                if (error.code === 4902) {
+                    // 链不存在，尝试添加
+                    log('ZetaChain 不存在，尝试添加...');
+                    try {
+                        await provider.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: '0x1B59',
+                                chainName: 'ZetaChain Athens Testnet',
+                                nativeCurrency: {
+                                    name: 'ZETA',
+                                    symbol: 'ZETA',
+                                    decimals: 18,
+                                },
+                                rpcUrls: ['https://zetachain-athens-evm.blockpi.network/v1/rpc/public'],
+                                blockExplorerUrls: ['https://athens.explorer.zetachain.com'],
+                            }],
+                        });
+                        
+                        updateStatus('已添加并切换到 ZetaChain！', 'success');
+                        log('成功添加并切换到 ZetaChain');
+                        
+                    } catch (addError) {
+                        updateStatus(`添加链失败: ${addError.message}`, 'error');
+                        log(`添加链错误: ${addError.message}`);
+                    }
+                } else {
+                    updateStatus(`切换链失败: ${error.message}`, 'error');
+                    log(`切换链错误: ${error.message}`);
+                }
+            }
+        };
+        
+        window.testTransaction = async function() {
+            try {
+                updateStatus('正在发送测试交易...', 'info');
+                log('开始发送测试交易...');
+                
+                const txParams = {
+                    to: account, // 发送给自己
+                    value: '0x0', // 0 ETH
+                    gas: '0x5208', // 21000 gas
+                };
+                
+                const txHash = await provider.request({
+                    method: 'eth_sendTransaction',
+                    params: [txParams],
+                });
+                
+                updateStatus(`交易已发送: ${txHash}`, 'success');
+                log(`交易哈希: ${txHash}`);
+                
+            } catch (error) {
+                updateStatus(`交易失败: ${error.message}`, 'error');
+                log(`交易错误: ${error.message}`);
+            }
+        };
+        
+        // 初始化
+        log('页面加载完成');
+        updateStatus('准备就绪，请点击"连接钱包"按钮开始测试', 'info');
+        
+        // 检查是否已有连接
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.request({ method: 'eth_accounts' }).then(accounts => {
+                if (accounts.length > 0) {
+                    log(`检测到已有连接: ${accounts[0]}`);
+                    account = accounts[0];
+                    provider = window.ethereum;
+                    updateAccountInfo();
+                    updateStatus('检测到已有钱包连接', 'success');
+                }
+            });
+        } else {
+            log('未检测到钱包插件');
+            updateStatus('未检测到钱包插件，请安装 MetaMask', 'error');
+        }
+    </script>
+</body>
+</html>
