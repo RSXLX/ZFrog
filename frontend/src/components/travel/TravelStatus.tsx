@@ -1,6 +1,7 @@
 // frontend/src/components/travel/TravelStatus.tsx
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { LANDMARKS } from '../../config/landmarks';
 
 interface Travel {
     id: number;
@@ -95,9 +96,18 @@ export function TravelStatus({ travel, frogName }: TravelStatusProps) {
             <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="bg-white/50 rounded-lg p-3">
                     <p className="text-gray-500">目的地</p>
-                    <p className="font-mono font-medium text-gray-800">
-                        {shortenAddress(travel.targetWallet)}
-                    </p>
+                    <div className="font-mono font-medium text-gray-800">
+                        {(() => {
+                            // 尝试在所有链的推荐地点中查找名称
+                            for (const chainId in LANDMARKS) {
+                                const found = LANDMARKS[chainId].find(
+                                    l => l.address.toLowerCase() === travel.targetWallet.toLowerCase()
+                                );
+                                if (found) return found.name;
+                            }
+                            return shortenAddress(travel.targetWallet);
+                        })()}
+                    </div>
                 </div>
                 <div className="bg-white/50 rounded-lg p-3">
                     <p className="text-gray-500">剩余时间</p>

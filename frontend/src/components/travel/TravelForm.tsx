@@ -11,6 +11,8 @@ interface TravelFormProps {
     onSuccess?: () => void;
 }
 
+import { LANDMARKS } from '../../config/landmarks';
+
 const DURATION_OPTIONS = [
     { label: '1 分钟', value: 60, description: '闪电测试' },
     { label: '30 分钟', value: 1800, description: '短暂冒险' },
@@ -42,6 +44,23 @@ export function TravelForm({ frogId, frogName, onSuccess }: TravelFormProps) {
     const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
         hash,
     });
+
+    const handleRandomExplore = () => {
+        const chainLandmarks = LANDMARKS[chainId];
+        if (!chainLandmarks || chainLandmarks.length === 0) {
+            // Fallback for chains without curated landmarks
+            // Using a generic dummy address or simply alerting
+            setError('此链暂无推荐地点，请手动输入');
+            return;
+        }
+
+        const randomIndex = Math.floor(Math.random() * chainLandmarks.length);
+        const landmark = chainLandmarks[randomIndex];
+        setTargetWallet(landmark.address);
+        
+        // You might want to show a toast or some feedback, here we just clear error
+        setError(`正在前往: ${landmark.name}`);
+    };
 
     const handleStartTravel = () => {
         setError('');
@@ -119,11 +138,20 @@ export function TravelForm({ frogId, frogName, onSuccess }: TravelFormProps) {
                 </div>
             </div>
 
-            {/* 目标钱包输入 */}
+    {/* 目标钱包输入 */}
             <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                    目标钱包地址
-                </label>
+                <div className="flex justify-between items-center">
+                    <label className="block text-sm font-medium text-gray-700">
+                        目标钱包地址
+                    </label>
+                    <button
+                        onClick={handleRandomExplore}
+                        className="text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1"
+                    >
+                        <span>🎲</span>
+                        <span>主要地标</span>
+                    </button>
+                </div>
                 <input
                     type="text"
                     value={targetWallet}
