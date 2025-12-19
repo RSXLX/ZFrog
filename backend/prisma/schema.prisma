@@ -21,6 +21,11 @@ model Frog {
   updatedAt    DateTime   @updatedAt
   souvenirs    Souvenir[]
   travels      Travel[]
+  
+  // 好友关系
+  sentRequests     Friendship[]     @relation("FriendshipRequester")
+  receivedRequests Friendship[]     @relation("FriendshipAddressee")
+  interactions     FriendInteraction[] @relation("InteractionActor")
 
   @@index([ownerAddress])
 }
@@ -101,4 +106,98 @@ enum Rarity {
   Common
   Uncommon
   Rare
+  Epic
+  Legendary
+}
+
+enum ImageGenerationStatus {
+  PENDING
+  GENERATING
+  PROCESSING
+  UPLOADING
+  COMPLETED
+  FAILED
+}
+
+model SouvenirImage {
+  id             String                @id @default(uuid())
+  odosId         String
+  travelId       String
+  souvenirId     String
+  souvenirType   String
+  souvenirName   String
+  rarity         String
+  chainId        Int?
+  prompt         String
+  negativePrompt String?
+  actualPrompt   String?
+  imageUrl       String?
+  ipfsHash       String?
+  ipfsUrl        String?
+  gatewayUrl     String?
+  fileSize       Int?
+  seed           Int
+  stylePreset    String?
+  status         ImageGenerationStatus @default(PENDING)
+  retryCount     Int                   @default(0)
+  errorMessage   String?
+  generatedAt    DateTime?
+  uploadedAt     DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([odosId])
+  @@index([souvenirId])
+  @@index([status])
+}
+
+
+model Friendship {
+  id         Int            @id @default(autoincrement())
+  requesterId Int
+  addresseeId Int
+  status     FriendshipStatus @default(Pending)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  
+  requester  Frog           @relation("FriendshipRequester", fields: [requesterId], references: [id])
+  addressee  Frog           @relation("FriendshipAddressee", fields: [addresseeId], references: [id])
+  
+  // 好友间的互动记录
+  interactions FriendInteraction[]
+  
+  @@unique([requesterId, addresseeId])
+  @@index([status])
+}
+
+model FriendInteraction {
+  id           Int               @id @default(autoincrement())
+  friendshipId Int
+  actorId      Int               // 发起互动的青蛙ID
+  type         InteractionType
+  message      String?
+  metadata     Json?             // 额外的互动数据，如礼物信息等
+  createdAt    DateTime          @default(now())
+  
+  friendship   Friendship        @relation(fields: [friendshipId], references: [id])
+  actor        Frog              @relation("InteractionActor", fields: [actorId], references: [id])
+  
+  @@index([friendshipId])
+  @@index([actorId])
+}
+
+enum FriendshipStatus {
+  Pending     // 待确认
+  Accepted    // 已接受
+  Declined    // 已拒绝
+  Blocked     // 已拉黑
+}
+
+enum InteractionType {
+  Visit       // 拜访
+  Feed        // 喂食
+  Play        // 玩耍
+  Gift        // 送礼
+  Message     // 留言
+  Travel      // 一起旅行
 }

@@ -13,6 +13,8 @@ import { initializeWebSocket, setIO } from './websocket';
 import frogRoutes from './api/routes/frog.routes';
 import travelRoutes from './api/routes/travel.routes';
 import healthRoutes from './api/routes/health.routes';
+import friendsRoutes from './api/routes/friends.routes';
+import nftImageRoutes from './api/routes/nft-image.routes';
 
 const app = express();
 const httpServer = createServer(app);
@@ -37,7 +39,9 @@ app.use((req, res, next) => {
 // Routes
 app.use('/api/frogs', frogRoutes);
 app.use('/api/travels', travelRoutes);
+app.use('/api/friends', friendsRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/nft-image', nftImageRoutes);
 
 // Root route
 app.get('/', (req, res) => {

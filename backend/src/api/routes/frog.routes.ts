@@ -1,11 +1,10 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../database';
 import { createPublicClient, http } from 'viem';
 import { config } from '../../config';
 import { ZETAFROG_ABI } from '../../config/contracts';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // 定义 ZetaChain
 const zetachainAthens = {
@@ -31,66 +30,75 @@ type FrogData = readonly [
 ];
 
 /**
- * GET /api/frogs/:tokenId
- * 获取青蛙详情
+ * GET /api/frogs/search
+ * 搜索青蛙（支持按地址、名称或tokenId搜索）
  */
-router.get('/:tokenId', async (req, res) => {
+router.get('/search', async (req, res) => {
     try {
-        const tokenId = parseInt(req.params.tokenId);
+        const { query, limit = 10 } = req.query;
 
-        // 从数据库获取
-        let frog = await prisma.frog.findUnique({
-            where: { tokenId },
-            include: {
-                travels: {
-                    orderBy: { createdAt: 'desc' },
-                    take: 10,
+        if (!query || typeof query !== 'string') {
+            return res.status(400).json({ error: 'Search query is required' });
+        }
+
+        const searchTerm = query.trim();
+        const maxLimit = Math.min(parseInt(limit as string), 50);
+
+        let frogs: any[] = [];
+
+        // 如果是以0x开头，按地址搜索
+        if (searchTerm.startsWith('0x')) {
+            frogs = await prisma.frog.findMany({
+                where: {
+                    ownerAddress: searchTerm.toLowerCase()
                 },
-                souvenirs: true,
-            },
-        });
-
-        // 如果数据库没有且合约已配置，尝试从链上获取
-        if (!frog && config.ZETAFROG_NFT_ADDRESS) {
-            try {
-                const onChainData = await publicClient.readContract({
-                    address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
-                    abi: ZETAFROG_ABI,
-                    functionName: 'getFrog',
-                    args: [BigInt(tokenId)],
-                }) as unknown as FrogData;
-
-                if (onChainData && onChainData[0]) {
-                    // 解构 6 元素元组: [name, birthday, totalTravels, status, experience, level]
-                    const [name, birthday, totalTravels, status] = onChainData;
-                    
-                    frog = await prisma.frog.create({
-                        data: {
-                            tokenId,
-                            name: name,
-                            ownerAddress: '',
-                            birthday: new Date(Number(birthday) * 1000),
-                            totalTravels: Number(totalTravels),
-                            status: ['Idle', 'Traveling', 'Returning'][status] as any,
-                        },
-                        include: {
-                            travels: true,
-                            souvenirs: true,
-                        },
-                    });
+                include: {
+                    travels: {
+                        orderBy: { createdAt: 'desc' },
+                        take: 1
+                    }
+                },
+                take: maxLimit
+            });
+        } 
+        // 如果是纯数字，按tokenId搜索
+        else if (/^\d+$/.test(searchTerm)) {
+            const tokenId = parseInt(searchTerm);
+            const frog = await prisma.frog.findUnique({
+                where: { tokenId },
+                include: {
+                    travels: {
+                        orderBy: { createdAt: 'desc' },
+                        take: 1
+                    }
                 }
-            } catch (error) {
-                console.error('Error fetching from chain:', error);
+            });
+            if (frog) {
+                frogs = [frog];
             }
         }
-
-        if (!frog) {
-            return res.status(404).json({ error: 'Frog not found' });
+        // 否则按名称模糊搜索
+        else {
+            frogs = await prisma.frog.findMany({
+                where: {
+                    name: {
+                        contains: searchTerm,
+                        mode: 'insensitive'
+                    }
+                },
+                include: {
+                    travels: {
+                        orderBy: { createdAt: 'desc' },
+                        take: 1
+                    }
+                },
+                take: maxLimit
+            });
         }
 
-        res.json(frog);
+        res.json(frogs);
     } catch (error) {
-        console.error('Error fetching frog:', error);
+        console.error('Error searching frogs:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -120,6 +128,161 @@ router.get('/owner/:address', async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
+/**
+ * GET /api/frogs/:tokenId
+ * 获取青蛙详情
+ */
+router.get('/:tokenId', async (req, res) => {
+    try {
+        const tokenId = parseInt(req.params.tokenId);
+
+        // 如果 tokenId 不是数字，直接返回 404
+        if (isNaN(tokenId)) {
+            return res.status(404).json({ error: 'Invalid tokenId' });
+        }
+
+        // 从数据库获取
+        let frog = await prisma.frog.findUnique({
+            where: { tokenId },
+            include: {
+                travels: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 10,
+                },
+                souvenirs: true,
+            },
+        });
+
+        // 如果数据库没有且合约已配置，尝试从链上获取
+        if (!frog && config.ZETAFROG_NFT_ADDRESS) {
+            try {
+                const onChainData = await publicClient.readContract({
+                    address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+                    abi: ZETAFROG_ABI,
+                    functionName: 'getFrog',
+                    args: [BigInt(tokenId)],
+                }) as unknown as FrogData;
+
+                if (onChainData && onChainData[0]) {
+                    // 获取所有者
+                    const owner = await publicClient.readContract({
+                        address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+                        abi: ZETAFROG_ABI,
+                        functionName: 'ownerOf',
+                        args: [BigInt(tokenId)],
+                    }) as string;
+
+                    // 解构 6 元素元组
+                    const [name, birthday, totalTravels, status] = onChainData;
+                    
+                    const statusIndex = Number(status);
+                    const statusEnum = ['Idle', 'Traveling', 'Returning'][statusIndex] || 'Idle';
+
+                    try {
+                        frog = await prisma.frog.create({
+                            data: {
+                                tokenId,
+                                name: name,
+                                ownerAddress: (owner as string).toLowerCase(),
+                                birthday: new Date(Number(birthday) * 1000),
+                                totalTravels: Number(totalTravels),
+                                status: statusEnum as any,
+                            },
+                            include: {
+                                travels: true,
+                                souvenirs: true,
+                            },
+                        });
+                        console.log(`Synced frog ${tokenId} from chain`);
+                    } catch (dbError) {
+                        // 如果并发导致已存在，再次尝试查询
+                        console.log(`Failed to create frog ${tokenId}, trying to fetch again:`, dbError);
+                        frog = await prisma.frog.findUnique({
+                            where: { tokenId },
+                            include: {
+                                travels: true,
+                                souvenirs: true,
+                            },
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching from chain:', error);
+            }
+        }
+
+        if (!frog) {
+            return res.status(404).json({ error: 'Frog not found' });
+        }
+
+        // 解析嵌套的旅行日记内容
+        const travelsWithJournal = frog.travels.map(travel => {
+            let journal = null;
+            try {
+                if (travel.journalContent) {
+                    journal = JSON.parse(travel.journalContent);
+                }
+            } catch (e) {
+                journal = { 
+                    title: '旅行回顾',
+                    content: travel.journalContent,
+                    mood: 'happy',
+                    highlights: []
+                };
+            }
+            return {
+                ...travel,
+                journal
+            };
+        });
+
+        // 社交关系判定
+        let friendshipStatus = 'None';
+        let friendshipId = undefined;
+        const viewerAddress = req.query.viewerAddress as string;
+
+        if (viewerAddress && viewerAddress.toLowerCase() !== frog.ownerAddress.toLowerCase()) {
+            // 查找访客拥有的青蛙与当前青蛙之间是否有好友关系
+            const friendship = await prisma.friendship.findFirst({
+                where: {
+                    OR: [
+                        {
+                            requester: { ownerAddress: viewerAddress.toLowerCase() },
+                            addresseeId: frog.id
+                        },
+                        {
+                            addressee: { ownerAddress: viewerAddress.toLowerCase() },
+                            requesterId: frog.id
+                        }
+                    ]
+                },
+                orderBy: { updatedAt: 'desc' },
+                select: {
+                  id: true,
+                  status: true
+                }
+            });
+
+            if (friendship) {
+                friendshipStatus = friendship.status;
+                friendshipId = friendship.id;
+            }
+        }
+
+        res.json({
+            ...frog,
+            travels: travelsWithJournal,
+            friendshipStatus,
+            friendshipId
+        });
+    } catch (error) {
+        console.error('Error fetching frog:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// 路由已移动到上方以处理匹配顺序问题
 
 /**
  * POST /api/frogs/sync

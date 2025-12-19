@@ -2,12 +2,13 @@
 
 import { createPublicClient, http, parseAbiItem } from 'viem';
 import { defineChain } from 'viem';
-import { PrismaClient, FrogStatus } from '@prisma/client';
+import { prisma } from '../database';
+import { FrogStatus } from '@prisma/client';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { ZETAFROG_ABI } from '../config/contracts';
 
-const prisma = new PrismaClient();
+
 
 const zetachainAthens = defineChain({
     id: 7001,
@@ -282,6 +283,8 @@ class EventListener {
                     endTime: new Date(Number(endTime) * 1000),
                     status: 'Active',
                     chainId: Number(targetChainId),
+                    observedTxCount: 0,
+                    observedTotalValue: "0",
                 },
             });
 
@@ -516,6 +519,7 @@ class EventListener {
                         endTime: new Date(endTime * 1000),
                         chainId: targetChainId,
                         status: completed ? 'Completed' : 'Active',
+                        completedAt: completed ? new Date() : null,
                     },
                 });
                 logger.info(`Created travel record for frog ${tokenId}`);

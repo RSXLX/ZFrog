@@ -1,6 +1,7 @@
 // backend/src/workers/travelProcessor.ts
 
-import { PrismaClient, TravelStatus, FrogStatus } from '@prisma/client';
+import { prisma } from '../database';
+import { TravelStatus, FrogStatus } from '@prisma/client';
 import { createWalletClient, http, createPublicClient } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { observerService } from '../services/observer.service';
@@ -25,7 +26,7 @@ const zetachainAthens = {
     },
 } as const;
 
-const prisma = new PrismaClient();
+
 
 class TravelProcessor {
     private walletClient: any;
@@ -194,6 +195,10 @@ class TravelProcessor {
             const xpGained = Math.max(10, (durationHours * 10) + (observation.notableEvents.length * 50));
             logger.info(`Frog ${frog.tokenId} gained ${xpGained} XP`);
 
+            // 计算新等级
+            const newXp = frog.xp + xpGained;
+            const newLevel = Math.floor(newXp / 100) + 1;
+
             // 上传到 IPFS
             const journalHash = await ipfsService.uploadJournal(
                 frog.name,
@@ -204,13 +209,21 @@ class TravelProcessor {
 
             // 如果配置了合约，则在链上完成旅行
             let souvenirId = 0;
+            let finalRarity: 'Common' | 'Uncommon' | 'Rare' = 'Common';
 
             if (this.isInitialized && config.ZETAFROG_NFT_ADDRESS) {
                 try {
                     // 1. 先铸造纪念品
                     if (config.SOUVENIR_NFT_ADDRESS) {
-                        souvenirId = await this.mintSouvenir(frog.ownerAddress, frog.tokenId);
-                        logger.info(`Minted souvenir ${souvenirId} for frog ${frog.tokenId}`);
+                        const roll = Math.random() * 100;
+                        if (roll < 70) finalRarity = 'Common';
+                        else if (roll < 95) finalRarity = 'Uncommon';
+                        else finalRarity = 'Rare';
+
+                        const rarityRoll = finalRarity === 'Common' ? 50 : (finalRarity === 'Uncommon' ? 80 : 98);
+                        
+                        souvenirId = await this.mintSouvenir(frog.ownerAddress, frog.tokenId, rarityRoll);
+                        logger.info(`Minted ${finalRarity} souvenir ${souvenirId} for frog ${frog.tokenId}`);
                     }
 
                     // 2. 在链上完成旅行
@@ -223,24 +236,82 @@ class TravelProcessor {
                     logger.error('On-chain completion failed:', error);
                     // 继续更新数据库，即使链上操作失败
                 }
+            } else {
+                // 如果没有合约配置，模拟计算一个稀有度用于数据库
+                const roll = Math.random() * 100;
+                if (roll < 70) finalRarity = 'Common';
+                else if (roll < 95) finalRarity = 'Uncommon';
+                else finalRarity = 'Rare';
             }
 
-            // 计算新等级
-            const newXp = frog.xp + xpGained;
-            const newLevel = Math.floor(newXp / 100) + 1;
+            // 调试日志：检查即将保存的数据
+            logger.info(`[DEBUG] 准备更新旅行记录 ${travelId}:`);
+            logger.info(`[DEBUG] journalHash: ${journalHash}`);
+            logger.info(`[DEBUG] journal type: ${typeof journal}, is null: ${journal === null}, is undefined: ${journal === undefined}`);
+            if (journal) {
+                logger.info(`[DEBUG] journal content preview: ${JSON.stringify(journal).substring(0, 100)}...`);
+            }
+            logger.info(`[DEBUG] observation.totalTxCount: ${observation.totalTxCount}`);
+            logger.info(`[DEBUG] observation.totalValueWei: ${observation.totalValueWei}`);
+
+            // 确保 journal 不为空
+            let journalContent = null;
+            if (journal && typeof journal === 'object') {
+                try {
+                    journalContent = JSON.stringify(journal);
+                } catch (error) {
+                    logger.error('Failed to serialize journal:', error);
+                    journalContent = JSON.stringify({
+                        title: `${frog.name}的旅行日记`,
+                        content: '呱！这次旅行真有趣！',
+                        mood: 'happy',
+                        highlights: []
+                    });
+                }
+            } else {
+                logger.warn(`Journal is not an object: ${typeof journal}, value: ${journal}`);
+                journalContent = journal ? String(journal) : null;
+            }
+
+            // 如果铸造了纪念品，先保存到数据库以获取自增 ID
+            let dbSouvenirId: number | null = null;
+            if (souvenirId && souvenirId > 0) {
+                try {
+                    const dbSouvenir = await prisma.souvenir.create({
+                        data: {
+                            tokenId: souvenirId,
+                            frogId: frog.id,
+                            name: this.getSouvenirName(finalRarity),
+                            rarity: finalRarity as any,
+                            mintedAt: new Date(),
+                        },
+                    });
+                    dbSouvenirId = dbSouvenir.id;
+                    logger.info(`Saved souvenir ${souvenirId} to database with ID ${dbSouvenirId}`);
+                } catch (error) {
+                    logger.error(`Failed to save souvenir ${souvenirId} to database:`, error);
+                    // 继续更新旅行记录，即使纪念品保存失败
+                }
+            }
 
             // 更新数据库 - 旅行记录
+            // 只有当dbSouvenirId有值时才设置souvenirId字段
+            const updateData: any = {
+                status: TravelStatus.Completed,
+                journalHash,
+                journalContent,
+                observedTxCount: observation.totalTxCount,
+                observedTotalValue: observation.totalValueWei.toString(),
+                completedAt: new Date(),
+            };
+            
+            if (dbSouvenirId !== null) {
+                updateData.souvenirId = dbSouvenirId;
+            }
+            
             await prisma.travel.update({
                 where: { id: travelId },
-                data: {
-                    status: TravelStatus.Completed,
-                    journalHash,
-                    journalContent: JSON.stringify(journal),
-                    observedTxCount: observation.totalTxCount,
-                    observedTotalValue: observation.totalValueWei.toString(),
-                    completedAt: new Date(),
-                    souvenirId: souvenirId > 0 ? souvenirId : null,
-                },
+                data: updateData,
             });
 
             // 更新数据库 - 青蛙状态
@@ -253,22 +324,6 @@ class TravelProcessor {
                     level: newLevel,
                 },
             });
-
-            // 如果铸造了纪念品，保存到数据库
-            if (souvenirId > 0) {
-                const rarityNames = ['Common', 'Uncommon', 'Rare'];
-                const rarity = this.calculateRarity();
-
-                await prisma.souvenir.create({
-                    data: {
-                        tokenId: souvenirId,
-                        frogId: frog.id,
-                        name: this.getSouvenirName(rarity),
-                        rarity: rarity as any,
-                        mintedAt: new Date(),
-                    },
-                });
-            }
 
             // 发送 WebSocket 通知
             if (this.io) {
@@ -307,13 +362,13 @@ class TravelProcessor {
     /**
      * 铸造纪念品 NFT
      */
-    private async mintSouvenir(ownerAddress: string, frogId: number): Promise<number> {
+    private async mintSouvenir(ownerAddress: string, frogId: number, rarityRoll: number): Promise<number> {
         if (!this.isInitialized || !config.SOUVENIR_NFT_ADDRESS) {
             return 0;
         }
 
         try {
-            const rarityRoll = Math.floor(Math.random() * 100);
+            // 使用传入的 rarityRoll
 
             const { request } = await this.publicClient.simulateContract({
                 address: config.SOUVENIR_NFT_ADDRESS as `0x${string}`,

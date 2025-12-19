@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { PrismaClient, TravelStatus } from '@prisma/client';
+import { prisma } from '../../database';
+import { TravelStatus } from '@prisma/client';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 /**
  * GET /api/travels/:frogId
@@ -13,7 +13,11 @@ router.get('/:frogId', async (req, res) => {
         const frogId = parseInt(req.params.frogId);
         
         const travels = await prisma.travel.findMany({
-            where: { frogId },
+            where: { 
+                frog: {
+                    tokenId: frogId
+                }
+            },
             orderBy: { createdAt: 'desc' },
             include: {
                 souvenir: true,
@@ -21,18 +25,23 @@ router.get('/:frogId', async (req, res) => {
         });
         
         const travelsParsed = travels.map(travel => {
-            let parsedContent = null;
+            let journal = null;
             try {
                 if (travel.journalContent) {
-                    parsedContent = JSON.parse(travel.journalContent);
+                    journal = JSON.parse(travel.journalContent);
                 }
             } catch (e) {
                 // 如果解析失败，说明可能是旧格式的纯文本
-                parsedContent = { content: travel.journalContent };
+                journal = { 
+                    title: '旅行回顾',
+                    content: travel.journalContent,
+                    mood: 'happy',
+                    highlights: []
+                };
             }
             return {
                 ...travel,
-                journalContent: parsedContent
+                journal
             };
         });
         
@@ -51,13 +60,19 @@ router.get('/:frogId', async (req, res) => {
 router.get('/:frogId/active', async (req, res) => {
     try {
         const frogId = parseInt(req.params.frogId);
+        const now = new Date();
         
         const activeTravel = await prisma.travel.findFirst({
             where: {
-                frogId,
+                frog: {
+                    tokenId: frogId
+                },
                 status: {
                     in: [TravelStatus.Active, TravelStatus.Processing],
                 },
+                endTime: {
+                    gt: now  // 只返回还未结束的旅行
+                }
             },
         });
         
@@ -104,17 +119,24 @@ router.get('/journal/:travelId', async (req, res) => {
             return res.status(404).json({ error: 'Journal not found' });
         }
         
-        let parsedContent = null;
+        let journal = null;
         try {
-            parsedContent = JSON.parse(travel.journalContent);
+            if (travel.journalContent) {
+                journal = JSON.parse(travel.journalContent);
+            }
         } catch (e) {
-            parsedContent = { content: travel.journalContent };
+            journal = { 
+                title: '旅行回顾',
+                content: travel.journalContent,
+                mood: 'happy',
+                highlights: []
+            };
         }
 
         res.json({
             frogName: travel.frog.name,
             journalHash: travel.journalHash,
-            journalContent: parsedContent,
+            journal,
             souvenir: travel.souvenir,
             completedAt: travel.completedAt,
         });
