@@ -9,6 +9,7 @@ export function Navbar() {
   const navLinks = [
     { path: '/', label: '首页' },
     { path: '/my-frogs', label: '我的青蛙' },
+    { path: '/friends/1', label: '好友系统' },
   ];
   
   return (

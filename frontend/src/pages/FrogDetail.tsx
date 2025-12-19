@@ -8,24 +8,33 @@ import { Loading } from '../components/common/Loading';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useEffect, useState } from 'react';
 import { apiService, type Frog } from '../services/api';
+import { useAccount } from 'wagmi';
+import FriendInteractionModal from '../components/frog/FriendInteraction';
+import { InteractionType } from '../types';
 
-interface Travel {
+interface TravelDetail {
     id: number;
+    tokenId: number;
+    frogId: number;
     startTime: string;
     endTime: string;
     targetWallet: string;
+    chainId: number;
     status: string;
-    completed: boolean;
+    journalHash?: string;
+    journalContent?: string | null;
     journal?: {
         title: string;
         content: string;
         mood: string;
         highlights: string[];
-    };
+    } | null;
     souvenir?: {
         name: string;
         rarity: string;
-    };
+    } | null;
+    completedAt?: string | null;
+    completed: boolean;
 }
 
 export function FrogDetail() {
@@ -33,17 +42,26 @@ export function FrogDetail() {
     const tokenId = parseInt(id || '0');
 
     const [frog, setFrog] = useState<Frog | null>(null);
-    const [activeTravel, setActiveTravel] = useState<Travel | null>(null);
-    const [travels, setTravels] = useState<Travel[]>([]);
+    const [activeTravel, setActiveTravel] = useState<TravelDetail | null>(null);
+    const [travels, setTravels] = useState<TravelDetail[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showCelebration, setShowCelebration] = useState(false);
     const [prevStatus, setPrevStatus] = useState<string | null>(null);
     const [error, setError] = useState<Error | null>(null);
+    
+    const { address } = useAccount();
+    const [userFrogs, setUserFrogs] = useState<Frog[]>([]);
+    
+    // 互动相关状态
+    const [showInteractionModal, setShowInteractionModal] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    const isOwner = frog && address && frog.ownerAddress.toLowerCase() === address.toLowerCase();
 
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const frogData = await apiService.getFrogDetail(tokenId);
+            const frogData = await apiService.getFrogDetail(tokenId, address);
 
             // Check for status transition: Traveling -> Idle
             if (prevStatus === 'Traveling' && frogData?.status === 'Idle') {
@@ -53,10 +71,10 @@ export function FrogDetail() {
             setPrevStatus(frogData?.status || null);
             setFrog(frogData);
 
-            // 获取旅行历史
-            const historyData = await apiService.getFrogsTravels(tokenId);
-            setTravels(historyData.filter((t: Travel) => t.status === 'Completed')); // 仅显示已完成的旅行
-
+            // 直接从青蛙数据中提取已完成的旅行历史
+            if (frogData?.travels) {
+                setTravels(frogData.travels.filter((t: TravelDetail) => t.status === 'Completed'));
+            }
             if (frogData?.status === 'Traveling') {
                 const response = await fetch(`${import.meta.env.VITE_API_URL}/api/travels/${tokenId}/active`);
                 if (response.ok) {
@@ -71,6 +89,12 @@ export function FrogDetail() {
             } else {
                 setActiveTravel(null);
             }
+
+            // 如果不是所有者且用户已登录，获取用户自己的青蛙列表以支持“加好友”
+            if (address && frogData?.ownerAddress.toLowerCase() !== address.toLowerCase()) {
+                const myFrogs = await apiService.getFrogsByOwner(address);
+                setUserFrogs(myFrogs);
+            }
         } catch (err) {
             setError(err as Error);
         } finally {
@@ -81,7 +105,7 @@ export function FrogDetail() {
     useEffect(() => {
         fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tokenId]);
+    }, [tokenId, address]);
 
     useWebSocket();
 
@@ -126,7 +150,25 @@ export function FrogDetail() {
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
                     <h1 className="text-2xl font-bold text-gray-800 mb-2">青蛙未找到</h1>
-                    <p className="text-gray-500">找不到 ID 为 {tokenId} 的青蛙</p>
+                    <p className="text-gray-500 mb-4">找不到 ID 为 {tokenId} 的青蛙</p>
+                    <button
+                        onClick={async () => {
+                            setIsSyncing(true);
+                            try {
+                                await apiService.post('/api/frogs/sync', { tokenId });
+                                await fetchData();
+                            } catch (e) {
+                                console.error(e);
+                                alert('同步失败，请确合约地址配置正确');
+                            } finally {
+                                setIsSyncing(false);
+                            }
+                        }}
+                        disabled={isSyncing}
+                        className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+                    >
+                        {isSyncing ? '同步中...' : '尝试从链上同步'}
+                    </button>
                 </div>
             </div>
         );
@@ -157,9 +199,19 @@ export function FrogDetail() {
                     className="bg-white rounded-2xl shadow-lg p-6 mb-6"
                 >
                     <div className="flex items-center space-x-6">
-                        <FrogPet name={frog.name} status={frog.status} />
+                        <FrogPet frogId={frog.tokenId} name={frog.name} />
                         <div className="flex-1">
-                            <h1 className="text-3xl font-bold text-gray-800">{frog.name}</h1>
+                            <div className="flex items-center justify-between">
+                                <h1 className="text-3xl font-bold text-gray-800">{frog.name}</h1>
+                                {isOwner && (
+                                    <button
+                                        onClick={() => window.location.href = `/friends/${frog.tokenId}`}
+                                        className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center gap-2"
+                                    >
+                                        👥 好友系统
+                                    </button>
+                                )}
+                            </div>
                             <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
                                 <span>🎂 {new Date(frog.birthday).toLocaleDateString()}</span>
                                 <span>✈️ {frog.totalTravels} 次旅行</span>
@@ -177,16 +229,76 @@ export function FrogDetail() {
 
                 {/* 主要内容区域 */}
                 <div className="grid md:grid-cols-2 gap-6">
-                    {/* 左侧: 旅行状态或表单 */}
+                    {/* 左侧: 旅行状态或表单/访客信息 */}
                     <div>
-                        {frog.status === 'Traveling' && activeTravel ? (
-                            <TravelStatus travel={activeTravel} frogName={frog.name} />
+                        {isOwner ? (
+                            frog.status === 'Traveling' && activeTravel ? (
+                                <TravelStatus travel={activeTravel} frogName={frog.name} />
+                            ) : (
+                                <TravelForm
+                                    frogId={tokenId}
+                                    frogName={frog.name}
+                                    onSuccess={fetchData}
+                                />
+                            )
                         ) : (
-                            <TravelForm
-                                frogId={tokenId}
-                                frogName={frog.name}
-                                onSuccess={fetchData}
-                            />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="bg-white rounded-2xl shadow-lg p-6 space-y-6"
+                            >
+                                <div className="text-center space-y-2">
+                                    <h3 className="text-xl font-bold text-gray-800">👋 你好，旅行者！</h3>
+                                    <p className="text-gray-500 text-sm">你正在访问 {frog.name} 的个人主页</p>
+                                </div>
+                                
+                                <div className="p-4 bg-gray-50 rounded-xl space-y-3">
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-gray-500">拥有者</span>
+                                        <span className="font-mono text-blue-600 truncate ml-4">
+                                            {frog.ownerAddress.slice(0, 6)}...{frog.ownerAddress.slice(-4)}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-gray-500">当前状态</span>
+                                        <span className={`font-medium ${frog.status === 'Traveling' ? 'text-blue-500' : 'text-green-500'}`}>
+                                            {frog.status === 'Traveling' ? '正在探索世界' : '正在家中休息'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {address && userFrogs.length > 0 && (
+                                    <div className="space-y-3 pt-2">
+                                        {frog.friendshipStatus === 'Accepted' ? (
+                                            <div className="space-y-3">
+                                                <div className="w-full py-3 bg-green-50 text-green-600 rounded-xl font-bold flex items-center justify-center gap-2 border border-green-200">
+                                                    ✅ 已经是好友
+                                                </div>
+                                                <button
+                                                    onClick={() => setShowInteractionModal(true)}
+                                                    className="w-full py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                                                >
+                                                    👋 拜访/互动
+                                                </button>
+                                            </div>
+                                        ) : frog.friendshipStatus === 'Pending' ? (
+                                            <div className="w-full py-3 bg-blue-50 text-blue-600 rounded-xl font-bold flex items-center justify-center gap-2 border border-blue-200">
+                                                ⏳ 请求发送中...
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <p className="text-xs text-gray-400 text-center">你可以让你的青蛙和 {frog.name} 交朋友</p>
+                                                <button 
+                                                    onClick={() => window.location.href = `/friends/${userFrogs[0].tokenId}`}
+                                                    className="w-full py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                                                >
+                                                    🤝 发起好友请求
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </motion.div>
                         )}
                     </div>
 
@@ -209,5 +321,169 @@ export function FrogDetail() {
                 </div>
             </div>
         </div>
+    );
+
+    return (
+        <>
+            <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50 py-8">
+                <div className="max-w-4xl mx-auto px-4">
+                    {/* 庆祝动画 */}
+                    {showCelebration && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.5 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"
+                        >
+                            <div className="bg-white rounded-2xl p-8 text-center">
+                                <h2 className="text-3xl font-bold mb-4">🎉 欢迎回来！</h2>
+                                <p className="text-xl">{frog.name} 旅行归来啦！</p>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* 青蛙信息头部 */}
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white rounded-2xl shadow-lg p-6 mb-6"
+                    >
+                        <div className="flex items-center space-x-6">
+                            <FrogPet frogId={frog.tokenId} name={frog.name} />
+                            <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                    <h1 className="text-3xl font-bold text-gray-800">{frog.name}</h1>
+                                    {isOwner && (
+                                        <button
+                                            onClick={() => window.location.href = `/friends/${frog.tokenId}`}
+                                            className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center gap-2"
+                                        >
+                                            👥 好友系统
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                                    <span>🎂 {new Date(frog.birthday).toLocaleDateString()}</span>
+                                    <span>✈️ {frog.totalTravels} 次旅行</span>
+                                    <span className={`px-2 py-1 rounded-full text-xs ${
+                                        frog.status === 'Traveling' 
+                                            ? 'bg-blue-100 text-blue-800' 
+                                            : 'bg-green-100 text-green-800'
+                                    }`}>
+                                        {frog.status === 'Traveling' ? '旅行中' : '在家'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+
+                    {/* 主要内容区域 */}
+                    <div className="grid md:grid-cols-2 gap-6">
+                        {/* 左侧: 旅行状态或表单/访客信息 */}
+                        <div>
+                            {isOwner ? (
+                                frog.status === 'Traveling' && activeTravel ? (
+                                    <TravelStatus travel={activeTravel} frogName={frog.name} />
+                                ) : (
+                                    <TravelForm
+                                        frogId={tokenId}
+                                        frogName={frog.name}
+                                        onSuccess={fetchData}
+                                    />
+                                )
+                            ) : (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="bg-white rounded-2xl shadow-lg p-6 space-y-6"
+                                >
+                                    <div className="text-center space-y-2">
+                                        <h3 className="text-xl font-bold text-gray-800">👋 你好，旅行者！</h3>
+                                        <p className="text-gray-500 text-sm">你正在访问 {frog.name} 的个人主页</p>
+                                    </div>
+                                    
+                                    <div className="p-4 bg-gray-50 rounded-xl space-y-3">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-gray-500">拥有者</span>
+                                            <span className="font-mono text-blue-600 truncate ml-4">
+                                                {frog.ownerAddress.slice(0, 6)}...{frog.ownerAddress.slice(-4)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-gray-500">当前状态</span>
+                                            <span className={`font-medium ${frog.status === 'Traveling' ? 'text-blue-500' : 'text-green-500'}`}>
+                                                {frog.status === 'Traveling' ? '正在探索世界' : '正在家中休息'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {address && userFrogs.length > 0 && (
+                                        <div className="space-y-3 pt-2">
+                                            {frog.friendshipStatus === 'Accepted' ? (
+                                                <div className="space-y-3">
+                                                    <div className="w-full py-3 bg-green-50 text-green-600 rounded-xl font-bold flex items-center justify-center gap-2 border border-green-200">
+                                                        ✅ 已经是好友
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setShowInteractionModal(true)}
+                                                        className="w-full py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                                                    >
+                                                        👋 拜访/互动
+                                                    </button>
+                                                </div>
+                                            ) : frog.friendshipStatus === 'Pending' ? (
+                                                <div className="w-full py-3 bg-blue-50 text-blue-600 rounded-xl font-bold flex items-center justify-center gap-2 border border-blue-200">
+                                                    ⏳ 请求发送中...
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <p className="text-xs text-gray-400 text-center">你可以让你的青蛙和 {frog.name} 交朋友</p>
+                                                    <button 
+                                                        onClick={() => window.location.href = `/friends/${userFrogs[0].tokenId}`}
+                                                        className="w-full py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                                                    >
+                                                        🤝 发起好友请求
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                </motion.div>
+                            )}
+                        </div>
+
+                        {/* 右侧: 旅行历史 */}
+                        <div className="space-y-4">
+                            <h2 className="text-xl font-bold text-gray-800">📖 旅行日记</h2>
+                            {travels.length > 0 ? (
+                                <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                                    {travels.map((travel) => (
+                                        <TravelJournal key={travel.id} travel={travel} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="bg-white rounded-xl p-6 text-center text-gray-500">
+                                    <p>还没有旅行记录</p>
+                                    <p className="text-sm mt-1">派 {frog.name} 去冒险吧！</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {showInteractionModal && frog && userFrogs.length > 0 && frog.friendshipId && (
+                <FriendInteractionModal
+                    friend={frog}
+                    friendshipId={frog.friendshipId}
+                    currentFrogId={userFrogs[0].id}
+                    onClose={() => setShowInteractionModal(false)}
+                    onInteractionComplete={() => {
+                        setShowInteractionModal(false);
+                        // 可以添加成功提示
+                    }}
+                />
+            )}
+        </>
     );
 }

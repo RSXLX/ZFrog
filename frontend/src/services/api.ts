@@ -13,12 +13,20 @@ export interface Frog {
   travels?: any[];
   souvenirs?: any[];
   xp?: number;
+  friendshipStatus?: 'Pending' | 'Accepted' | 'Declined' | 'None';
+  friendshipId?: number;
   level?: number;
 }
 
 class ApiService {
   private async request(endpoint: string, options?: RequestInit) {
-    const url = `${API_BASE_URL}${endpoint}`;
+    let finalEndpoint = endpoint;
+    // 如果不是以 http 开头且不是以 /api 开头，自动补全 /api
+    if (!endpoint.startsWith('http') && !endpoint.startsWith('/api')) {
+      finalEndpoint = `/api${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    }
+    
+    const url = finalEndpoint.startsWith('http') ? finalEndpoint : `${API_BASE_URL}${finalEndpoint}`;
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
@@ -28,27 +36,73 @@ class ApiService {
     });
 
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+        
+        if (errorData.error) {
+          if (typeof errorData.error === 'string') {
+            errorMessage = errorData.error;
+          } else if (errorData.error.message) {
+            errorMessage = errorData.error.message;
+          }
+        }
+        
+        const error = new Error(errorMessage);
+        (error as any).response = { data: errorData, status: response.status };
+        throw error;
     }
 
-    return response.json();
+    const data = await response.json();
+    return { data }; // 模拟 axios 返回结构
+  }
+
+  async get(endpoint: string, config?: { params?: Record<string, any> }) {
+    let url = endpoint;
+    if (config?.params) {
+      const qs = new URLSearchParams(config.params).toString();
+      url += (url.includes('?') ? '&' : '?') + qs;
+    }
+    return this.request(url, { method: 'GET' });
+  }
+
+  async post(endpoint: string, data?: any) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async put(endpoint: string, data?: any) {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async delete(endpoint: string) {
+    return this.request(endpoint, { method: 'DELETE' });
   }
 
   /**
    * 获取某地址拥有的所有青蛙
    */
   async getFrogsByOwner(address: string): Promise<Frog[]> {
-    return this.request(`/api/frogs/owner/${address.toLowerCase()}`);
+    const res = await this.get(`/api/frogs/owner/${address.toLowerCase()}`);
+    return res.data;
   }
 
   /**
    * 获取青蛙详情
    */
-  async getFrogDetail(tokenId: number): Promise<Frog | null> {
+  async getFrogDetail(tokenId: number, viewerAddress?: string): Promise<Frog | null> {
     try {
-      return await this.request(`/api/frogs/${tokenId}`);
+      const url = viewerAddress 
+        ? `/api/frogs/${tokenId}?viewerAddress=${viewerAddress.toLowerCase()}`
+        : `/api/frogs/${tokenId}`;
+      const res = await this.get(url);
+      return res.data;
     } catch (error) {
-      if (error instanceof Error && error.message.includes('404')) {
+      if ((error as any).response?.status === 404) {
         return null;
       }
       throw error;
@@ -60,11 +114,8 @@ class ApiService {
    */
   async syncFrog(tokenId: number): Promise<boolean> {
     try {
-      const response = await this.request('/api/frogs/sync', {
-        method: 'POST',
-        body: JSON.stringify({ tokenId }),
-      });
-      return response.success;
+      const response = await this.post('/api/frogs/sync', { tokenId });
+      return response.data.success;
     } catch (error) {
         console.error('Sync failed:', error);
         return false;
@@ -75,8 +126,10 @@ class ApiService {
    * 获取青蛙旅行历史
    */
   async getFrogsTravels(frogId: number): Promise<any[]> {
-    return this.request(`/api/travels/${frogId}`);
+    const res = await this.get(`/api/travels/${frogId}`);
+    return res.data;
   }
 }
 
 export const apiService = new ApiService();
+export const api = apiService;

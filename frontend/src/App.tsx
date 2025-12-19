@@ -3,6 +3,7 @@ import { Home } from './pages/Home';
 import { MyFrogs } from './pages/MyFrogs';
 import { FrogDetail } from './pages/FrogDetail';
 import { Desktop } from './pages/Desktop';
+import { Friends } from './pages/Friends';
 import { Navbar } from './components/common/Navbar';
 import { FrogPet } from './components/frog/FrogPet';
 import { useWalletConnect } from './hooks/useWalletConnect';
@@ -65,6 +66,7 @@ export function App() {
               <Route path="/" element={<Home />} />
               <Route path="/my-frogs" element={<MyFrogs />} />
               <Route path="/frog/:id" element={<FrogDetail />} />
+              <Route path="/friends/:frogId" element={<Friends />} />
               <Route path="/desktop" element={<Desktop />} />
             </Routes>
           </main>
