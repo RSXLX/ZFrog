@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Frog, FriendInteraction, InteractionType } from '../../types';
-import { api } from '../../services/api';
+import { apiService } from '../../services/api';
 
 interface FriendInteractionProps {
   friend: Frog;
@@ -39,8 +39,8 @@ const FriendInteractionModal: React.FC<FriendInteractionProps> = ({
   const fetchInteractionHistory = async () => {
     try {
       setLoadingHistory(true);
-      const response = await api.get(`/api/friends/${friendshipId}/interactions?limit=10`);
-      setInteractions(response.data);
+      const response = await apiService.get(`/friends/${friendshipId}/interactions?limit=10`);
+      setInteractions(response.success ? response.data : []);
     } catch (err) {
       console.error('Error fetching interaction history:', err);
     } finally {
@@ -58,7 +58,7 @@ const FriendInteractionModal: React.FC<FriendInteractionProps> = ({
     try {
       const metadata = {};
       
-      await api.post(`/api/friends/${friendshipId}/interact`, {
+      await apiService.post(`/friends/${friendshipId}/interact`, {
         actorId: currentFrogId,
         type: selectedType,
         message: message.trim() || undefined,

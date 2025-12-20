@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Friendship, Frog } from '../../types';
 import { useFriendWebSocket } from '../../hooks/useFriendWebSocket';
-import { api } from '../../services/api';
+import { apiService } from '../../services/api';
 import { FriendRequestSkeleton } from '../common/Skeleton';
 
 interface FriendRequestsProps {
@@ -36,8 +36,8 @@ const FriendRequests: React.FC<FriendRequestsProps> = ({ frogId, onRequestProces
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/friends/requests/${frogId}`);
-      setRequests(response.data);
+      const response = await apiService.get(`/friends/requests/${frogId}`);
+      setRequests(response.success ? response.data : []);
       setError(null);
     } catch (err) {
       console.error('Error fetching friend requests:', err);
@@ -49,7 +49,7 @@ const FriendRequests: React.FC<FriendRequestsProps> = ({ frogId, onRequestProces
 
   const respondToRequest = async (requestId: number, status: 'Accepted' | 'Declined', message?: string) => {
     try {
-      await api.put(`/api/friends/request/${requestId}/respond`, {
+      await apiService.put(`/friends/request/${requestId}/respond`, {
         status,
         message: status === 'Accepted' ? message : undefined
       });

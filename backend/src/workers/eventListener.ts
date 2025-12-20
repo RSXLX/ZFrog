@@ -7,6 +7,8 @@ import { FrogStatus } from '@prisma/client';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { ZETAFROG_ABI } from '../config/contracts';
+import { travelP0Service } from '../services/travel/travel-p0.service';
+import { ChainKey } from '../config/chains';
 
 
 
@@ -110,6 +112,18 @@ class EventListener {
                 await this.handleTravelCompleted(log);
             }
 
+            // 监听 SouvenirMinted 事件
+            const souvenirLogs = await this.publicClient.getLogs({
+                address: config.SOUVENIR_NFT_ADDRESS as `0x${string}`,
+                event: parseAbiItem('event SouvenirMinted(uint256 indexed souvenirId, uint256 indexed frogId, address indexed owner, uint8 rarity, string name)'),
+                fromBlock,
+                toBlock: currentBlock,
+            });
+
+            for (const log of souvenirLogs) {
+                await this.handleSouvenirMinted(log);
+            }
+
             // 监听 TravelCancelled 事件
             const cancelledLogs = await this.publicClient.getLogs({
                 address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
@@ -197,6 +211,17 @@ class EventListener {
             },
         });
 
+        // 监听 SouvenirMinted
+        this.publicClient.watchEvent({
+            address: config.SOUVENIR_NFT_ADDRESS as `0x${string}`,
+            event: parseAbiItem('event SouvenirMinted(uint256 indexed souvenirId, uint256 indexed frogId, address indexed owner, uint8 rarity, string name)'),
+            onLogs: async (logs: any) => {
+                for (const log of logs) {
+                    await this.handleSouvenirMinted(log);
+                }
+            },
+        });
+
         logger.info('Watching for new events...');
     }
 
@@ -274,6 +299,8 @@ class EventListener {
                 data: { status: FrogStatus.Traveling },
             });
 
+            const isRandom = (targetWallet as string).toLowerCase() === '0x0000000000000000000000000000000000000000';
+
             // 创建旅行记录
             await prisma.travel.create({
                 data: {
@@ -285,10 +312,11 @@ class EventListener {
                     chainId: Number(targetChainId),
                     observedTxCount: 0,
                     observedTotalValue: "0",
+                    isRandom: isRandom, // 标记为随机探索
                 },
             });
 
-            logger.info(`Travel started for frog ${tokenId} to chain ${targetChainId}`);
+            logger.info(`Travel started for frog ${tokenId} to chain ${targetChainId} (isRandom: ${isRandom})`);
 
         } catch (error) {
             logger.error(`Error handling TravelStarted event:`, error);
@@ -318,7 +346,7 @@ class EventListener {
                 },
             });
 
-            // 更新最近的活跃旅行记录
+            // 更新活跃旅行记录并触发统计更新
             const activeTravel = await prisma.travel.findFirst({
                 where: {
                     frogId: frog.id,
@@ -328,14 +356,45 @@ class EventListener {
             });
 
             if (activeTravel) {
+                // 查找纪念品的数据库主键 ID，以避免 P2003 外键约束错误
+                let dbSouvenirId = null;
+                if (souvenirId && Number(souvenirId) > 0) {
+                    const dbSouvenir = await prisma.souvenir.findUnique({
+                        where: { tokenId: Number(souvenirId) }
+                    });
+                    if (dbSouvenir) {
+                        dbSouvenirId = dbSouvenir.id;
+                    } else {
+                        logger.warn(`Souvenir tokenId ${souvenirId} not found in DB, linking will be deferred or skipped`);
+                    }
+                }
+
                 await prisma.travel.update({
                     where: { id: activeTravel.id },
                     data: {
                         status: 'Completed',
                         journalHash: journalHash as string,
+                        souvenirId: dbSouvenirId,
                         completedAt: new Date(Number(timestamp) * 1000),
                     },
                 });
+
+                // 更新勋章系统统计
+                const chainKeyMap: Record<number, ChainKey> = {
+                    97: 'BSC_TESTNET',
+                    11155111: 'ETH_SEPOLIA',
+                    7001: 'ZETACHAIN_ATHENS',
+                };
+                const chainKey = chainKeyMap[activeTravel.chainId];
+                if (chainKey) {
+                    await travelP0Service.updateFrogStats(
+                        activeTravel.id,
+                        chainKey,
+                        [], // 链上旅行暂时没有 discoveries，除非后面集成观测
+                        BigInt(0),
+                        new Date(Number(timestamp) * 1000)
+                    );
+                }
             }
 
             logger.info(`Travel completed for frog ${tokenId}`);
@@ -411,6 +470,64 @@ class EventListener {
         }
     }
 
+    private async handleSouvenirMinted(log: any) {
+        const { souvenirId, frogId, owner, rarity, name } = log.args;
+        logger.info(`SouvenirMinted: souvenirId=${souvenirId}, frogId=${frogId}, owner=${owner}`);
+
+        try {
+            const frog = await prisma.frog.findUnique({
+                where: { tokenId: Number(frogId) },
+            });
+
+            if (!frog) return;
+
+            const rarityMap = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+            const rarityStr = rarityMap[Number(rarity)] || 'Common';
+
+            await prisma.souvenir.upsert({
+                where: { tokenId: Number(souvenirId) },
+                update: {
+                    name: name as string,
+                    rarity: rarityStr as any,
+                    frogId: frog.id,
+                },
+                create: {
+                    tokenId: Number(souvenirId),
+                    frogId: frog.id,
+                    name: name as string,
+                    rarity: rarityStr as any,
+                    mintedAt: new Date(),
+                },
+            });
+
+            // 尝试在后续更新关联的旅行记录（如果有的话）
+            const unlinkedTravel = await prisma.travel.findFirst({
+                where: {
+                    frogId: frog.id,
+                    status: 'Completed',
+                    souvenirId: null
+                },
+                orderBy: { completedAt: 'desc' }
+            });
+
+            if (unlinkedTravel) {
+                const dbSouvenir = await prisma.souvenir.findUnique({
+                    where: { tokenId: Number(souvenirId) }
+                });
+                if (dbSouvenir) {
+                    await prisma.travel.update({
+                        where: { id: unlinkedTravel.id },
+                        data: { souvenirId: dbSouvenir.id }
+                    });
+                    logger.info(`Linked souvenir ${souvenirId} to travel ${unlinkedTravel.id} after delayed mint event`);
+                }
+            }
+
+        } catch (error) {
+            logger.error(`Error handling SouvenirMinted event:`, error);
+        }
+    }
+
     /**
      * 手动同步单个青蛙数据
      */
@@ -434,12 +551,15 @@ class EventListener {
             if (onChainData && onChainData[0]) {
                 const statusMap = ['Idle', 'Traveling', 'Returning'] as const;
 
+                // 预先查询本地数据以合并统计
+                const frog = await prisma.frog.findUnique({ where: { tokenId } });
+
                 await prisma.frog.upsert({
                     where: { tokenId },
                     update: {
                         name: onChainData[0],
                         ownerAddress: (owner as string).toLowerCase(),
-                        totalTravels: Number(onChainData[2]),
+                        totalTravels: Number(onChainData[2]) + (frog?.p0Travels || 0),
                         status: statusMap[Number(onChainData[3])] as FrogStatus,
                         xp: Number(onChainData[4]),
                         level: Number(onChainData[5]),

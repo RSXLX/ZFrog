@@ -4,6 +4,22 @@ import { createPublicClient, http } from 'viem';
 import { config } from '../../config';
 import { ZETAFROG_ABI } from '../../config/contracts';
 
+// 递归处理 BigInt 序列化问题
+function stringifyBigInt(obj: any): any {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj === 'bigint') return obj.toString();
+    if (obj instanceof Date) return obj.toISOString();
+    if (Array.isArray(obj)) return obj.map(stringifyBigInt);
+    if (typeof obj === 'object') {
+        const newObj: any = {};
+        for (const key in obj) {
+            newObj[key] = stringifyBigInt(obj[key]);
+        }
+        return newObj;
+    }
+    return obj;
+}
+
 const router = Router();
 
 // 定义 ZetaChain
@@ -122,7 +138,10 @@ router.get('/owner/:address', async (req, res) => {
             },
         });
 
-        res.json(frogs);
+        res.json({
+            success: true,
+            data: stringifyBigInt(frogs)
+        });
     } catch (error) {
         console.error('Error fetching frogs:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -271,10 +290,13 @@ router.get('/:tokenId', async (req, res) => {
         }
 
         res.json({
-            ...frog,
-            travels: travelsWithJournal,
-            friendshipStatus,
-            friendshipId
+            success: true,
+            data: {
+                ...frog,
+                travels: travelsWithJournal,
+                friendshipStatus,
+                friendshipId
+            }
         });
     } catch (error) {
         console.error('Error fetching frog:', error);

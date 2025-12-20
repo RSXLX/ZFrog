@@ -88,14 +88,15 @@ export const useFriendWebSocket = (
         events.onFriendInteraction?.(data);
         
         if (data.targetId === frogId) {
-          const interactionTypeText = {
+          const interactionTypeText: Record<string, string> = {
             'Visit': '拜访了你',
             'Feed': '喂食了你',
             'Play': '和你玩耍',
             'Gift': '送了你礼物',
             'Message': '给你留了言',
             'Travel': '邀请你一起旅行'
-          }[data.type] || '与你互动';
+          };
+          const text = interactionTypeText[data.type as string] || '与你互动';
           
           const notification = new Notification('新的好友互动', {
             body: `${data.actor?.name || '好友'} ${interactionTypeText}`,
@@ -140,7 +141,7 @@ export const useFriendWebSocket = (
         socket.off('friend:requestStatusChanged', onFriendRequestStatusChanged);
         socket.off('friend:interaction', onFriendInteraction);
         socket.off('friend:removed', onFriendRemoved);
-        socket.off('friend:onlineStatusChanged', onFriendOnlineStatusChanged);
+        socket.off('friend:onlineStatusChanged', onFriendOnlineStatusChanged as any);
         unsubscribeFromFrog();
       };
     }

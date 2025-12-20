@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Frog, Friendship, FriendInteraction } from '../../types';
 import { useFrogData } from '../../hooks/useFrogData';
 import { useFriendWebSocket } from '../../hooks/useFriendWebSocket';
-import { api } from '../../services/api';
+import { apiService } from '../../services/api';
 import { FriendCardSkeleton } from '../common/Skeleton';
 
 interface FriendsListProps {
@@ -60,8 +60,8 @@ const FriendsList: React.FC<FriendsListProps> = ({ frogId, onInteractionClick })
   const fetchFriends = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/friends/list/${frogId}`);
-      setFriends(response.data);
+      const response = await apiService.get(`/friends/list/${frogId}`);
+      setFriends(response.success ? response.data : []);
       setError(null);
     } catch (err) {
       console.error('Error fetching friends:', err);
@@ -75,7 +75,7 @@ const FriendsList: React.FC<FriendsListProps> = ({ frogId, onInteractionClick })
     if (!confirm('确定要删除这个好友吗？')) return;
 
     try {
-      await api.delete(`/api/friends/${friendshipId}`);
+      await apiService.delete(`/friends/${friendshipId}`);
       setFriends(friends.filter(f => f.friendshipId !== friendshipId));
     } catch (err) {
       console.error('Error removing friend:', err);
