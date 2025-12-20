@@ -7,7 +7,6 @@ import './styles/globals.css';
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { wagmiConfig } from './config/wagmi';
-import { web3Modal } from './config/web3modal';
 
 // 创建 React Query 客户端
 const queryClient = new QueryClient();

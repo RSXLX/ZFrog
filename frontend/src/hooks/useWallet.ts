@@ -15,6 +15,7 @@ export interface UseWalletReturn {
   balanceSymbol: string;
   
   // 会话
+  // @ts-ignore
   session: ReturnType<typeof useSessionStore>['session'];
   isSessionValid: boolean;
   

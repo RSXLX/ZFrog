@@ -52,8 +52,14 @@ class ApiService {
         throw error;
     }
 
-    const data = await response.json();
-    return { data }; // 模拟 axios 返回结构
+    const json = await response.json();
+    
+    // 如果后端已经包装了结构，直接返回
+    if (json && typeof json === 'object' && 'success' in json) {
+      return json;
+    }
+
+    return { success: true, data: json }; // 统一返回结构
   }
 
   async get(endpoint: string, config?: { params?: Record<string, any> }) {
@@ -127,6 +133,19 @@ class ApiService {
    */
   async getFrogsTravels(frogId: number): Promise<any[]> {
     const res = await this.get(`/api/travels/${frogId}`);
+    return res.data;
+  }
+
+  /**
+   * 获取纪念品图片生成状态
+   */
+  async getSouvenirImageStatus(souvenirId: string) {
+    const res = await this.get(`/api/nft-image/status/${souvenirId}`);
+    return res;
+  }
+
+  async discoverLuckyAddress(chain: string) {
+    const res = await this.get(`/api/travels/lucky-address?chain=${chain}`);
     return res.data;
   }
 }

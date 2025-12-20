@@ -2,16 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFrogStatus } from '../../hooks/useFrogStatus';
-
-// 青蛙状态枚举
-export enum FrogState {
-    IDLE = 'idle',
-    WALKING = 'walking',
-    SLEEPING = 'sleeping',
-    EATING = 'eating',
-    TRAVELING = 'traveling',
-    HAPPY = 'happy'
-}
+import { FrogState } from '../../types/frogAnimation';
 
 interface FrogPetAnimatedProps {
     frogId?: number;
@@ -237,9 +228,27 @@ export const FrogPetAnimated: React.FC<FrogPetAnimatedProps> = ({
                 <svg width={size} height={size} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-lg">
                     <defs>
                         <linearGradient id="skinGradientAnim" x1="100" y1="0" x2="100" y2="200" gradientUnits="userSpaceOnUse">
-                            <stop offset="0.4" stopColor="#4ADE80" />
-                            <stop offset="0.8" stopColor="#FCD34D" />
-                            <stop offset="1.0" stopColor="#FDBA74" />
+                            <motion.stop 
+                                offset="0.4" 
+                                animate={{ 
+                                    stopColor: currentState === FrogState.HAPPY || currentState === FrogState.TRAVELING ? '#4ADE80' : 
+                                               currentState === FrogState.ANGRY ? '#ef4444' : '#4ade80' 
+                                }} 
+                            />
+                            <motion.stop 
+                                offset="0.8" 
+                                animate={{ 
+                                    stopColor: currentState === FrogState.HAPPY || currentState === FrogState.TRAVELING ? '#FCD34D' : 
+                                               currentState === FrogState.ANGRY ? '#b91c1c' : '#fcd34d' 
+                                }} 
+                            />
+                            <motion.stop 
+                                offset="1.0" 
+                                animate={{ 
+                                    stopColor: currentState === FrogState.HAPPY || currentState === FrogState.TRAVELING ? '#FDBA74' : 
+                                               currentState === FrogState.ANGRY ? '#7f1d1d' : '#fdba74' 
+                                }} 
+                            />
                         </linearGradient>
                         
                         <filter id="softShadowAnim" x="-20%" y="-20%" width="140%" height="140%">
@@ -279,11 +288,11 @@ export const FrogPetAnimated: React.FC<FrogPetAnimatedProps> = ({
                         <motion.path 
                             d="M 45 75 A 32 32 0 1 1 90 60 Q 100 70 110 60 A 32 32 0 1 1 155 75 C 180 90 190 120 190 145 C 190 180 150 190 100 190 C 50 190 10 180 10 145 C 10 120 20 90 45 75 Z" 
                             fill="url(#skinGradientAnim)" 
-                            stroke="#22C55E" 
+                            stroke={currentState === FrogState.ANGRY ? '#991b1b' : '#22C55E'} 
                             strokeWidth="1.5" 
                             strokeLinejoin="round"
                             animate={{
-                                fill: currentState === FrogState.HAPPY || currentState === FrogState.TRAVELING ? 'url(#skinGradientAnim)' : '#4ade80'
+                                stroke: currentState === FrogState.ANGRY ? '#991b1b' : '#22C55E'
                             }}
                         />
 

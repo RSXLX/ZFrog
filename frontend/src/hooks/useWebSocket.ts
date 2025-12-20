@@ -24,6 +24,7 @@ interface TravelProgressEvent {
 
 interface TravelCompletedEvent {
   frogId: number;
+  travelId: number;
   journalHash: string;
   souvenirId: number;
   story: {

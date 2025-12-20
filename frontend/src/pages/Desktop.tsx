@@ -8,7 +8,7 @@ import { useWallet } from '../hooks/useWallet';
 import { useChainMonitor } from '../hooks/useChainMonitor';
 import { useFrogInteraction } from '../hooks/useFrogInteraction';
 import { useFrogData } from '../hooks/useFrogData';
-import { FrogData, FrogState, FoodItem } from '../types/frogAnimation';
+import { FoodItem } from '../types/frogAnimation';
 // TRAVEL_DESTINATIONS 将在组件内部定义
 
 // 旅行目的地配置
@@ -22,9 +22,10 @@ const TRAVEL_DESTINATIONS = [
 
 export function Desktop() {
   const { isConnected, address } = useWallet();
-  const { events, whaleAlert, priceChange, clearAlerts } = useChainMonitor();
-  const { feed, travel, FOOD_ITEMS } = useFrogInteraction();
-  const { activeFrog, loading } = useFrogData(address);
+  const { whaleAlert, priceChange, clearAlerts } = useChainMonitor();
+  const { travel, FOOD_ITEMS } = useFrogInteraction();
+  const { frog: activeFrog, loading } = useFrogData(address);
+  
   const [inventory, setInventory] = useState({
     fly: 10,
     worm: 5,
@@ -57,13 +58,13 @@ export function Desktop() {
   }, []);
   
   // 处理喂食
-  const handleFeed = (food: FoodItem) => {
-    if ((inventory[food.id] || 0) <= 0) return;
+const handleFeed = (food: FoodItem) => {
+    if ((inventory[food.id as keyof typeof inventory] || 0) <= 0) return;
     
     setInventory(prev => ({
-      ...prev,
-      [food.id]: Math.max(0, (prev[food.id] || 0) - 1),
-    }));
+        ...prev,
+        [food.id]: (prev[food.id as keyof typeof prev] || 0) - 1
+      }));
     
     if (activeFrog) {
       // 这里应该调用青蛙的喂食方法
@@ -88,7 +89,7 @@ export function Desktop() {
       
       setInventory(prev => ({
         ...prev,
-        [rewardFood.id]: (prev[rewardFood.id] || 0) + rewardCount,
+        [rewardFood.id]: (prev[rewardFood.id as keyof typeof prev] || 0) + rewardCount,
       }));
       
       setBalance(prev => prev + travelResult.reward);
@@ -115,7 +116,7 @@ export function Desktop() {
     setBalance(prev => prev - totalPrice);
     setInventory(prev => ({
       ...prev,
-      [food.id]: (prev[food.id] || 0) + count,
+      [food.id]: (prev[food.id as keyof typeof prev] || 0) + count,
     }));
   };
   
@@ -246,7 +247,7 @@ export function Desktop() {
               <FrogPet
                 frogId={activeFrog.id}
                 name={activeFrog.name}
-                initialState={activeFrog.status}
+                initialState={activeFrog?.status as any || 'IDLE'}
                 onInteract={handleFrogInteract}
               />
             ) : (

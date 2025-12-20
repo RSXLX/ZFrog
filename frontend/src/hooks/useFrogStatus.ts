@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useReadContract, useWatchContractEvent } from 'wagmi';
 import { ZETAFROG_ABI, ZETAFROG_ADDRESS } from '../config/contracts';
+import { useWebSocket } from './useWebSocket';
+import { apiService } from '../services/api';
 
 type FrogStatus = 'Idle' | 'Traveling' | 'Returning';
 
@@ -45,7 +47,9 @@ export function useFrogStatus(frogId: number | undefined): UseFrogStatusReturn {
   const [travel, setTravel] = useState<TravelInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [backendData, setBackendData] = useState<any>(null);
 
+  const { on } = useWebSocket();
   const contractAddress = ZETAFROG_ADDRESS;
 
   // 读取青蛙基本信息
@@ -101,8 +105,8 @@ export function useFrogStatus(frogId: number | undefined): UseFrogStatusReturn {
         if (args.tokenId?.toString() === frogId?.toString()) {
           setStatus('Traveling');
           setTravel({
-            startTime: Number(args.startTime || 0),
-            endTime: Number(args.endTime || 0),
+            startTime: Number(args.startTime || 0) * 1000,
+            endTime: Number(args.endTime || 0) * 1000,
             targetWallet: args.targetWallet || '',
             targetChainId: Number(args.targetChainId || 1),
             completed: false,
@@ -128,18 +132,89 @@ export function useFrogStatus(frogId: number | undefined): UseFrogStatusReturn {
           setTravel(null);
           refetchFrog();
           refetchTravel();
+          fetchBackendData();
         }
       });
     },
     enabled: !!contractAddress && frogId !== undefined,
   });
 
+  // 后端数据获取
+  const fetchBackendData = useCallback(async () => {
+    if (frogId === undefined) return;
+    try {
+      const response = await apiService.get(`/frogs/${frogId}`);
+      const data = response.data;
+      setBackendData(data);
+      
+      // 如果后端显示正在旅行，则更新本地状态（兼容 P0）
+      if (data.status === 'Traveling') {
+        setStatus('Traveling');
+        // 尝试获取活跃旅行详情
+        const response = await apiService.get(`/travels/${frogId}/active`);
+        const travelDetail = response.data;
+        if (travelDetail) {
+          setTravel({
+            startTime: new Date(travelDetail.startTime).getTime(),
+            endTime: new Date(travelDetail.endTime).getTime(),
+            targetWallet: travelDetail.targetWallet,
+            targetChainId: travelDetail.chainId || 1,
+            completed: false,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch backend frog data:', err);
+    }
+  }, [frogId]);
+
+  useEffect(() => {
+    fetchBackendData();
+  }, [fetchBackendData]);
+
+  // WebSocket 实时同步
+  useEffect(() => {
+    if (frogId === undefined) return;
+
+    const unsubscribeStarted = on<any>('travel:started', (data) => {
+      if (Number(data.frogId) === frogId) {
+        setStatus('Traveling');
+        setTravel({
+          startTime: new Date(data.startTime).getTime(),
+          endTime: new Date(data.endTime).getTime(),
+          targetWallet: data.targetWallet,
+          targetChainId: data.targetChainId || 1,
+          completed: false,
+        });
+        fetchBackendData();
+      }
+    });
+
+    const unsubscribeCompleted = on<any>('travel:completed', (data) => {
+      if (Number(data.frogId) === frogId) {
+        setStatus('Idle');
+        setTravel(null);
+        fetchBackendData();
+      }
+    });
+
+    return () => {
+      unsubscribeStarted();
+      unsubscribeCompleted();
+    };
+  }, [frogId, on, fetchBackendData]);
+
   // 处理数据更新
   useEffect(() => {
     if (frogData) {
       const [_name, _birthday, _totalTravels, statusCode] = frogData as [string, bigint, number, number, bigint, bigint];
       const statusMap: FrogStatus[] = ['Idle', 'Traveling', 'Returning'];
-      setStatus(statusMap[statusCode] || 'Idle');
+      
+      // 优先保留 WebSocket 或后端设置的 Traveling 状态（针对 P0）
+      setStatus(prev => {
+        if (prev === 'Traveling' && statusMap[statusCode] === 'Idle') return 'Traveling';
+        return statusMap[statusCode] || 'Idle';
+      });
       setLoading(false);
     }
   }, [frogData]);
@@ -149,8 +224,8 @@ export function useFrogStatus(frogId: number | undefined): UseFrogStatusReturn {
       const [startTime, endTime, targetWallet, targetChainId, completed] = travelData as [bigint, bigint, string, bigint, boolean];
       if (!completed && Number(endTime) > 0) {
         setTravel({
-          startTime: Number(startTime),
-          endTime: Number(endTime),
+          startTime: Number(startTime) * 1000,
+          endTime: Number(endTime) * 1000,
           targetWallet,
           targetChainId: Number(targetChainId),
           completed,
@@ -175,36 +250,44 @@ export function useFrogStatus(frogId: number | undefined): UseFrogStatusReturn {
   const getRemainingTime = useCallback((): RemainingTime | null => {
     if (!travel || status !== 'Traveling') return null;
     
-    const now = Math.floor(Date.now() / 1000);
+    const now = Date.now();
     const remaining = travel.endTime - now;
     
     if (remaining <= 0) return { hours: 0, minutes: 0, seconds: 0, total: 0 };
     
-    const hours = Math.floor(remaining / 3600);
-    const minutes = Math.floor((remaining % 3600) / 60);
-    const seconds = remaining % 60;
+    const totalSeconds = Math.floor(remaining / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
     
-    return { hours, minutes, seconds, total: remaining };
+    return { hours, minutes, seconds, total: totalSeconds };
   }, [travel, status]);
 
   // 刷新状态
   const refresh = useCallback(async (): Promise<void> => {
     setLoading(true);
-    await Promise.all([refetchFrog(), refetchTravel()]);
+    await Promise.all([refetchFrog(), refetchTravel(), fetchBackendData()]);
     setLoading(false);
-  }, [refetchFrog, refetchTravel]);
+  }, [refetchFrog, refetchTravel, fetchBackendData]);
 
   // 解析青蛙数据
   const parsedFrogData: FrogData | null = frogData 
     ? {
         name: (frogData as [string, bigint, number, number, bigint, bigint])[0],
         birthday: Number((frogData as [string, bigint, number, number, bigint, bigint])[1]),
-        totalTravels: Number((frogData as [string, bigint, number, number, bigint, bigint])[2]),
-        status: (frogData as [string, bigint, number, number, bigint, bigint])[3],
-        xp: Number((frogData as [string, bigint, number, number, bigint, bigint])[4]),
-        level: Number((frogData as [string, bigint, number, number, bigint, bigint])[5]),
+        totalTravels: backendData?.totalTravels ?? Number((frogData as [string, bigint, number, number, bigint, bigint])[2]),
+        status: backendData?.status === 'Traveling' ? 1 : (frogData as [string, bigint, number, number, bigint, bigint])[3],
+        xp: backendData?.xp ?? Number((frogData as [string, bigint, number, number, bigint, bigint])[4]),
+        level: backendData?.level ?? Number((frogData as [string, bigint, number, number, bigint, bigint])[5]),
       }
-    : null;
+    : backendData ? {
+        name: backendData.name,
+        birthday: new Date(backendData.birthday).getTime(),
+        totalTravels: backendData.totalTravels,
+        status: backendData.status === 'Traveling' ? 1 : 0,
+        xp: backendData.xp,
+        level: backendData.level,
+      } : null;
 
   return {
     status,

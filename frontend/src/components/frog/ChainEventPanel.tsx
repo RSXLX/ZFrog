@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import { useChainMonitor } from '../../hooks/useChainMonitor';
+// @ts-ignore
 import { ChainEvent } from '../../types/frogAnimation';
 
 // 简单的时间格式化函数

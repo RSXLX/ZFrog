@@ -265,11 +265,11 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
         break;
       case 'hide':
         // 隐藏当前窗口
-        window.__TAURI__?.window.getCurrentWindow().hide();
+        (window as any).__TAURI__?.window.getCurrentWindow().hide();
         break;
       case 'close':
         // 关闭当前窗口
-        window.__TAURI__?.window.getCurrentWindow().close();
+        (window as any).__TAURI__?.window.getCurrentWindow().close();
         break;
     }
   }, [closeContextMenu]);
@@ -343,9 +343,27 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
           <svg width="180" height="180" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-xl">
             <defs>
               <linearGradient id="skinGradient" x1="100" y1="0" x2="100" y2="200" gradientUnits="userSpaceOnUse">
-                <stop offset="0.4" stopColor="#4ADE80" />
-                <stop offset="0.8" stopColor="#FCD34D" />
-                <stop offset="1.0" stopColor="#FDBA74" />
+                <motion.stop 
+                  offset="0.4" 
+                  animate={{ 
+                    stopColor: state === FrogState.ANGRY ? '#ef4444' : 
+                               state === FrogState.SCARED ? '#fca5a5' : '#4ADE80' 
+                  }} 
+                />
+                <motion.stop 
+                  offset="0.8" 
+                  animate={{ 
+                    stopColor: state === FrogState.ANGRY ? '#b91c1c' : 
+                               state === FrogState.SCARED ? '#fecaca' : '#FCD34D' 
+                  }} 
+                />
+                <motion.stop 
+                  offset="1.0" 
+                  animate={{ 
+                    stopColor: state === FrogState.ANGRY ? '#7f1d1d' : 
+                               state === FrogState.SCARED ? '#fee2e2' : '#FDBA74' 
+                  }} 
+                />
               </linearGradient>
               
               <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
@@ -369,9 +387,17 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
                   0%, 96%, 100% { transform: scaleY(1); }
                   98% { transform: scaleY(0.1); }
                 }
+                @keyframes shake {
+                  0%, 100% { transform: translateX(0); }
+                  25% { transform: translateX(-2px); }
+                  75% { transform: translateX(2px); }
+                }
                 .frog-body-svg {
                   transform-origin: bottom center;
                   animation: squish 3.5s ease-in-out infinite;
+                }
+                .frog-angry-shake {
+                  animation: shake 0.15s infinite;
                 }
                 .frog-pupil-svg {
                   transform-origin: center;
@@ -380,17 +406,16 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
               `}</style>
             </defs>
 
-            <g className="frog-body-svg" filter="url(#softShadow)">
+            <g className={`frog-body-svg ${state === FrogState.ANGRY ? 'frog-angry-shake' : ''}`} filter="url(#softShadow)">
               {/* 身体主体 */}
               <motion.path 
                 d="M 45 75 A 32 32 0 1 1 90 60 Q 100 70 110 60 A 32 32 0 1 1 155 75 C 180 90 190 120 190 145 C 190 180 150 190 100 190 C 50 190 10 180 10 145 C 10 120 20 90 45 75 Z" 
                 fill="url(#skinGradient)" 
-                stroke="#22C55E" 
+                stroke={state === FrogState.ANGRY ? '#991b1b' : '#22C55E'} 
                 strokeWidth="1.5" 
                 strokeLinejoin="round"
                 animate={{
-                  fill: state === FrogState.SCARED ? '#fca5a5' : 
-                        state === FrogState.ANGRY ? '#ef4444' : 'url(#skinGradient)'
+                  stroke: state === FrogState.ANGRY ? '#991b1b' : '#22C55E'
                 }}
               />
 
@@ -432,6 +457,23 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
               <ellipse cx="30" cy="125" rx="12" ry="8" fill="#FDA4AF" opacity="0.4"/>
               <ellipse cx="170" cy="125" rx="12" ry="8" fill="#FDA4AF" opacity="0.4"/>
 
+              {/* 愤怒眉毛 */}
+              <AnimatePresence>
+                {state === FrogState.ANGRY && (
+                  <motion.g
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    stroke="#15803D"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                  >
+                    <line x1="45" y1="35" x2="75" y2="50" />
+                    <line x1="155" y1="35" x2="125" y2="50" />
+                  </motion.g>
+                )}
+              </AnimatePresence>
+
               {/* 动态嘴巴 */}
               <motion.path
                 d={state === FrogState.HAPPY || state === FrogState.EATING || state === FrogState.LOVE
@@ -447,11 +489,33 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
                 animate={{
                   d: state === FrogState.HAPPY || state === FrogState.EATING || state === FrogState.LOVE
                     ? "M 80 130 Q 100 150 120 130"
-                    : state === FrogState.SCARED || state === FrogState.ANGRY
+                    : state === FrogState.ANGRY
+                    ? "M 80 145 L 100 135 L 120 145"
+                    : state === FrogState.SCARED
                     ? "M 85 140 Q 100 135 115 140"
                     : "M 90 135 Q 100 138 110 135"
                 }}
               />
+                 
+              {/* 愤怒符号 💢 */}
+              <AnimatePresence>
+                {state === FrogState.ANGRY && (
+                  <motion.g
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ 
+                      scale: [0, 1.2, 1], 
+                      opacity: 1,
+                      rotate: [0, -10, 10, 0] 
+                    }}
+                    exit={{ scale: 0, opacity: 0 }}
+                    transition={{ repeat: Infinity, duration: 1.5 }}
+                    transform="translate(170, 45)"
+                  >
+                    <path d="M-10 -5 L-2 -5 L-2 -13 M10 5 L2 5 L2 13 M-5 10 L-5 2 L-13 2 M5 -10 L5 -2 L13 -2" 
+                      stroke="#ef4444" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </motion.g>
+                )}
+              </AnimatePresence>
                  
               {/* Zeta 标志 */}
               <path d="M96 152 L104 152 L96 160 L104 160" stroke="#15803D" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.5"/>

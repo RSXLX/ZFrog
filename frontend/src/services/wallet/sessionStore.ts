@@ -36,17 +36,17 @@ const SESSION_VALIDITY_MS = 7 * 24 * 60 * 60 * 1000;
 // 创建存储（支持 Electron 和浏览器）
 const storage = createJSONStorage(() => {
   // 检测是否在 Electron 环境
-  if (typeof window !== 'undefined' && window.electron?.store) {
+  if (typeof window !== 'undefined' && (window as any).electron?.store) {
     return {
       getItem: async (name: string) => {
-        const value = await window.electron.store.get(name);
+        const value = await (window as any).electron.store.get(name);
         return value ? JSON.stringify(value) : null;
       },
       setItem: async (name: string, value: string) => {
-        await window.electron.store.set(name, JSON.parse(value));
+        await (window as any).electron.store.set(name, JSON.parse(value));
       },
       removeItem: async (name: string) => {
-        await window.electron.store.delete(name);
+        await (window as any).electron.store.delete(name);
       },
     };
   }

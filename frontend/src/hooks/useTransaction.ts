@@ -101,7 +101,7 @@ export function useMintFrog(options: UseTransactionOptions = {}) {
     const { ZETAFROG_ABI, ZETAFROG_ADDRESS } = await import('../config/contracts');
     
     return tx.execute({
-      address: ZETAFROG_ADDRESS,
+      address: ZETAFROG_ADDRESS!,
       abi: ZETAFROG_ABI,
       functionName: 'mintFrog',
       args: [name],
@@ -124,7 +124,7 @@ export function useStartTravel(options: UseTransactionOptions = {}) {
     const { ZETAFROG_ABI, ZETAFROG_ADDRESS } = await import('../config/contracts');
     
     return tx.execute({
-      address: ZETAFROG_ADDRESS,
+      address: ZETAFROG_ADDRESS!,
       abi: ZETAFROG_ABI,
       functionName: 'startTravel',
       args: [tokenId, targetWallet, duration],

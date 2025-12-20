@@ -4,6 +4,11 @@ import { MyFrogs } from './pages/MyFrogs';
 import { FrogDetail } from './pages/FrogDetail';
 import { Desktop } from './pages/Desktop';
 import { Friends } from './pages/Friends';
+import { TravelResultPage } from './pages/TravelResultPage';
+import { BadgesPage } from './pages/BadgesPage';
+import { SouvenirsPage } from './pages/SouvenirsPage';
+import { TravelHistoryPage } from './pages/TravelHistoryPage';
+import { TravelDetailPage } from './pages/TravelDetailPage';
 import { Navbar } from './components/common/Navbar';
 import { FrogPet } from './components/frog/FrogPet';
 import { useWalletConnect } from './hooks/useWalletConnect';
@@ -68,6 +73,12 @@ export function App() {
               <Route path="/frog/:id" element={<FrogDetail />} />
               <Route path="/friends/:frogId" element={<Friends />} />
               <Route path="/desktop" element={<Desktop />} />
+              <Route path="/travel/:travelId" element={<TravelResultPage />} />
+              <Route path="/travel-detail/:travelId" element={<TravelDetailPage />} />
+              <Route path="/badges" element={<BadgesPage />} />
+              <Route path="/badges/:frogId" element={<BadgesPage />} />
+              <Route path="/souvenirs/:frogId" element={<SouvenirsPage />} />
+              <Route path="/travel-history" element={<TravelHistoryPage />} />
             </Routes>
           </main>
           
