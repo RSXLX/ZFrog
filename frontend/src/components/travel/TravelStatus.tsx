@@ -2,15 +2,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { LANDMARKS } from '../../config/landmarks';
-
-interface Travel {
-    id: number;
-    startTime: string;
-    endTime: string;
-    targetWallet: string;
-    status: string;
-    completed: boolean;
-}
+import type { Travel } from '../../types';
 
 export interface TravelStatusProps {
     travel: Travel;
@@ -33,6 +25,7 @@ export function TravelStatus({ travel, frogName }: TravelStatusProps) {
             if (remaining <= 0) {
                 setTimeRemaining('即将返回...');
                 setProgress(100);
+                // 旅行结束，但不要在这里触发状态更新，让父组件处理
                 return;
             }
 

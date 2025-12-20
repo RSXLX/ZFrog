@@ -10,6 +10,10 @@ import { ipfsService } from '../services/ipfs.service';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { ZETAFROG_ABI, SOUVENIR_ABI } from '../config/contracts';
+import { travelP0Service } from '../services/travel/travel-p0.service';
+import { NFTImageOrchestratorService } from '../services/nft-image-orchestrator.service';
+import { ChainKey } from '../config/chains';
+import { explorationService } from '../services/travel/exploration.service';
 import type { Server } from 'socket.io';
 
 // 定义 ZetaChain Athens Testnet
@@ -35,8 +39,10 @@ class TravelProcessor {
     private isInitialized = false;
     private io: Server | null = null;
     private isProcessing = false;
+    private orchestrator: NFTImageOrchestratorService;
 
     constructor() {
+        this.orchestrator = new NFTImageOrchestratorService();
         this.initialize();
     }
 
@@ -147,8 +153,8 @@ class TravelProcessor {
      * 处理单个旅行
      */
     private async processSingleTravel(travel: any) {
-        const { id: travelId, frog, targetWallet, startTime, endTime, chainId } = travel;
-        logger.info(`Processing travel ${travelId} for frog ${frog.tokenId} (chain: ${chainId})`);
+        let { id: travelId, frog, targetWallet, startTime, endTime, chainId, isRandom } = travel;
+        logger.info(`Processing travel ${travelId} for frog ${frog.tokenId} (chain: ${chainId}, item: ${isRandom ? 'Random' : 'Specific'})`);
 
         try {
             // 更新状态为处理中
@@ -157,7 +163,33 @@ class TravelProcessor {
                 data: { status: TravelStatus.Processing },
             });
 
-            // 观察钱包活动
+            // 1. 如果是随机探索且地址为零地址，则现场发现一个“幸运地址”
+            if (isRandom && (targetWallet.toLowerCase() === '0x0000000000000000000000000000000000000000')) {
+                try {
+                    const chainKeyMap: Record<number, ChainKey> = {
+                        97: 'BSC_TESTNET',
+                        11155111: 'ETH_SEPOLIA',
+                        7001: 'ZETACHAIN_ATHENS',
+                    };
+                    const chainKey = chainKeyMap[chainId || 7001];
+                    
+                    logger.info(`Discovering lucky address for random travel ${travelId} on ${chainKey}...`);
+                    const discoveredAddress = await explorationService.getRandomTargetAddress(chainKey);
+                    
+                    // 更新本地变量和数据库中的目标地址
+                    targetWallet = discoveredAddress;
+                    await prisma.travel.update({
+                        where: { id: travelId },
+                        data: { targetWallet: targetWallet.toLowerCase() },
+                    });
+                    logger.info(`Random exploration ${travelId} discovered address: ${targetWallet}`);
+                } catch (discoveryError) {
+                    logger.error(`Failed to discover address for random travel ${travelId}:`, discoveryError);
+                    // 如果发现失败，保持零地址，后续观察可能会报错或返回空
+                }
+            }
+
+            // 2. 观察钱包活动
             const observation = await observerService.observeWallet(
                 targetWallet,
                 startTime,
@@ -188,7 +220,8 @@ class TravelProcessor {
             const journal = await aiService.generateJournal(
                 frog.name,
                 observation,
-                durationHours
+                durationHours,
+                isRandom
             );
 
             // 计算经验值: 10 XP 每小时 + 50 XP 每个特殊事件
@@ -277,17 +310,42 @@ class TravelProcessor {
             let dbSouvenirId: number | null = null;
             if (souvenirId && souvenirId > 0) {
                 try {
-                    const dbSouvenir = await prisma.souvenir.create({
-                        data: {
-                            tokenId: souvenirId,
-                            frogId: frog.id,
-                            name: this.getSouvenirName(finalRarity),
-                            rarity: finalRarity as any,
-                            mintedAt: new Date(),
-                        },
+                    // 先检查是否已存在相同tokenId的纪念品
+                    const existingSouvenir = await prisma.souvenir.findUnique({
+                        where: { tokenId: souvenirId }
                     });
-                    dbSouvenirId = dbSouvenir.id;
-                    logger.info(`Saved souvenir ${souvenirId} to database with ID ${dbSouvenirId}`);
+                    
+                    if (existingSouvenir) {
+                        dbSouvenirId = existingSouvenir.id;
+                        logger.info(`Souvenir ${souvenirId} already exists in database with ID ${dbSouvenirId}`);
+                    } else {
+                        const dbSouvenir = await prisma.souvenir.create({
+                            data: {
+                                tokenId: souvenirId,
+                                frogId: frog.id,
+                                name: this.getSouvenirName(finalRarity),
+                                rarity: finalRarity as any,
+                                mintedAt: new Date(),
+                            },
+                        });
+                        dbSouvenirId = dbSouvenir.id;
+                        logger.info(`Saved souvenir ${souvenirId} to database with ID ${dbSouvenirId}`);
+                    }
+
+                    // --- 触发自动生图 ---
+                    // 这里我们采用异步方式，不阻塞主流程
+                    const souvenirType = this.mapSouvenirTypeToPromptKey(finalRarity);
+                    this.orchestrator.generateSouvenirImage({
+                        odosId: frog.tokenId.toString(),
+                        travelId: travelId.toString(),
+                        souvenirId: souvenirId.toString(),
+                        souvenirType,
+                        rarity: finalRarity.toUpperCase(),
+                        chainId: chainId || 1
+                    }).catch(err => {
+                        logger.error(`Auto image generation failed for souvenir ${souvenirId}:`, err);
+                    });
+                    // ------------------
                 } catch (error) {
                     logger.error(`Failed to save souvenir ${souvenirId} to database:`, error);
                     // 继续更新旅行记录，即使纪念品保存失败
@@ -324,6 +382,23 @@ class TravelProcessor {
                     level: newLevel,
                 },
             });
+
+            // 更新勋章系统统计
+            const chainKeyMap: Record<number, ChainKey> = {
+                97: 'BSC_TESTNET',
+                11155111: 'ETH_SEPOLIA',
+                7001: 'ZETACHAIN_ATHENS',
+            };
+            const chainKey = chainKeyMap[chainId || 1];
+            if (chainKey) {
+                await travelP0Service.updateFrogStats(
+                    travelId,
+                    chainKey,
+                    [], // 链上旅行暂时没有 discoveries，除非后面集成观测
+                    BigInt(0),
+                    new Date()
+                );
+            }
 
             // 发送 WebSocket 通知
             if (this.io) {
@@ -488,6 +563,18 @@ class TravelProcessor {
         if (roll < 70) return 'Common';
         if (roll < 95) return 'Uncommon';
         return 'Rare';
+    }
+
+    /**
+     * 获取纪念品名称对应的 Prompt 模版 Key
+     */
+    private mapSouvenirTypeToPromptKey(rarity: string): string {
+        const mapping: Record<string, string> = {
+            'Common': 'ETHEREUM_POSTCARD',
+            'Uncommon': 'GAS_FEE_RECEIPT',
+            'Rare': 'BLOCKCHAIN_SNOWGLOBE',
+        };
+        return mapping[rarity] || 'ETHEREUM_POSTCARD';
     }
 
     /**

@@ -2,6 +2,9 @@
 import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { apiService } from '../../services/api';
 
 // 支持两种使用方式的 props
 interface Travel {
@@ -21,8 +24,10 @@ interface Travel {
         highlights: string[];
     } | null;
     souvenir?: {
+        id?: string | number;
         name: string;
         rarity: string;
+        imageUrl?: string;
     } | null;
     completedAt?: string | null;
 }
@@ -37,8 +42,10 @@ interface DirectJournalProps {
     chainId?: number;
     targetWallet?: string;
     souvenir?: {
+        id?: string | number;
         name: string;
         rarity: string;
+        imageUrl?: string;
     };
     completedAt: Date;
 }
@@ -70,16 +77,19 @@ const rarityColors: Record<string, string> = {
 };
 
 export function TravelJournal(props: JournalProps) {
+    const navigate = useNavigate();
+    
     // 根据 props 类型提取数据
     let frogName: string;
     let title: string;
     let content: string;
     let mood: string;
     let highlights: string[];
-    let souvenir: { name: string; rarity: string } | undefined;
+    let souvenir: { id?: string | number; name: string; rarity: string; imageUrl?: string } | undefined;
     let completedAt: Date;
     let chainId: number | undefined;
     let targetWallet: string | undefined;
+    let travelId: number | undefined;
 
     if (isTravelProps(props)) {
         // 从 travel 对象提取
@@ -93,9 +103,20 @@ export function TravelJournal(props: JournalProps) {
         mood = travel.journal?.mood || 'happy';
         highlights = travel.journal?.highlights || [];
         souvenir = travel.souvenir || undefined;
+        
+        // 如果是 P0 旅行，从 souvenirData 提取纪念品
+        if (!souvenir && (travel as any).souvenirData) {
+            const sData = (travel as any).souvenirData;
+            souvenir = {
+                name: sData.name,
+                rarity: mapRarity(sData.rarity)
+            };
+        }
+
         completedAt = new Date(travel.completedAt || travel.endTime);
         chainId = travel.chainId;
         targetWallet = travel.targetWallet;
+        travelId = travel.id;
     } else {
         // 直接使用传入的属性
         frogName = props.frogName;
@@ -103,17 +124,59 @@ export function TravelJournal(props: JournalProps) {
         content = props.content;
         mood = props.mood;
         highlights = props.highlights;
-        souvenir = props.souvenir;
+        souvenir = props.souvenir ? { ...props.souvenir } : undefined;
         completedAt = props.completedAt;
         chainId = props.chainId;
         targetWallet = props.targetWallet;
+        travelId = undefined; // 直接属性模式下没有travelId
     }
+
+    // 添加纪念品图片状态管理
+    const [souvenirImageUrl, setSouvenirImageUrl] = useState<string | undefined>(souvenir?.imageUrl);
+
+    useEffect(() => {
+        if (souvenir && !souvenirImageUrl) {
+            const s = (props as any).travel?.souvenir || (props as any).souvenir;
+            const souvenirId = s?.tokenId || 
+                             ((props as any).travel?.souvenirData ? `p0-${(props as any).travel.id}` : null);
+            
+            if (souvenirId) {
+                apiService.getSouvenirImageStatus(souvenirId.toString())
+                    .then(res => {
+                        if (res.success && res.record) {
+                            const displayUrl = res.record.gatewayUrl || res.record.imageUrl;
+                            if (displayUrl) {
+                                setSouvenirImageUrl(displayUrl);
+                            }
+                        }
+                    })
+                    .catch(() => {});
+            }
+        }
+    }, [souvenir, props]);
+
+    // 使用局部状态覆盖
+    if (souvenir) {
+        souvenir = { ...souvenir, imageUrl: souvenirImageUrl };
+    }
+
+    // 点击处理函数
+    const handleJournalClick = () => {
+        if (travelId) {
+            navigate(`/travel/${travelId}`);
+        }
+    };
 
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100"
+            whileHover={{ scale: travelId ? 1.02 : 1 }}
+            whileTap={{ scale: travelId ? 0.98 : 1 }}
+            className={`bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 ${
+                travelId ? 'cursor-pointer hover:shadow-xl transition-all duration-200' : ''
+            }`}
+            onClick={handleJournalClick}
         >
             {/* 标题区域 */}
             <div className="bg-gradient-to-r from-emerald-400 to-cyan-500 p-4 text-white">
@@ -198,8 +261,12 @@ export function TravelJournal(props: JournalProps) {
                             </span>
                         </div>
                         <div className="flex items-center space-x-3">
-                            <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-2xl shadow-inner border border-yellow-200">
-                                🏆
+                            <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-2xl shadow-inner border border-yellow-200 overflow-hidden">
+                                {souvenir.imageUrl ? (
+                                    <img src={souvenir.imageUrl} alt={souvenir.name} className="w-full h-full object-cover" />
+                                ) : (
+                                    <span>🏆</span>
+                                )}
                             </div>
                             <span className="font-bold text-gray-800">{souvenir.name}</span>
                         </div>
@@ -217,3 +284,9 @@ export function TravelJournal(props: JournalProps) {
         </motion.div>
     );
 }
+
+const mapRarity = (r: number | string) => {
+    if (typeof r === 'string') return r;
+    const rarities = ['Common', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+    return rarities[r] || 'Common';
+};

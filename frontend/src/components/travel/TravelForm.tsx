@@ -22,16 +22,16 @@ const DURATION_OPTIONS = [
 ];
 
 const CHAIN_OPTIONS = [
-    { label: 'Ethereum', value: 1, icon: '💎' },
-    { label: 'Polygon', value: 137, icon: '💜' },
-    { label: 'BSC', value: 56, icon: '💛' },
-    { label: 'ZetaChain', value: 7001, icon: '🟢' },
+    { label: 'Ethereum Sepolia', value: 11155111, icon: '💎' },
+    { label: 'Polygon Amoy', value: 80002, icon: '💜' },
+    { label: 'BSC Testnet', value: 97, icon: '💛' },
+    { label: 'ZetaChain Athens', value: 7001, icon: '🟢' },
 ];
 
 export function TravelForm({ frogId, frogName, onSuccess }: TravelFormProps) {
     const [targetWallet, setTargetWallet] = useState('');
     const [duration, setDuration] = useState(3600);
-    const [chainId, setChainId] = useState(1);
+    const [chainId, setChainId] = useState(7001);
     const [error, setError] = useState('');
 
     const {
@@ -73,9 +73,19 @@ export function TravelForm({ frogId, frogName, onSuccess }: TravelFormProps) {
 
         // 检查合约地址是否已配置
         if (!ZETAFROG_ADDRESS) {
-            setError('合约地址未配置');
+            setError('合约地址未配置，请检查环境变量 VITE_ZETAFROG_ADDRESS');
+            console.error('ZETAFROG_ADDRESS 未配置');
             return;
         }
+
+        // 调试信息
+        console.log('发起旅行参数:', {
+            frogId,
+            targetWallet,
+            duration,
+            chainId,
+            contractAddress: ZETAFROG_ADDRESS,
+        });
 
         try {
             writeContract({
@@ -85,16 +95,33 @@ export function TravelForm({ frogId, frogName, onSuccess }: TravelFormProps) {
                 args: [BigInt(frogId), targetWallet as `0x${string}`, BigInt(duration), BigInt(chainId)],
             });
         } catch (e) {
-            setError('发起旅行失败，请重试');
+            console.error('合约调用失败:', e);
+            setError(`发起旅行失败: ${e instanceof Error ? e.message : '未知错误'}`);
         }
     };
 
     useEffect(() => {
         if (isSuccess && onSuccess) {
-            const timer = setTimeout(onSuccess, 1500);
-            return () => clearTimeout(timer);
+            // 立即触发一次刷新
+            onSuccess();
+            
+            // 触发全局事件通知其他组件，前端可以先使用临时状态
+            window.dispatchEvent(new CustomEvent('travel:started', { 
+                detail: { frogId, timestamp: Date.now(), targetWallet, duration, chainId } 
+            }));
+            
+            // 多次延迟刷新，确保后端数据完全同步
+            const timer1 = setTimeout(() => onSuccess(), 1000);
+            const timer2 = setTimeout(() => onSuccess(), 3000);
+            const timer3 = setTimeout(() => onSuccess(), 5000);
+            
+            return () => {
+                clearTimeout(timer1);
+                clearTimeout(timer2);
+                clearTimeout(timer3);
+            };
         }
-    }, [isSuccess, onSuccess]);
+    }, [isSuccess, onSuccess, frogId, targetWallet, duration, chainId]);
 
     // 如果合约未配置，显示提示
     if (!ZETAFROG_ADDRESS) {
