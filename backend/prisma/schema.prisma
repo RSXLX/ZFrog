@@ -8,24 +8,25 @@ datasource db {
 }
 
 model Frog {
-  id           Int        @id @default(autoincrement())
-  tokenId      Int        @unique
-  name         String
-  ownerAddress String
-  birthday     DateTime
-  totalTravels Int        @default(0)
-  status       FrogStatus @default(Idle)
-  xp           Int        @default(0)
-  level        Int        @default(1)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  souvenirs    Souvenir[]
-  travels      Travel[]
-  
-  // 好友关系
-  sentRequests     Friendship[]     @relation("FriendshipRequester")
-  receivedRequests Friendship[]     @relation("FriendshipAddressee")
+  id               Int                 @id @default(autoincrement())
+  tokenId          Int                 @unique
+  name             String
+  ownerAddress     String
+  birthday         DateTime
+  totalTravels     Int                 @default(0)
+  status           FrogStatus          @default(Idle)
+  xp               Int                 @default(0)
+  level            Int                 @default(1)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  p0Travels        Int                 @default(0)
   interactions     FriendInteraction[] @relation("InteractionActor")
+  receivedRequests Friendship[]        @relation("FriendshipAddressee")
+  sentRequests     Friendship[]        @relation("FriendshipRequester")
+  travelStats      FrogTravelStats?
+  souvenirs        Souvenir[]
+  travels          Travel[]
+  badges           UserBadge[]
 
   @@index([ownerAddress])
 }
@@ -34,7 +35,7 @@ model Travel {
   id                 Int                 @id @default(autoincrement())
   frogId             Int
   targetWallet       String
-  chainId            Int                 @default(1) // Default Ethereum Mainnet
+  chainId            Int                 @default(1)
   startTime          DateTime
   endTime            DateTime
   status             TravelStatus        @default(Active)
@@ -46,6 +47,13 @@ model Travel {
   completedAt        DateTime?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+  exploredBlock      BigInt?
+  exploredTimestamp  DateTime?
+  exploredSnapshot   Json?
+  diary              String?
+  diaryMood          DiaryMood?
+  souvenirData       Json?
+  isRandom           Boolean             @default(false)
   frog               Frog                @relation(fields: [frogId], references: [id])
   souvenir           Souvenir?           @relation(fields: [souvenirId], references: [id])
   observations       WalletObservation[]
@@ -53,6 +61,8 @@ model Travel {
   @@index([frogId])
   @@index([status])
   @@index([endTime])
+  @@index([exploredBlock])
+  @@index([isRandom])
 }
 
 model Souvenir {
@@ -88,37 +98,6 @@ model WalletObservation {
   @@index([walletAddress])
 }
 
-enum FrogStatus {
-  Idle
-  Traveling
-  Returning
-}
-
-enum TravelStatus {
-  Active
-  Processing
-  Completed
-  Cancelled
-  Failed
-}
-
-enum Rarity {
-  Common
-  Uncommon
-  Rare
-  Epic
-  Legendary
-}
-
-enum ImageGenerationStatus {
-  PENDING
-  GENERATING
-  PROCESSING
-  UPLOADING
-  COMPLETED
-  FAILED
-}
-
 model SouvenirImage {
   id             String                @id @default(uuid())
   odosId         String
@@ -151,53 +130,140 @@ model SouvenirImage {
   @@index([status])
 }
 
-
 model Friendship {
-  id         Int            @id @default(autoincrement())
-  requesterId Int
-  addresseeId Int
-  status     FriendshipStatus @default(Pending)
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  
-  requester  Frog           @relation("FriendshipRequester", fields: [requesterId], references: [id])
-  addressee  Frog           @relation("FriendshipAddressee", fields: [addresseeId], references: [id])
-  
-  // 好友间的互动记录
+  id           Int                 @id @default(autoincrement())
+  requesterId  Int
+  addresseeId  Int
+  status       FriendshipStatus    @default(Pending)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
   interactions FriendInteraction[]
-  
+  addressee    Frog                @relation("FriendshipAddressee", fields: [addresseeId], references: [id])
+  requester    Frog                @relation("FriendshipRequester", fields: [requesterId], references: [id])
+
   @@unique([requesterId, addresseeId])
   @@index([status])
 }
 
 model FriendInteraction {
-  id           Int               @id @default(autoincrement())
+  id           Int             @id @default(autoincrement())
   friendshipId Int
-  actorId      Int               // 发起互动的青蛙ID
+  actorId      Int
   type         InteractionType
   message      String?
-  metadata     Json?             // 额外的互动数据，如礼物信息等
-  createdAt    DateTime          @default(now())
-  
-  friendship   Friendship        @relation(fields: [friendshipId], references: [id])
-  actor        Frog              @relation("InteractionActor", fields: [actorId], references: [id])
-  
+  metadata     Json?
+  createdAt    DateTime        @default(now())
+  actor        Frog            @relation("InteractionActor", fields: [actorId], references: [id])
+  friendship   Friendship      @relation(fields: [friendshipId], references: [id])
+
   @@index([friendshipId])
   @@index([actorId])
 }
 
+model TravelBadge {
+  id              String          @id @default(cuid())
+  code            String          @unique
+  name            String
+  description     String
+  icon            String
+  unlockType      BadgeUnlockType
+  unlockCondition Json
+  rarity          Int             @default(1)
+  isHidden        Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  userBadges      UserBadge[]
+}
+
+model UserBadge {
+  id                 String      @id @default(cuid())
+  frogId             Int
+  badgeId            String
+  unlockedAt         DateTime    @default(now())
+  unlockedByTravelId Int?
+  badge              TravelBadge @relation(fields: [badgeId], references: [id])
+  frog               Frog        @relation(fields: [frogId], references: [id])
+
+  @@unique([frogId, badgeId])
+  @@index([frogId])
+}
+
+model FrogTravelStats {
+  id                   String    @id @default(cuid())
+  frogId               Int       @unique
+  totalTrips           Int       @default(0)
+  bscTrips             Int       @default(0)
+  ethTrips             Int       @default(0)
+  zetaTrips            Int       @default(0)
+  totalDiscoveries     Int       @default(0)
+  rareFinds            Int       @default(0)
+  earliestBlockVisited BigInt?
+  oldestDateVisited    DateTime?
+  updatedAt            DateTime  @updatedAt
+  frog                 Frog      @relation(fields: [frogId], references: [id])
+
+  @@index([frogId])
+}
+
+enum FrogStatus {
+  Idle
+  Traveling
+  Returning
+}
+
+enum TravelStatus {
+  Active
+  Processing
+  Completed
+  Cancelled
+  Failed
+}
+
+enum Rarity {
+  Common
+  Uncommon
+  Rare
+  Epic
+  Legendary
+}
+
+enum ImageGenerationStatus {
+  PENDING
+  GENERATING
+  PROCESSING
+  UPLOADING
+  COMPLETED
+  FAILED
+}
+
 enum FriendshipStatus {
-  Pending     // 待确认
-  Accepted    // 已接受
-  Declined    // 已拒绝
-  Blocked     // 已拉黑
+  Pending
+  Accepted
+  Declined
+  Blocked
 }
 
 enum InteractionType {
-  Visit       // 拜访
-  Feed        // 喂食
-  Play        // 玩耍
-  Gift        // 送礼
-  Message     // 留言
-  Travel      // 一起旅行
+  Visit
+  Feed
+  Play
+  Gift
+  Message
+  Travel
+}
+
+enum DiaryMood {
+  HAPPY
+  CURIOUS
+  SURPRISED
+  PEACEFUL
+  EXCITED
+  SLEEPY
+}
+
+enum BadgeUnlockType {
+  TRIP_COUNT
+  CHAIN_VISIT
+  MULTI_CHAIN
+  RARE_FIND
+  SPECIAL
 }

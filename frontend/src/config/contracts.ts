@@ -14,18 +14,18 @@ export const SOUVENIR_ADDRESS = getAddress(import.meta.env.VITE_SOUVENIR_ADDRESS
 export const ZETAFROG_ABI = [
   // === 写入函数 ===
   {
-    inputs: [{ name: 'name', type: 'string' }],
+    inputs: [{"internalType": "string", "name": "name", "type": "string"}],
     name: 'mintFrog',
-    outputs: [{ name: '', type: 'uint256' }],
+    outputs: [{"internalType": "uint256", "name": "", "type": "uint256"}],
     stateMutability: 'nonpayable',
     type: 'function'
   },
   {
     inputs: [
-      { name: 'tokenId', type: 'uint256' },
-      { name: 'targetWallet', type: 'address' },
-      { name: 'duration', type: 'uint256' },
-      { name: 'targetChainId', type: 'uint256' }
+      {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
+      {"internalType": "address", "name": "targetWallet", "type": "address"},
+      {"internalType": "uint256", "name": "duration", "type": "uint256"},
+      {"internalType": "uint256", "name": "targetChainId", "type": "uint256"}
     ],
     name: 'startTravel',
     outputs: [],
@@ -33,7 +33,7 @@ export const ZETAFROG_ABI = [
     type: 'function'
   },
   {
-    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    inputs: [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
     name: 'cancelTravel',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -42,64 +42,64 @@ export const ZETAFROG_ABI = [
 
   // === 读取函数 ===
   {
-    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    inputs: [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
     name: 'getFrog',
     outputs: [
-      { name: 'name', type: 'string' },
-      { name: 'birthday', type: 'uint64' },
-      { name: 'totalTravels', type: 'uint32' },
-      { name: 'status', type: 'uint8' },
-      { name: 'xp', type: 'uint256' },
-      { name: 'level', type: 'uint256' }
+      {"internalType": "string", "name": "name", "type": "string"},
+      {"internalType": "uint64", "name": "birthday", "type": "uint64"},
+      {"internalType": "uint32", "name": "totalTravels", "type": "uint32"},
+      {"internalType": "uint8", "name": "status", "type": "uint8"},
+      {"internalType": "uint256", "name": "xp", "type": "uint256"},
+      {"internalType": "uint256", "name": "level", "type": "uint256"}
     ],
     stateMutability: 'view',
     type: 'function'
   },
   {
-    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    inputs: [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
     name: 'getActiveTravel',
     outputs: [
-      { name: 'startTime', type: 'uint64' },
-      { name: 'endTime', type: 'uint64' },
-      { name: 'targetWallet', type: 'address' },
-      { name: 'targetChainId', type: 'uint256' },
-      { name: 'completed', type: 'bool' }
+      {"internalType": "uint64", "name": "startTime", "type": "uint64"},
+      {"internalType": "uint64", "name": "endTime", "type": "uint64"},
+      {"internalType": "address", "name": "targetWallet", "type": "address"},
+      {"internalType": "uint256", "name": "targetChainId", "type": "uint256"},
+      {"internalType": "bool", "name": "completed", "type": "bool"}
     ],
     stateMutability: 'view',
     type: 'function'
   },
   {
-    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    inputs: [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
     name: 'canTravel',
-    outputs: [{ name: '', type: 'bool' }],
+    outputs: [{"internalType": "bool", "name": "", "type": "bool"}],
     stateMutability: 'view',
     type: 'function'
   },
   {
-    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    inputs: [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
     name: 'getTravelJournals',
-    outputs: [{ name: '', type: 'string[]' }],
+    outputs: [{"internalType": "string[]", "name": "", "type": "string[]"}],
     stateMutability: 'view',
     type: 'function'
   },
   {
     inputs: [],
     name: 'totalSupply',
-    outputs: [{ name: '', type: 'uint256' }],
+    outputs: [{"internalType": "uint256", "name": "", "type": "uint256"}],
     stateMutability: 'view',
     type: 'function'
   },
   {
-    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    inputs: [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
     name: 'ownerOf',
-    outputs: [{ name: '', type: 'address' }],
+    outputs: [{"internalType": "address", "name": "", "type": "address"}],
     stateMutability: 'view',
     type: 'function'
   },
   {
-    inputs: [{ name: 'owner', type: 'address' }],
+    inputs: [{"internalType": "address", "name": "owner", "type": "address"}],
     name: 'balanceOf',
-    outputs: [{ name: '', type: 'uint256' }],
+    outputs: [{"internalType": "uint256", "name": "", "type": "uint256"}],
     stateMutability: 'view',
     type: 'function'
   },
