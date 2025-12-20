@@ -34,12 +34,12 @@ export class ImageProcessorService {
 
     // 1. 下载图片
     const response = await axios.get(imageUrl, {
-      responseType: 'stream',
+      responseType: 'arraybuffer',
       timeout: 30000,
     });
 
     // 2. 使用 Sharp 处理图片
-    let processor = sharp(response.data);
+    let processor = sharp(Buffer.from(response.data));
 
     // 3. 调整尺寸（保持宽高比）
     processor = processor.resize(targetWidth, targetHeight, {

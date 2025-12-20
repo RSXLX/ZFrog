@@ -15,6 +15,7 @@ import travelRoutes from './api/routes/travel.routes';
 import healthRoutes from './api/routes/health.routes';
 import friendsRoutes from './api/routes/friends.routes';
 import nftImageRoutes from './api/routes/nft-image.routes';
+import badgeRoutes from './api/routes/badge.routes';
 
 const app = express();
 const httpServer = createServer(app);
@@ -42,6 +43,7 @@ app.use('/api/travels', travelRoutes);
 app.use('/api/friends', friendsRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/nft-image', nftImageRoutes);
+app.use('/api/badges', badgeRoutes);
 
 // Root route
 app.get('/', (req, res) => {
