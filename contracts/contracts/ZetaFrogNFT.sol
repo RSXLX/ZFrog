@@ -41,6 +41,7 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
         address targetWallet;
         uint256 targetChainId;
         bool completed;
+        bool isRandom;          // 新增：是否随机探索
     }
 
     // ============ State Variables ============
@@ -49,7 +50,10 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
     mapping(uint256 => Travel) public activeTravels;
     mapping(uint256 => uint64) public lastTravelEnd;
     mapping(uint256 => string[]) public travelJournals;
-
+    
+    // 新增：支持的链 ID
+    mapping(uint256 => bool) public supportedChains;
+    
     address public souvenirNFT;
     address public travelManager;
 
@@ -66,8 +70,11 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
         address indexed targetWallet,
         uint256 targetChainId,
         uint64 startTime,
-        uint64 endTime
+        uint64 endTime,
+        bool isRandom              // 新增
     );
+    
+    event ChainSupportUpdated(uint256 indexed chainId, bool supported);  // 新增
 
     event TravelCompleted(
         uint256 indexed tokenId,
@@ -93,6 +100,16 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
     // ============ Constructor ============
     constructor() ERC721("ZetaFrog", "ZFROG") Ownable(msg.sender) {
         travelManager = msg.sender;
+        _initializeSupportedChains();
+    }
+    
+    // 新增：初始化支持的链
+    function _initializeSupportedChains() internal {
+        supportedChains[97] = true;       // BSC Testnet
+        supportedChains[11155111] = true; // ETH Sepolia
+        supportedChains[7001] = true;     // ZetaChain Athens
+        supportedChains[80001] = true;    // Polygon Mumbai
+        supportedChains[421613] = true;   // Arbitrum Goerli
     }
 
     // ============ Admin Functions ============
@@ -104,6 +121,12 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
     function setSouvenirNFT(address _souvenir) external onlyOwner {
         require(_souvenir != address(0), "Invalid address");
         souvenirNFT = _souvenir;
+    }
+    
+    // 新增：管理支持的链
+    function setSupportedChain(uint256 chainId, bool supported) external onlyOwner {
+        supportedChains[chainId] = supported;
+        emit ChainSupportUpdated(chainId, supported);
     }
 
     function pause() external onlyOwner {
@@ -163,13 +186,16 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
     ) external whenNotPaused nonReentrant onlyFrogOwner(tokenId) {
         Frog storage frog = frogs[tokenId];
         require(frog.status == FrogStatus.Idle, "Frog is busy");
-        require(targetWallet != address(0), "Invalid target");
+        require(supportedChains[targetChainId], "Chain not supported");
         require(duration >= MIN_TRAVEL_DURATION, "Duration too short");
         require(duration <= MAX_TRAVEL_DURATION, "Duration too long");
         require(
             block.timestamp >= lastTravelEnd[tokenId] + COOLDOWN_PERIOD,
             "Still in cooldown"
         );
+        
+        // 关键修改：允许零地址（随机探索）
+        bool isRandom = (targetWallet == address(0));
 
         frog.status = FrogStatus.Traveling;
 
@@ -181,10 +207,11 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
             endTime: endTime,
             targetWallet: targetWallet,
             targetChainId: targetChainId,
-            completed: false
+            completed: false,
+            isRandom: isRandom
         });
 
-        emit TravelStarted(tokenId, targetWallet, targetChainId, startTime, endTime);
+        emit TravelStarted(tokenId, targetWallet, targetChainId, startTime, endTime, isRandom);
     }
 
     /**
@@ -300,7 +327,8 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
             uint64 endTime,
             address targetWallet,
             uint256 targetChainId,
-            bool completed
+            bool completed,
+            bool isRandom       // 新增返回值
         )
     {
         Travel memory travel = activeTravels[tokenId];
@@ -309,8 +337,13 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
             travel.endTime,
             travel.targetWallet,
             travel.targetChainId,
-            travel.completed
+            travel.completed,
+            travel.isRandom
         );
+    }
+    
+    function isChainSupported(uint256 chainId) external view returns (bool) {
+        return supportedChains[chainId];
     }
 
     function getTravelJournals(uint256 tokenId)

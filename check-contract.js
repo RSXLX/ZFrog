@@ -3,7 +3,7 @@ const { privateKeyToAccount } = require('viem/accounts');
 const { createWalletClient } = require('viem');
 
 // 合约地址
-const ZETAFROG_ADDRESS = "0x691A531469e70300ebb09A9323bdcea18BA00E25";
+const ZETAFROG_ADDRESS = "0xE8615ffC22ff570aB21DFBE161E7Ef68820626e3";
 const RELAYER_PRIVATE_KEY = "3cdf8ed8657b4dbb0cb06b231a90f2caa272a936e26dfacf93df5024d5d857fc";
 
 // ZetaChain Athens Testnet
