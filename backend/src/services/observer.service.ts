@@ -12,6 +12,8 @@ export interface ObservationResult {
   notableEvents: NotableEvent[];
   observedFrom: Date;
   observedTo: Date;
+  nativeBalance?: string;  // 新增
+  protocols?: string[];   // 新增
 }
 
 export interface TransactionSummary {

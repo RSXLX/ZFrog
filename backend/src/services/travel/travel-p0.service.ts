@@ -284,7 +284,9 @@ class TravelP0Service {
       BSC_TESTNET: 'bscTrips',
       ETH_SEPOLIA: 'ethTrips',
       ZETACHAIN_ATHENS: 'zetaTrips',
-    }[chain] as 'bscTrips' | 'ethTrips' | 'zetaTrips';
+      POLYGON_MUMBAI: 'polygonTrips',
+      ARBITRUM_GOERLI: 'arbitrumTrips',
+    }[chain] as 'bscTrips' | 'ethTrips' | 'zetaTrips' | 'polygonTrips' | 'arbitrumTrips';
 
     const rareFinds = discoveries.filter(d => d.rarity >= 4).length;
 

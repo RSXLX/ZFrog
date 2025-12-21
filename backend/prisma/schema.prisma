@@ -32,70 +32,131 @@ model Frog {
 }
 
 model Travel {
-  id                 Int                 @id @default(autoincrement())
+  id                 Int                    @id @default(autoincrement())
   frogId             Int
-  targetWallet       String
-  chainId            Int                 @default(1)
+   
+  // 目标信息（升级）
+  targetWallet       String                 // 目标钱包地址
+  targetChain        ChainType              @default(ZETACHAIN_ATHENS)  // 目标链类型
+  chainId            Int                    @default(7001)              // 数值型 chainId，与合约一致
+  
+  // 随机探索支持
+  isRandom           Boolean                @default(false)             // 是否随机探索
+  originalTarget     String?                                           // 原始目标（随机时为零地址）
+  discoveredAt       DateTime?                                         // 地址发现时间
+  
+  // 时间
   startTime          DateTime
   endTime            DateTime
-  status             TravelStatus        @default(Active)
+  duration           Int                    @default(3600)              // 旅行时长（秒），默认1小时
+  
+  // 状态
+  status             TravelStatus           @default(Active)
+  currentStage       TravelStage            @default(DEPARTING)         // 当前阶段
+  progress           Int                    @default(0)                  // 进度 0-100
+  
+  // 跨链交易追踪
+  startTxHash        String?                                           // 开始旅行的交易哈希
+  completeTxHash     String?                                           // 完成旅行的交易哈希
+  
+  // 观察结果
   observedTxCount    Int?
   observedTotalValue String?
+  
+  // AI 生成内容
   journalHash        String?
   journalContent     String?
+  
+  // 纪念品
   souvenirId         Int?
+  
+  // 错误处理
+  errorMessage       String?                                           // 错误信息
+  
+  // 时间戳
   completedAt        DateTime?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  
+  // 兼容旧字段
   exploredBlock      BigInt?
   exploredTimestamp  DateTime?
   exploredSnapshot   Json?
   diary              String?
   diaryMood          DiaryMood?
   souvenirData       Json?
-  isRandom           Boolean             @default(false)
-  frog               Frog                @relation(fields: [frogId], references: [id])
-  souvenir           Souvenir?           @relation(fields: [souvenirId], references: [id])
+  addressDiscoveredAt DateTime?
+  originalTargetAddress String?
+  
+  // 关联
+  frog               Frog                   @relation(fields: [frogId], references: [id])
+  souvenir           Souvenir?              @relation(fields: [souvenirId], references: [id])
   observations       WalletObservation[]
+  statusMessages     TravelStatusMessage[]  // 状态消息
 
   @@index([frogId])
   @@index([status])
   @@index([endTime])
+  @@index([targetChain])                                          // 新增索引
   @@index([exploredBlock])
   @@index([isRandom])
+  @@index([addressDiscoveredAt])
+}
+
+// 新增：旅行状态消息
+model TravelStatusMessage {
+  id          Int         @id @default(autoincrement())
+  travelId    Int
+  message     String
+  messageType MessageType @default(INFO)
+  createdAt   DateTime    @default(now())
+  
+  travel      Travel      @relation(fields: [travelId], references: [id])
+  
+  @@index([travelId])
 }
 
 model Souvenir {
-  id          Int      @id @default(autoincrement())
-  tokenId     Int      @unique
+  id          Int        @id @default(autoincrement())
+  tokenId     Int        @unique
   frogId      Int
   name        String
   rarity      Rarity
   metadataUri String?
+  chainType   ChainType  @default(ZETACHAIN_ATHENS)                 // 来源链
   mintedAt    DateTime
-  createdAt   DateTime @default(now())
-  frog        Frog     @relation(fields: [frogId], references: [id])
+  createdAt   DateTime   @default(now())
+  frog        Frog       @relation(fields: [frogId], references: [id])
   travels     Travel[]
 
   @@index([frogId])
+  @@index([chainType])                                               // 新增索引
 }
 
 model WalletObservation {
-  id            Int      @id @default(autoincrement())
-  travelId      Int
-  walletAddress String
-  chainId       Int
-  transactions  Json
-  totalTxCount  Int
-  totalValueWei String
-  notableEvents Json?
-  observedFrom  DateTime
-  observedTo    DateTime
-  createdAt     DateTime @default(now())
-  travel        Travel   @relation(fields: [travelId], references: [id])
+  id             Int       @id @default(autoincrement())
+  travelId       Int
+  walletAddress  String
+  chainId        Int
+  chainType      ChainType @default(ZETACHAIN_ATHENS)               // 新增
+  transactions   Json
+  totalTxCount   Int
+  totalValueWei  String
+  notableEvents  Json?
+  
+  // 新增：更详细的观察数据
+  nativeBalance  String?                                             // 原生代币余额
+  tokenBalances  Json?                                               // 代币余额
+  protocols      String[]  @default([])                              // 交互的协议
+  
+  observedFrom   DateTime
+  observedTo     DateTime
+  createdAt      DateTime  @default(now())
+  travel         Travel    @relation(fields: [travelId], references: [id])
 
   @@index([travelId])
   @@index([walletAddress])
+  @@index([chainType])                                               // 新增索引
 }
 
 model SouvenirImage {
@@ -211,11 +272,29 @@ enum FrogStatus {
 }
 
 enum TravelStatus {
-  Active
-  Processing
-  Completed
-  Cancelled
-  Failed
+  Active      // 旅行中
+  Processing  // 处理中（观察钱包、生成AI内容）
+  Completed   // 已完成
+  Cancelled   // 已取消
+  Failed      // 失败
+}
+
+// 新增：旅行阶段
+enum TravelStage {
+  DEPARTING   // 出发中
+  CROSSING    // 跨链穿越中
+  ARRIVING    // 到达中
+  EXPLORING   // 探索中
+  RETURNING   // 返程中
+}
+
+// 新增：消息类型
+enum MessageType {
+  INFO
+  DISCOVERY
+  JOKE
+  WARNING
+  ERROR
 }
 
 enum Rarity {
@@ -224,6 +303,15 @@ enum Rarity {
   Rare
   Epic
   Legendary
+}
+
+// 新增：支持的链类型（与 chains.ts 保持一致）
+enum ChainType {
+  BSC_TESTNET       // chainId: 97
+  ETH_SEPOLIA       // chainId: 11155111
+  ZETACHAIN_ATHENS  // chainId: 7001
+  POLYGON_MUMBAI    // chainId: 80001 (可选扩展)
+  ARBITRUM_GOERLI   // chainId: 421613 (可选扩展)
 }
 
 enum ImageGenerationStatus {

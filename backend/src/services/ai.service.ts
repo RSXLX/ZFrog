@@ -28,11 +28,31 @@ class AIService {
         frogName: string,
         observation: ObservationResult,
         travelDuration: number,
-        isRandom: boolean = false
+        options?: boolean | {
+            chainName?: string;
+            chainScenery?: string;
+            chainVibe?: string;
+            isRandom?: boolean;
+        }
     ): Promise<GeneratedJournal> {
+        // 处理向后兼容性
+        let isRandom = false;
+        let chainInfo: { chainName?: string; chainScenery?: string; chainVibe?: string } = {};
+        
+        if (typeof options === 'boolean') {
+            isRandom = options;
+        } else if (options) {
+            isRandom = options.isRandom || false;
+            chainInfo = {
+                chainName: options.chainName,
+                chainScenery: options.chainScenery,
+                chainVibe: options.chainVibe,
+            };
+        }
+        
         logger.info(`Generating journal for ${frogName}'s travel (isRandom: ${isRandom})`);
         
-        const prompt = this.buildPrompt(frogName, observation, travelDuration, isRandom);
+        const prompt = this.buildPrompt(frogName, observation, travelDuration, isRandom, chainInfo);
         
         try {
             // 增加重试机制
@@ -120,7 +140,8 @@ class AIService {
         frogName: string,
         observation: ObservationResult,
         travelDuration: number,
-        isRandom: boolean = false
+        isRandom: boolean = false,
+        chainInfo?: { chainName?: string; chainScenery?: string; chainVibe?: string }
     ): string {
         const txCount = observation.totalTxCount;
         const notableEvents = observation.notableEvents;

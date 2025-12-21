@@ -46,6 +46,57 @@ type FrogData = readonly [
 ];
 
 /**
+ * GET /api/frogs/world-online
+ * 获取世界在线青蛙列表
+ */
+router.get('/world-online', async (req, res) => {
+    try {
+        const { limit = 20, offset = 0 } = req.query;
+        const maxLimit = Math.min(parseInt(limit as string), 50);
+        const skipOffset = Math.max(parseInt(offset as string), 0);
+
+        // 获取所有青蛙，按最后活动时间排序
+        const frogs = await prisma.frog.findMany({
+            where: {
+                // 可以添加过滤条件，比如最近一段时间内有活动的青蛙
+                updatedAt: {
+                    gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // 最近7天内有活动
+                }
+            },
+            include: {
+                travels: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 1
+                }
+            },
+            orderBy: [
+                { updatedAt: 'desc' },
+                { level: 'desc' },
+                { xp: 'desc' }
+            ],
+            take: maxLimit,
+            skip: skipOffset
+        });
+
+        // 获取在线状态
+        const { isFrogOnline } = await import('../../websocket');
+        const frogsWithOnlineStatus = frogs.map(frog => ({
+            ...frog,
+            isOnline: isFrogOnline(frog.id)
+        }));
+
+        res.json({
+            success: true,
+            data: stringifyBigInt(frogsWithOnlineStatus),
+            total: frogs.length
+        });
+    } catch (error) {
+        console.error('Error fetching world online frogs:', error);
+        res.status(500).json({ error: 'Failed to fetch world online frogs' });
+    }
+});
+
+/**
  * GET /api/frogs/search
  * 搜索青蛙（支持按地址、名称或tokenId搜索）
  */
@@ -62,11 +113,14 @@ router.get('/search', async (req, res) => {
 
         let frogs: any[] = [];
 
-        // 如果是以0x开头，按地址搜索
-        if (searchTerm.startsWith('0x')) {
+        // 优先处理钱包地址搜索 - 更精确的匹配
+        if (searchTerm.startsWith('0x') && searchTerm.length >= 10) {
             frogs = await prisma.frog.findMany({
                 where: {
-                    ownerAddress: searchTerm.toLowerCase()
+                    ownerAddress: {
+                        equals: searchTerm.toLowerCase(),
+                        mode: 'insensitive'
+                    }
                 },
                 include: {
                     travels: {

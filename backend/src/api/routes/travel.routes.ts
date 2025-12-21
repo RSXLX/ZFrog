@@ -3,7 +3,9 @@ import { prisma } from '../../database';
 import { TravelStatus } from '@prisma/client';
 import { travelP0Service } from '../../services/travel/travel-p0.service';
 import { explorationService } from '../../services/travel/exploration.service';
-import { ChainKey } from '../../config/chains';
+import { ChainKey, SUPPORTED_CHAINS } from '../../config/chains';
+import { travelProcessor } from '../../workers/travelProcessor';
+import { logger } from '../../utils/logger';
 
 // 递归处理 BigInt 序列化问题
 // ... (原有代码)
@@ -419,6 +421,77 @@ router.get('/journal/:travelId', async (req, res) => {
     } catch (error) {
         console.error('Error fetching journal:', error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * POST /api/travels/start
+ * 开始链上随机探索旅行
+ */
+router.post('/start', async (req, res) => {
+    try {
+        const { frogId, travelType = 'RANDOM', targetChain, targetAddress, duration } = req.body;
+        
+        if (!frogId) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'frogId is required' 
+            });
+        }
+        
+        // 根据tokenId查找青蛙的数据库id
+        const frog = await prisma.frog.findUnique({
+            where: { tokenId: parseInt(frogId) },
+        });
+        
+        if (!frog) {
+            return res.status(404).json({ 
+                success: false, 
+                error: 'Frog not found' 
+            });
+        }
+        
+        // 如果是随机探索且没有提供目标地址，使用零地址
+        const finalTargetAddress = travelType === 'RANDOM' && !targetAddress 
+            ? '0x0000000000000000000000000000000000000000' 
+            : targetAddress;
+        
+        // 创建旅行记录
+        const travel = await prisma.travel.create({
+            data: {
+                frogId: frog.id,
+                targetWallet: finalTargetAddress,
+                chainId: SUPPORTED_CHAINS[targetChain as ChainKey]?.chainId || 7001,
+                status: TravelStatus.Active,
+                startTime: new Date(),
+                endTime: new Date(Date.now() + (duration || 60) * 1000), // 默认60秒
+                isRandom: travelType === 'RANDOM',
+            },
+            include: {
+                frog: true,
+            },
+        });
+        
+        // 启动后台处理
+        travelProcessor.processTravel(travel).catch((error: any) => {
+            logger.error(`Failed to process travel ${travel.id}:`, error);
+        });
+        
+        res.json({
+            success: true,
+            data: {
+                travelId: travel.id,
+                txHash: '0x' + Math.random().toString(16).slice(2, 66), // 临时模拟hash
+            },
+            message: '🐸 青蛙背上小书包出发啦！',
+        });
+        
+    } catch (error: any) {
+        console.error('Error starting travel:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message || 'Internal server error' 
+        });
     }
 });
 

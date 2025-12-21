@@ -15,20 +15,43 @@ const router = Router();
  * 发送好友请求
  */
 router.post('/request', async (req, res) => {
-  try {
-    const { requesterId, addresseeId } = req.body;
+    try {
+        const { requesterId, addresseeId, walletAddress } = req.body;
 
-    if (!requesterId || !addresseeId) {
-      return res.status(400).json({ error: 'Requester ID and addressee ID are required' });
-    }
+        if (!requesterId) {
+            return res.status(400).json({ error: 'Requester ID is required' });
+        }
 
-    if (requesterId === addresseeId) {
+        let targetAddresseeId = addresseeId;
+
+        // 如果提供了钱包地址，根据地址查找青蛙
+        if (walletAddress && !addresseeId) {
+            const targetFrog = await prisma.frog.findFirst({
+                where: {
+                    ownerAddress: {
+                        equals: walletAddress.toLowerCase(),
+                        mode: 'insensitive'
+                    }
+                }
+            });
+
+            if (!targetFrog) {
+                return res.status(404).json({ error: 'No frog found with this wallet address' });
+            }
+
+            targetAddresseeId = targetFrog.id;
+        }
+
+        if (!targetAddresseeId) {
+            return res.status(400).json({ error: 'Addressee ID or wallet address is required' });
+        }
+    if (requesterId === targetAddresseeId) {
       return res.status(400).json({ error: 'Cannot send friend request to yourself' });
     }
 
     // 检查青蛙是否存在
     const requester = await prisma.frog.findUnique({ where: { id: requesterId } });
-    const addressee = await prisma.frog.findUnique({ where: { id: addresseeId } });
+    const addressee = await prisma.frog.findUnique({ where: { id: targetAddresseeId } });
 
     if (!requester || !addressee) {
       return res.status(404).json({ error: 'One or both frogs not found' });
@@ -38,8 +61,8 @@ router.post('/request', async (req, res) => {
     const existingFriendship = await prisma.friendship.findFirst({
       where: {
         OR: [
-          { requesterId, addresseeId },
-          { requesterId: addresseeId, addresseeId: requesterId }
+          { requesterId, addresseeId: targetAddresseeId },
+          { requesterId: targetAddresseeId, addresseeId: requesterId }
         ]
       }
     });
@@ -67,7 +90,7 @@ router.post('/request', async (req, res) => {
     const friendship = await prisma.friendship.create({
       data: {
         requesterId,
-        addresseeId,
+        addresseeId: targetAddresseeId,
         status: FriendshipStatus.Pending
       },
       include: {
@@ -76,8 +99,8 @@ router.post('/request', async (req, res) => {
       }
     });
 
-    // 发送WebSocket通知给被请求者
-    notifyFriendRequestReceived(addresseeId, friendship);
+    // 发送WebSocket通知给接收者
+    notifyFriendRequestReceived(targetAddresseeId, friendship);
 
     res.status(201).json(friendship);
   } catch (error) {
