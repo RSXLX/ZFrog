@@ -79,7 +79,7 @@ export function TravelHistoryPage() {
     const [travels, setTravels] = useState<Travel[]>([]);
     const [stats, setStats] = useState<TravelStats | null>(null);
     const [frogs, setFrogs] = useState<Frog[]>([]);
-    const [selectedFrogId, setSelectedFrogId] = useState<string>('');
+    const [selectedFrogId, setSelectedFrogId] = useState<string>('all');
     const [loading, setLoading] = useState(true);
     const [selectedTravel, setSelectedTravel] = useState<Travel | null>(null);
     const [souvenirImages, setSouvenirImages] = useState<Record<string, string>>({});
@@ -89,13 +89,13 @@ export function TravelHistoryPage() {
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        const fId = params.get('frogId') || '';
+        const fId = params.get('frogId') || 'all';
         setSelectedFrogId(fId);
         if (address) {
             fetchFrogs();
-            fetchData(fId);
+            fetchData(fId === 'all' ? null : fId);
         }
-    }, [page, address]);
+    }, [page, address, selectedFrogId]);
 
     const fetchFrogs = async () => {
         if (!address) return;
@@ -245,19 +245,17 @@ export function TravelHistoryPage() {
                                 const newId = e.target.value;
                                 setSelectedFrogId(newId);
                                 setPage(1);
-                                fetchData(newId);
-                                // 更新 URL
                                 const url = new URL(window.location.href);
-                                if (newId) url.searchParams.set('frogId', newId);
+                                if (newId && newId !== 'all') url.searchParams.set('frogId', newId);
                                 else url.searchParams.delete('frogId');
                                 window.history.replaceState({}, '', url);
                             }}
                             className="bg-transparent border-none focus:ring-0 text-gray-800 font-medium cursor-pointer"
                         >
-                            <option value="">全部青蛙</option>
+                            <option value="all">🐸 所有青蛙</option>
                             {frogs.map(frog => (
                                 <option key={frog.id} value={frog.tokenId}>
-                                    {frog.name} (#{frog.tokenId})
+                                    🐸 {frog.name} (#{frog.tokenId})
                                 </option>
                             ))}
                         </select>

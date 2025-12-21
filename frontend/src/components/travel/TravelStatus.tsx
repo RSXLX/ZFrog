@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { LANDMARKS } from '../../config/landmarks';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import type { Travel } from '../../types';
 
 export interface TravelStatusProps {
@@ -12,6 +13,12 @@ export interface TravelStatusProps {
 export function TravelStatus({ travel, frogName }: TravelStatusProps) {
     const [timeRemaining, setTimeRemaining] = useState<string>('');
     const [progress, setProgress] = useState(0);
+    const [stage, setStage] = useState<string>('ACTIVE');
+    const [message, setMessage] = useState('');
+    const [targetAddress, setTargetAddress] = useState<string>('');
+    const [isDiscovering, setIsDiscovering] = useState(false);
+
+    const { socket } = useWebSocket();
 
     useEffect(() => {
         const updateTime = () => {
@@ -52,6 +59,49 @@ export function TravelStatus({ travel, frogName }: TravelStatusProps) {
         return () => clearInterval(interval);
     }, [travel.startTime, travel.endTime]);
 
+    // WebSocket 事件监听
+    useEffect(() => {
+        if (!socket) return;
+
+        // 监听旅行更新
+        socket.on('travel:update', (data) => {
+            if (data.payload.travelId !== travel.id) return;
+
+            setStage(data.payload.stage);
+            setMessage(data.payload.message?.text || '');
+
+            // 处理地址发现阶段
+            if (data.payload.stage === 'DISCOVERING') {
+                setIsDiscovering(true);
+                
+                // 从消息中提取地址
+                const addressMatch = data.payload.message?.text.match(/0x[a-fA-F0-9]{40}/);
+                if (addressMatch) {
+                    setTargetAddress(addressMatch[0]);
+                    setIsDiscovering(false);
+                }
+                
+                // 从 payload 中直接获取地址
+                if (data.payload.message?.address) {
+                    setTargetAddress(data.payload.message.address);
+                    setIsDiscovering(false);
+                }
+            }
+        });
+
+        // 监听旅行错误
+        socket.on('travel:error', (data) => {
+            if (data.payload.travelId !== travel.id) return;
+            setMessage(data.payload.error || '发生错误');
+            setIsDiscovering(false);
+        });
+
+        return () => {
+            socket.off('travel:update');
+            socket.off('travel:error');
+        };
+    }, [socket, travel.id]);
+
     const shortenAddress = (address: string) => {
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
     };
@@ -85,12 +135,57 @@ export function TravelStatus({ travel, frogName }: TravelStatusProps) {
                 </div>
             </div>
 
+            {/* 地址发现状态 */}
+            {isDiscovering && (
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4">
+                    <div className="flex items-center space-x-3">
+                        <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                            className="text-2xl"
+                        >
+                            🎲
+                        </motion.div>
+                        <div>
+                            <p className="font-medium text-purple-800">正在发现目标地址...</p>
+                            <p className="text-sm text-purple-600">青蛙正在寻找有趣的探索目标</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 显示发现的地址 */}
+            {targetAddress && (
+                <div className="bg-green-50 rounded-lg p-3">
+                    <p className="text-sm text-green-600 mb-1">发现目标地址：</p>
+                    <a 
+                        href={`https://etherscan.io/address/${targetAddress}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-sm text-green-800 hover:underline"
+                    >
+                        {targetAddress.slice(0, 6)}...{targetAddress.slice(-4)}
+                    </a>
+                </div>
+            )}
+
+            {/* 消息显示 */}
+            {message && (
+                <div className="bg-blue-50 rounded-lg p-3">
+                    <p className="text-sm text-blue-800">{message}</p>
+                </div>
+            )}
+
             {/* 旅行信息 */}
             <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="bg-white/50 rounded-lg p-3">
                     <p className="text-gray-500">目的地</p>
                     <div className="font-mono font-medium text-gray-800">
                         {(() => {
+                            // 如果是随机探索且已发现地址，显示发现的地址
+                            if (travel.isRandom && targetAddress) {
+                                return shortenAddress(targetAddress);
+                            }
                             // 尝试在所有链的推荐地点中查找名称
                             for (const chainId in LANDMARKS) {
                                 const found = LANDMARKS[chainId].find(
@@ -98,7 +193,7 @@ export function TravelStatus({ travel, frogName }: TravelStatusProps) {
                                 );
                                 if (found) return found.name;
                             }
-                            return shortenAddress(travel.targetWallet);
+                            return travel.isRandom ? '🎲 随机探索' : shortenAddress(travel.targetWallet);
                         })()}
                     </div>
                 </div>
@@ -114,7 +209,10 @@ export function TravelStatus({ travel, frogName }: TravelStatusProps) {
                     animate={{ opacity: [1, 0.5, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}
                 >
-                    🐸 {frogName} 正在探索新世界...
+                    {isDiscovering ? 
+                        `🎲 ${frogName} 正在寻找探索目标...` : 
+                        `🐸 ${frogName} 正在探索新世界...`
+                    }
                 </motion.span>
             </div>
         </motion.div>

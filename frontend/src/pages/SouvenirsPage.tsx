@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAccount } from 'wagmi';
 import { apiService, type Frog } from '../services/api';
 import { Loading } from '../components/common/Loading';
 import { format } from 'date-fns';
@@ -30,23 +31,102 @@ const rarityConfig: Record<string, { color: string, label: string }> = {
 export function SouvenirsPage() {
     const { frogId } = useParams<{ frogId: string }>();
     const navigate = useNavigate();
+    const { address } = useAccount();
     const [frog, setFrog] = useState<Frog | null>(null);
+    const [allFrogs, setAllFrogs] = useState<Frog[]>([]);
+    const [selectedFrogId, setSelectedFrogId] = useState<string>('all');
     const [souvenirs, setSouvenirs] = useState<SouvenirDisplay[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedSouvenir, setSelectedSouvenir] = useState<SouvenirDisplay | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
-            if (!frogId) return;
+            if (!address) return;
+            
             try {
                 setIsLoading(true);
-                const tokenId = parseInt(frogId);
-                const frogData = await apiService.getFrogDetail(tokenId);
-                setFrog(frogData);
-
-                // 获取旅行历史以提取纪念品
-                const travels = await apiService.getFrogsTravels(tokenId);
-                const allSouvenirs: SouvenirDisplay[] = [];
+                
+                // 获取用户的所有青蛙
+                const frogs = await apiService.getFrogsByOwner(address);
+                setAllFrogs(frogs);
+                
+                // 如果URL中有frogId参数，优先使用它
+                if (frogId) {
+                    setSelectedFrogId(frogId);
+                    const frogData = await apiService.getFrogDetail(parseInt(frogId));
+                    setFrog(frogData);
+                    
+                    // 获取纪念品
+                    const souvenirData = await apiService.getSouvenirs(parseInt(frogId));
+                    const allSouvenirs: SouvenirDisplay[] = [];
+                    
+                    if (souvenirData && Array.isArray(souvenirData)) {
+                        souvenirData.forEach((souvenir: any) => {
+                            allSouvenirs.push({
+                                id: souvenir.id,
+                                name: souvenir.name,
+                                description: `${souvenir.rarity} 纪念品`,
+                                rarity: souvenir.rarity,
+                                type: 'NFT',
+                                emoji: '🎁',
+                                imageUrl: souvenir.metadataUri,
+                                date: new Date(souvenir.mintedAt || souvenir.createdAt),
+                                travelId: souvenir.travelId || 0
+                            });
+                        });
+                    }
+                    
+                    setSouvenirs(allSouvenirs);
+                } else if (selectedFrogId !== 'all' && selectedFrogId !== '') {
+                    // 获取选中青蛙的纪念品
+                    const frogData = await apiService.getFrogDetail(parseInt(selectedFrogId));
+                    setFrog(frogData);
+                    
+                    const souvenirData = await apiService.getSouvenirs(parseInt(selectedFrogId));
+                    const allSouvenirs: SouvenirDisplay[] = [];
+                    
+                    if (souvenirData && Array.isArray(souvenirData)) {
+                        souvenirData.forEach((souvenir: any) => {
+                            allSouvenirs.push({
+                                id: souvenir.id,
+                                name: souvenir.name,
+                                description: `${souvenir.rarity} 纪念品`,
+                                rarity: souvenir.rarity,
+                                type: 'NFT',
+                                emoji: '🎁',
+                                imageUrl: souvenir.metadataUri,
+                                date: new Date(souvenir.mintedAt || souvenir.createdAt),
+                                travelId: souvenir.travelId || 0
+                            });
+                        });
+                    }
+                    
+                    setSouvenirs(allSouvenirs);
+                } else {
+                    // 获取所有青蛙的纪念品
+                    const allSouvenirsData = await apiService.getSouvenirs(undefined, address);
+                    const allSouvenirs: SouvenirDisplay[] = [];
+                    
+                    allSouvenirsData.forEach((frogData: any) => {
+                        if (frogData.souvenirs && Array.isArray(frogData.souvenirs)) {
+                            frogData.souvenirs.forEach((souvenir: any) => {
+                                allSouvenirs.push({
+                                    id: souvenir.id,
+                                    name: `${frogData.frogName} - ${souvenir.name}`,
+                                    description: `${souvenir.rarity} 纪念品`,
+                                    rarity: souvenir.rarity,
+                                    type: 'NFT',
+                                    emoji: '🎁',
+                                    imageUrl: souvenir.metadataUri,
+                                    date: new Date(souvenir.mintedAt || souvenir.createdAt),
+                                    travelId: souvenir.travelId || 0
+                                });
+                            });
+                        }
+                    });
+                    
+                    setSouvenirs(allSouvenirs);
+                }
 
                 travels.forEach((t: any) => {
                     // 1. 处理普通纪念品关系
@@ -107,7 +187,7 @@ export function SouvenirsPage() {
         };
 
         fetchData();
-    }, [frogId]);
+    }, [address, frogId, selectedFrogId]);
 
     const getChainName = (chainId: number) => {
         const chains: Record<number, string> = {
@@ -140,9 +220,27 @@ export function SouvenirsPage() {
                         </button>
                         <div>
                             <h1 className="text-3xl font-bold text-gray-800">纪念品收藏</h1>
-                            <p className="text-gray-500">{frog?.name} 的冒险珍藏 ({souvenirs.length})</p>
+                            <p className="text-gray-500">
+                                {selectedFrogId === 'all' ? '所有青蛙' : frog?.name} 的冒险珍藏 ({souvenirs.length})
+                            </p>
                         </div>
                     </div>
+                    
+                    {/* 青蛙选择器 */}
+                    {allFrogs.length > 0 && (
+                        <select
+                            value={selectedFrogId}
+                            onChange={(e) => setSelectedFrogId(e.target.value)}
+                            className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        >
+                            <option value="all">🐸 所有青蛙</option>
+                            {allFrogs.map((frog) => (
+                                <option key={frog.id} value={frog.id}>
+                                    🐸 {frog.name} (#{frog.tokenId})
+                                </option>
+                            ))}
+                        </select>
+                    )}
                 </div>
 
                 {souvenirs.length === 0 ? (

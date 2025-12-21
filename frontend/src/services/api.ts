@@ -137,6 +137,18 @@ class ApiService {
   }
 
   /**
+   * 获取旅行历史（支持青蛙筛选）
+   */
+  async getTravelHistory(address: string, frogId?: number): Promise<any> {
+    const params = new URLSearchParams({ address });
+    if (frogId) {
+      params.append('frogId', frogId.toString());
+    }
+    const res = await this.get(`/api/travels/history?${params}`);
+    return res.data;
+  }
+
+  /**
    * 获取纪念品图片生成状态
    */
   async getSouvenirImageStatus(souvenirId: string) {
@@ -144,9 +156,100 @@ class ApiService {
     return res;
   }
 
+  /**
+   * 获取徽章（支持青蛙筛选）
+   */
+  async getBadges(frogId?: number, ownerAddress?: string): Promise<any> {
+    if (frogId) {
+      const res = await this.get(`/api/badges/${frogId}`);
+      return res.data;
+    } else if (ownerAddress) {
+      const res = await this.get(`/api/badges?ownerAddress=${ownerAddress}`);
+      return res.data;
+    }
+    return [];
+  }
+
+  /**
+   * 获取纪念品（支持青蛙筛选）
+   */
+  async getSouvenirs(frogId?: number, ownerAddress?: string): Promise<any> {
+    if (frogId) {
+      const res = await this.get(`/api/souvenirs/${frogId}`);
+      return res.data;
+    } else if (ownerAddress) {
+      const res = await this.get(`/api/souvenirs?ownerAddress=${ownerAddress}`);
+      return res.data;
+    }
+    return [];
+  }
+
   async discoverLuckyAddress(chain: string) {
     const res = await this.get(`/api/travels/lucky-address?chain=${chain}`);
     return res.data;
+  }
+
+  /**
+   * 开始随机探索
+   */
+  async startRandomTravel(
+    frogId: number,
+    targetChain: string,
+    duration: number
+  ): Promise<{ travelId: number; txHash: string }> {
+    try {
+      const response = await this.post('/api/travel/start', {
+        frogId,
+        travelType: 'RANDOM',
+        targetChain,
+        // 不传 targetAddress，后端会使用零地址
+        duration,
+      });
+
+      if (!response.success) {
+        throw new Error(response.data?.error?.message || 'Failed to start travel');
+      }
+
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to start random travel:', error);
+      
+      // 用户友好的错误消息
+      if (error.message.includes('Invalid target')) {
+        throw new Error('合约不支持随机探索，请联系管理员更新合约');
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * 开始指定地址旅行
+   */
+  async startTargetedTravel(
+    frogId: number,
+    targetChain: string,
+    targetAddress: string,
+    duration: number
+  ): Promise<{ travelId: number; txHash: string }> {
+    // 验证地址格式
+    if (!targetAddress || !/^0x[a-fA-F0-9]{40}$/.test(targetAddress)) {
+      throw new Error('Invalid target address format');
+    }
+
+    const response = await this.post('/api/travel/start', {
+      frogId,
+      travelType: 'TARGETED',
+      targetChain,
+      targetAddress, // 明确指定地址
+      duration,
+    });
+
+    if (!response.success) {
+      throw new Error(response.data?.error?.message || 'Failed to start travel');
+    }
+
+    return response.data;
   }
 }
 

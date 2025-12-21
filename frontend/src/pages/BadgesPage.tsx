@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAccount } from 'wagmi';
 import { Button } from '../components/common/Button';
 import { apiService } from '../services/api';
 import { useFrogStore } from '../stores/frogStore';
@@ -38,33 +39,56 @@ const rarityStars = {
 export function BadgesPage() {
     const navigate = useNavigate();
     const [badges, setBadges] = useState<Badge[]>([]);
+    const [allFrogs, setAllFrogs] = useState<any[]>([]);
+    const [selectedFrogId, setSelectedFrogId] = useState<string>('all');
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'unlocked' | 'locked'>('all');
 
     const { frogId } = useParams<{ frogId: string }>();
     const { currentFrog } = useFrogStore();
+    const { address } = useAccount();
 
     useEffect(() => {
-        const fetchBadges = async () => {
-            const idToFetch = frogId || currentFrog?.id?.toString();
-            if (!idToFetch) return;
+        const fetchData = async () => {
+            if (!address) return;
             
             try {
                 setLoading(true);
-                const response = await apiService.get(`/badges/${idToFetch}`);
                 
-                if (response.success) {
-                    setBadges(response.data);
+                // 获取用户的所有青蛙
+                const frogs = await apiService.getFrogsByOwner(address);
+                setAllFrogs(frogs);
+                
+                // 如果URL中有frogId参数，优先使用它
+                if (frogId) {
+                    setSelectedFrogId(frogId);
+                    const badges = await apiService.getBadges(parseInt(frogId));
+                    setBadges(badges || []);
+                } else if (selectedFrogId !== 'all' && selectedFrogId !== '') {
+                    // 获取选中青蛙的徽章
+                    const badges = await apiService.getBadges(parseInt(selectedFrogId));
+                    setBadges(badges || []);
+                } else {
+                    // 获取所有青蛙的徽章
+                    const allBadgesData = await apiService.getBadges(undefined, address);
+                    // 合并所有青蛙的徽章
+                    const mergedBadges: Badge[] = [];
+                    allBadgesData.forEach((frogData: any) => {
+                        if (frogData.badges) {
+                            mergedBadges.push(...frogData.badges);
+                        }
+                    });
+                    setBadges(mergedBadges);
                 }
             } catch (error) {
-                console.error('Failed to fetch badges:', error);
+                console.error('Failed to fetch data:', error);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchBadges();
-    }, [currentFrog]);
+        fetchData();
+    }, [address, frogId, selectedFrogId]);
 
     const filteredBadges = badges.filter(badge => {
         if (filter === 'all') return true;
@@ -133,6 +157,24 @@ export function BadgesPage() {
                     <p className="text-gray-700 mb-4">
                         收集旅行徽章，记录你的探险成就！
                     </p>
+                    
+                    {/* 青蛙选择器 */}
+                    {allFrogs.length > 0 && (
+                        <div className="flex justify-center mb-4">
+                            <select
+                                value={selectedFrogId}
+                                onChange={(e) => setSelectedFrogId(e.target.value)}
+                                className="px-4 py-2 rounded-lg border border-white/50 bg-white/70 backdrop-blur text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            >
+                                <option value="all">🐸 所有青蛙</option>
+                                {allFrogs.map((frog) => (
+                                    <option key={frog.id} value={frog.id}>
+                                        🐸 {frog.name} (#{frog.tokenId})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <div className="inline-flex items-center space-x-4 bg-white/50 backdrop-blur rounded-full px-6 py-3">
                         <span className="text-2xl">🎯</span>
                         <span className="font-medium text-gray-700">

@@ -62,13 +62,21 @@ const AddFriend: React.FC<AddFriendProps> = ({
     }
   };
 
-  const sendFriendRequest = async (targetFrogId: number) => {
+  const sendFriendRequest = async (targetFrogId: number, walletAddress?: string) => {
     setSendingRequest(targetFrogId);
     try {
-      await apiService.post('/friends/request', {
-        requesterId: currentFrogId,
-        addresseeId: targetFrogId
-      });
+      const requestData: any = {
+        requesterId: currentFrogId
+      };
+
+      // 优先使用钱包地址发送请求
+      if (walletAddress) {
+        requestData.walletAddress = walletAddress;
+      } else {
+        requestData.addresseeId = targetFrogId;
+      }
+
+      await apiService.post('/friends/request', requestData);
       
       // 从搜索结果中移除已发送请求的青蛙
       setSearchResults(searchResults.filter(frog => frog.id !== targetFrogId));
@@ -116,7 +124,7 @@ const AddFriend: React.FC<AddFriendProps> = ({
         {/* 搜索框 */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            搜索青蛙
+            通过钱包地址添加蛙友
           </label>
           <div className="flex gap-2">
             <input
@@ -124,7 +132,7 @@ const AddFriend: React.FC<AddFriendProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="输入钱包地址、青蛙名称或tokenId..."
+              placeholder="输入钱包地址 (0x...)"
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <button
@@ -141,7 +149,7 @@ const AddFriend: React.FC<AddFriendProps> = ({
         <div className="max-h-80 overflow-y-auto">
           {searchResults.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              {searching ? '搜索中...' : '输入钱包地址搜索青蛙'}
+              {searching ? '搜索中...' : '输入钱包地址查找并添加蛙友'}
             </div>
           ) : (
             <div className="space-y-3">
@@ -158,12 +166,12 @@ const AddFriend: React.FC<AddFriendProps> = ({
                     等级 {frog.level} • 经验值 {frog.xp} • 旅行 {frog.totalTravels} 次
                   </div>
                   
-                  <div className="text-xs text-gray-500 mb-3 font-mono">
-                    {frog.ownerAddress}
+                  <div className="text-xs text-gray-500 mb-3 font-mono bg-gray-100 p-2 rounded">
+                    钱包地址: {frog.ownerAddress}
                   </div>
                   
                   <button
-                    onClick={() => sendFriendRequest(frog.id)}
+                    onClick={() => sendFriendRequest(frog.id, frog.ownerAddress)}
                     disabled={sendingRequest === frog.id}
                     className="w-full px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
                   >
@@ -177,7 +185,7 @@ const AddFriend: React.FC<AddFriendProps> = ({
 
         <div className="mt-4 pt-4 border-t">
           <p className="text-xs text-gray-500">
-            提示：支持按钱包地址(0x...)、青蛙名称或tokenId搜索
+            💡 提示：输入完整的钱包地址(0x...)来添加蛙友，这是最准确的添加方式
           </p>
         </div>
       </div>

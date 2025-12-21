@@ -97,45 +97,53 @@ export function Home() {
         </div>
       ) : hasFrogs && !showMint ? (
               <>
-                {/* 欢迎回来卡片 */}
+                {/* 直接显示功能区域 */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="bg-white rounded-2xl shadow-xl p-8 max-w-md mx-auto text-center"
                 >
-                  <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                    欢迎回来，旅行者！🎒
-                  </h2>
-      
-                  <p className="text-gray-600 mb-8">
-                    查看你的青蛙收集的旅行故事和纪念品。
-                  </p>
-                  <div className="space-y-4">
-                    <Link to="/my-frogs" className="block w-full">
-                      <Button className="w-full text-lg py-4">
-                        我的青蛙控制台
-                      </Button>
-                    </Link>
-                    <Link to="/travel-history" className="block w-full">
-                      <Button variant="outline" className="w-full text-lg py-4">
-                        📖 旅行日记
-                      </Button>
-                    </Link>
-                    <Link to="/badges" className="block w-full">
-                      <Button variant="outline" className="w-full text-lg py-4">
-                        🏆 我的徽章
-                      </Button>
-                    </Link>
-                    <p className="text-sm text-gray-500">
-                      或者 <button 
-                        onClick={() => setShowMint(true)} 
-                        className="text-green-600 hover:underline cursor-pointer"
-                      >
-                        去铸造更多青蛙
-                      </button>
-                    </p>
-                  </div>
+                  {/* Features */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.6 }}
+                    className="grid md:grid-cols-3 gap-6 mt-16"
+                  >
+                    <FeatureCard
+                      emoji="🎨"
+                      title="独特 NFT"
+                      description="每只 ZetaFrog 都是 ZetaChain 上独一无二的 NFT"
+                    />
+                    <FeatureCard
+                      emoji="🔍"
+                      title="钱包探索"
+                      description="派你的青蛙去观察任意钱包"
+                    />
+                    <FeatureCard
+                      emoji="📖"
+                      title="AI 故事"
+                      description="收获 AI 生成的旅行日记和纪念品"
+                    />
+                  </motion.div>
+                  
+                  {/* How it works */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.8 }}
+                    className="mt-16 text-center"
+                  >
+                    <h2 className="text-2xl font-bold text-gray-800 mb-8">
+                      如何玩？
+                    </h2>
+                    <div className="grid md:grid-cols-4 gap-4">
+                      <StepCard step={1} title="连接钱包" icon="🔗" />
+                      <StepCard step={2} title="铸造青蛙" icon="🐸" />
+                      <StepCard step={3} title="派它旅行" icon="✈️" />
+                      <StepCard step={4} title="收获故事" icon="📜" />
+                    </div>
+                  </motion.div>
                 </motion.div>
               </>
       ) : (
@@ -151,48 +159,6 @@ export function Home() {
           />
         </motion.div>
       )}
-      
-      {/* Features */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-            className="grid md:grid-cols-3 gap-6 mt-16"
-          >
-            <FeatureCard
-              emoji="🎨"
-              title="独特 NFT"
-              description="每只 ZetaFrog 都是 ZetaChain 上独一无二的 NFT"
-            />
-            <FeatureCard
-              emoji="🔍"
-              title="钱包探索"
-              description="派你的青蛙去观察任意钱包"
-            />
-            <FeatureCard
-              emoji="📖"
-              title="AI 故事"
-              description="收获 AI 生成的旅行日记和纪念品"
-            />
-          </motion.div>
-          
-          {/* How it works */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8 }}
-            className="mt-16 text-center"
-          >
-            <h2 className="text-2xl font-bold text-gray-800 mb-8">
-              如何玩？
-            </h2>
-            <div className="grid md:grid-cols-4 gap-4">
-              <StepCard step={1} title="连接钱包" icon="🔗" />
-              <StepCard step={2} title="铸造青蛙" icon="🐸" />
-              <StepCard step={3} title="派它旅行" icon="✈️" />
-              <StepCard step={4} title="收获故事" icon="📜" />
-            </div>
-          </motion.div>
         </div>
         
         {/* 侧边栏 */}
@@ -207,43 +173,51 @@ export function Home() {
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="bg-white rounded-2xl shadow-lg p-6"
+                  className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl shadow-xl p-6 border border-green-100"
                 >
-                  <h3 className="font-bold text-gray-800 mb-4 flex items-center">
-                    <span className="mr-2">🎒</span>
+                  <h3 className="font-bold text-gray-800 mb-6 flex items-center text-lg">
+                    <span className="mr-2 text-2xl">🎒</span>
                     用户中心
                   </h3>
                   <div className="space-y-3">
                     <Link
                       to="/my-frogs"
-                      className="block w-full text-center py-3 px-4 bg-green-500 hover:bg-green-600 text-white rounded-xl font-medium transition-colors"
+                      className="block w-full text-center py-4 px-4 bg-green-500 hover:bg-green-600 text-white rounded-xl font-medium transition-all transform hover:scale-105 shadow-md"
                     >
                       🐸 我的青蛙
                     </Link>
                     <Link
                       to="/travel-history"
-                      className="block w-full text-center py-3 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium transition-colors"
+                      className="block w-full text-center py-4 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium transition-all transform hover:scale-105 shadow-md"
                     >
                       📖 旅行日记
                     </Link>
                     <Link
                       to="/badges"
-                      className="block w-full text-center py-3 px-4 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-medium transition-colors"
+                      className="block w-full text-center py-4 px-4 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-medium transition-all transform hover:scale-105 shadow-md"
                     >
                       🏆 我的徽章
                     </Link>
-                    <button
-                      onClick={() => setShowMint(true)}
-                      className="block w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors text-sm"
+                    <Link
+                      to="/souvenirs"
+                      className="block w-full text-center py-4 px-4 bg-pink-500 hover:bg-pink-600 text-white rounded-xl font-medium transition-all transform hover:scale-105 shadow-md"
                     >
-                      铸造更多青蛙
-                    </button>
-                    <button
-                      onClick={() => window.open('https://athens.explorer.zetachain.com/', '_blank')}
-                      className="block w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors text-sm"
-                    >
-                      🔍 区块链浏览器
-                    </button>
+                      🎁 我的纪念品
+                    </Link>
+                    <div className="pt-3 border-t border-gray-200 space-y-2">
+                      <button
+                        onClick={() => setShowMint(true)}
+                        className="block w-full py-3 px-4 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-medium transition-colors shadow-sm"
+                      >
+                        ➕ 铸造更多青蛙
+                      </button>
+                      <button
+                        onClick={() => window.open('https://athens.explorer.zetachain.com/', '_blank')}
+                        className="block w-full py-3 px-4 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-medium transition-colors shadow-sm"
+                      >
+                        🔍 区块链浏览器
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               )}

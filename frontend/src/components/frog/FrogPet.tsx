@@ -558,14 +558,6 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
         )}
       </AnimatePresence> */}
       
-      {/* 状态指示器 */}
-      <StatusIndicators 
-        energy={energy} 
-        mood={mood} 
-        state={state}
-      />
-      
-      
       {/* 右键菜单 */}
       <AnimatePresence>
         {showContextMenu && (
@@ -679,41 +671,7 @@ function FrogAccessories({ state }: { state: FrogState }) {
   );
 }
 
-// 状态指示器
-function StatusIndicators({ energy, mood, state }: { 
-  energy: number; 
-  mood: FrogMood; 
-  state: FrogState;
-}) {
-  const moodEmoji = {
-    [FrogMood.VERY_HAPPY]: '😄',
-    [FrogMood.HAPPY]: '🙂',
-    [FrogMood.NEUTRAL]: '😐',
-    [FrogMood.SAD]: '😔',
-    [FrogMood.VERY_SAD]: '😢',
-  };
-  
-  return (
-    <div className="absolute -top-8 right-0 flex gap-1">
-      {/* 心情 */}
-      <motion.div
-        className="text-lg"
-        animate={{ scale: [1, 1.2, 1] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      >
-        {moodEmoji[mood]}
-      </motion.div>
-      
-      {/* 精力条 */}
-      <div className="w-12 h-2 bg-gray-200 rounded-full overflow-hidden">
-        <motion.div
-          className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full"
-          animate={{ width: `${energy}%` }}
-        />
-      </div>
-    </div>
-  );
-}
+
 
 // 辅助函数
 function formatAmount(amount: number): string {
