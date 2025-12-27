@@ -14,6 +14,8 @@ import { ZETAFROG_ABI, SOUVENIR_ABI } from '../config/contracts';
 import { ChainKey, CHAIN_ID_TO_KEY, getChainConfig } from '../config/chains';  // 导入
 import { travelP0Service } from '../services/travel/travel-p0.service';
 import { NFTImageOrchestratorService } from '../services/nft-image-orchestrator.service';
+import { badgeService } from '../services/badge/badge.service';
+import { notifyTravelProgress } from '../websocket';
 import type { Server } from 'socket.io';
 
 // 定义 ZetaChain Athens Testnet
@@ -264,6 +266,12 @@ class TravelProcessor {
             }
 
             // 2. 观察钱包活动
+            notifyTravelProgress(frog.tokenId, {
+                phase: 'observing',
+                message: '🔍 正在观察目标钱包活动...',
+                percentage: 20
+            });
+            
             const observation = await observerService.observeWallet(
                 targetWallet,
                 startTime,
@@ -290,6 +298,12 @@ class TravelProcessor {
             });
 
             // 生成 AI 故事（包含链信息）
+            notifyTravelProgress(frog.tokenId, {
+                phase: 'generating_story',
+                message: '✍️ 正在生成旅行日记...',
+                percentage: 40
+            });
+            
             const durationHours = Math.ceil(
                 (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60)
             );
@@ -317,6 +331,12 @@ class TravelProcessor {
             const newLevel = Math.floor(newXp / 100) + 1;
 
             // 上传到 IPFS
+            notifyTravelProgress(frog.tokenId, {
+                phase: 'uploading',
+                message: '📤 正在上传日记到 IPFS...',
+                percentage: 60
+            });
+            
             const journalHash = await ipfsService.uploadJournal(
                 frog.name,
                 frog.tokenId,
@@ -332,6 +352,12 @@ class TravelProcessor {
                 try {
                     // 1. 先铸造纪念品
                     if (config.SOUVENIR_NFT_ADDRESS) {
+                        notifyTravelProgress(frog.tokenId, {
+                            phase: 'minting',
+                            message: '🎁 正在铸造纪念品...',
+                            percentage: 80
+                        });
+                        
                         const roll = Math.random() * 100;
                         if (roll < 70) finalRarity = 'Common';
                         else if (roll < 95) finalRarity = 'Uncommon';
@@ -396,12 +422,17 @@ class TravelProcessor {
                 try {
                     // 先检查是否已存在相同tokenId的纪念品
                     const existingSouvenir = await prisma.souvenir.findUnique({
-                        where: { tokenId: souvenirId }
+                        where: { 
+                            tokenId_chainType: {
+                                tokenId: souvenirId,
+                                chainType: chainKey as ChainType
+                            }
+                        }
                     });
                     
                     if (existingSouvenir) {
                         dbSouvenirId = existingSouvenir.id;
-                        logger.info(`Souvenir ${souvenirId} already exists in database with ID ${dbSouvenirId}`);
+                        logger.info(`Souvenir ${souvenirId} on chain ${chainKey} already exists in database with ID ${dbSouvenirId}`);
                     } else {
                         const dbSouvenir = await prisma.souvenir.create({
                             data: {
@@ -455,11 +486,11 @@ class TravelProcessor {
             });
 
             // 更新数据库 - 青蛙状态
+            // 注意：totalTravels 由 eventListener 在监听到 TravelCompleted 事件时统一更新
             await prisma.frog.update({
                 where: { id: frog.id },
                 data: {
                     status: FrogStatus.Idle,
-                    totalTravels: { increment: 1 },
                     xp: newXp,
                     level: newLevel,
                 },
@@ -475,6 +506,17 @@ class TravelProcessor {
                     BigInt(0),
                     new Date()
                 );
+
+                // 检查并解锁徽章
+                // 暂时使用空 discoveries，因为 TravelProcessor 中 observation 结构与 Discovery[] 不完全一致
+                // 如果需要基于 observation 解锁 RARE_FIND，需要转换 observation.notableEvents
+                const discoveries: any[] = []; // TODO: Convert observation to discoveries if needed
+                
+                await badgeService.checkAndUnlock(frog.id, {
+                    chain: chainKey,
+                    travelId,
+                    discoveries,
+                });
             }
 
             // WebSocket 通知

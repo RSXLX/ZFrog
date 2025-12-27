@@ -9,6 +9,7 @@ import { logger } from './utils/logger';
 import { travelProcessor } from './workers/travelProcessor';
 import { eventListener } from './workers/eventListener';
 import { initializeWebSocket, setIO } from './websocket';
+import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 
 import frogRoutes from './api/routes/frog.routes';
 import travelRoutes from './api/routes/travel.routes';
@@ -17,6 +18,8 @@ import friendsRoutes from './api/routes/friends.routes';
 import nftImageRoutes from './api/routes/nft-image.routes';
 import badgeRoutes from './api/routes/badge.routes';
 import souvenirRoutes from './api/routes/souvenir.routes';
+import chatRoutes from './api/routes/chat.routes';
+import priceRoutes from './api/routes/price.routes';
 
 const app = express();
 const httpServer = createServer(app);
@@ -46,6 +49,8 @@ app.use('/api/health', healthRoutes);
 app.use('/api/nft-image', nftImageRoutes);
 app.use('/api/badges', badgeRoutes);
 app.use('/api/souvenirs', souvenirRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/price', priceRoutes);
 
 // Root route
 app.get('/', (req, res) => {
@@ -60,26 +65,11 @@ app.get('/', (req, res) => {
   });
 });
 
-// Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  logger.error('Unhandled error:', err);
-  res.status(500).json({
-    error: {
-      message: err.message || 'Internal server error',
-      code: 'INTERNAL_ERROR'
-    }
-  });
-});
+// 404 handler (必须在路由之后，错误处理之前)
+app.use(notFoundHandler);
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    error: {
-      message: 'Not found',
-      code: 'NOT_FOUND'
-    }
-  });
-});
+// 统一错误处理中间件 (必须在所有中间件和路由之后)
+app.use(errorHandler);
 
 // Export io for use in other modules
 export { io };

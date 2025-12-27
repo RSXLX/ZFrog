@@ -16,6 +16,11 @@ export const SUPPORTED_CHAINS = {
     // 新增：跨链配置
     isZetaSupported: true,
     zetaConnector: null,  // 如果有部署
+    commonTokens: {
+      'USDT': '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd',
+      'USDC': '0x64544969ed7EBf5f083679233325356EbE738930',
+      'WBNB': '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd',
+    }
   },
   
   ETH_SEPOLIA: {
@@ -32,6 +37,11 @@ export const SUPPORTED_CHAINS = {
     vibe: '怀旧',
     isZetaSupported: true,
     zetaConnector: null,
+    commonTokens: {
+      'USDT': '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06',
+      'USDC': '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+      'WETH': '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9',
+    }
   },
   
   ZETACHAIN_ATHENS: {
@@ -49,6 +59,11 @@ export const SUPPORTED_CHAINS = {
     isZetaSupported: true,
     isMainChain: true,  // 新增：主链标识
     zetaConnector: null,
+    commonTokens: {
+      'aUSDC': '0x5353b4556B447C2c0A0e65e7c6043d2F3ba648C4',
+      'aUSDT': '0x07865c6E87B9F70255377e024ace6630C1Eaa37F',
+      'WZETA': '0x5F0b1a82749cb4E2278EC87F8BF6B618dC71a8bf',
+    }
   },
   
   // 新增：Polygon Mumbai
@@ -66,6 +81,11 @@ export const SUPPORTED_CHAINS = {
     vibe: '魔幻',
     isZetaSupported: true,
     zetaConnector: null,
+    commonTokens: {
+      'USDT': '0xA02f6adc7926efeBBd59Fd43B84E8C9951DacA28',
+      'USDC': '0x41e94eb019c0762f9bfcf9f248664db355169cbe',
+      'WMATIC': '0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889',
+    }
   },
   
   // 新增：Arbitrum Goerli
@@ -83,6 +103,11 @@ export const SUPPORTED_CHAINS = {
     vibe: '科技',
     isZetaSupported: true,
     zetaConnector: null,
+    commonTokens: {
+      'USDT': '0x50fbfd74e50882a88a0e81e3a650d99dc0749033', // Fake
+      'USDC': '0x8fb1e3fc51f3b789ded7557e680551d93ea9d892', // Fake
+      'WETH': '0xe39Ab88f8A4777030A534146A9Ca3B52bd5D43A3',
+    }
   },
 } as const;
 

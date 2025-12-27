@@ -1,0 +1,93 @@
+[
+    {
+        "inputs": [
+            {"internalType": "address", "name": "to", "type": "address"},
+            {"internalType": "uint256", "name": "frogId", "type": "uint256"},
+            {"internalType": "uint256", "name": "rarityRoll", "type": "uint256"}
+        ],
+        "name": "mintSouvenir",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {"internalType": "uint256", "name": "souvenirId", "type": "uint256"},
+            {"internalType": "string", "name": "uri", "type": "string"}
+        ],
+        "name": "setMetadataURI",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "address", "name": "_minter", "type": "address"}],
+        "name": "setMinter",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "address", "name": "_zetaFrog", "type": "address"}],
+        "name": "setZetaFrogNFT",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "uint256", "name": "souvenirId", "type": "uint256"}],
+        "name": "getSouvenir",
+        "outputs": [
+            {"internalType": "string", "name": "name", "type": "string"},
+            {"internalType": "uint8", "name": "rarity", "type": "uint8"},
+            {"internalType": "uint256", "name": "frogId", "type": "uint256"},
+            {"internalType": "uint64", "name": "mintTime", "type": "uint64"},
+            {"internalType": "string", "name": "metadataURI", "type": "string"}
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "uint256", "name": "frogId", "type": "uint256"}],
+        "name": "getFrogSouvenirs",
+        "outputs": [{"internalType": "uint256[]", "name": "", "type": "uint256[]"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "totalSupply",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+        "name": "uri",
+        "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {"internalType": "address", "name": "account", "type": "address"},
+            {"internalType": "uint256", "name": "id", "type": "uint256"}
+        ],
+        "name": "balanceOf",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {"indexed": true, "internalType": "uint256", "name": "souvenirId", "type": "uint256"},
+            {"indexed": true, "internalType": "uint256", "name": "frogId", "type": "uint256"},
+            {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
+            {"indexed": false, "internalType": "uint8", "name": "rarity", "type": "uint8"},
+            {"indexed": false, "internalType": "string", "name": "name", "type": "string"}
+        ],
+        "name": "SouvenirMinted",
+        "type": "event"
+    }
+]

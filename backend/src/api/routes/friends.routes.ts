@@ -159,18 +159,30 @@ router.put('/request/:id/respond', async (req, res) => {
 /**
  * GET /api/friends/list/:frogId
  * 获取青蛙的好友列表
+ * 注意: frogId 参数为 NFT tokenId，非数据库 id
  */
 router.get('/list/:frogId', async (req, res) => {
   try {
-    const { frogId } = req.params;
+    const tokenId = parseInt(req.params.frogId);
     const { isFrogOnline } = require('../../websocket');
+    
+    // 先根据 tokenId 查找青蛙
+    const frog = await prisma.frog.findUnique({
+      where: { tokenId }
+    });
+    
+    if (!frog) {
+      return res.status(404).json({ error: 'Frog not found' });
+    }
+    
+    const dbFrogId = frog.id;
 
     const friendships = await prisma.friendship.findMany({
       where: {
         status: FriendshipStatus.Accepted,
         OR: [
-          { requesterId: parseInt(frogId) },
-          { addresseeId: parseInt(frogId) }
+          { requesterId: dbFrogId },
+          { addresseeId: dbFrogId }
         ]
       },
       include: {
@@ -199,7 +211,7 @@ router.get('/list/:frogId', async (req, res) => {
 
     // 提取好友信息（排除自己）
     const friends = friendships.map(friendship => {
-      const friend = friendship.requesterId === parseInt(frogId) 
+      const friend = friendship.requesterId === dbFrogId 
         ? friendship.addressee 
         : friendship.requester;
       
@@ -221,14 +233,24 @@ router.get('/list/:frogId', async (req, res) => {
 /**
  * GET /api/friends/requests/:frogId
  * 获取青蛙收到的好友请求
+ * 注意: frogId 参数为 NFT tokenId，非数据库 id
  */
 router.get('/requests/:frogId', async (req, res) => {
   try {
-    const { frogId } = req.params;
+    const tokenId = parseInt(req.params.frogId);
+    
+    // 先根据 tokenId 查找青蛙
+    const frog = await prisma.frog.findUnique({
+      where: { tokenId }
+    });
+    
+    if (!frog) {
+      return res.status(404).json({ error: 'Frog not found' });
+    }
 
     const requests = await prisma.friendship.findMany({
       where: {
-        addresseeId: parseInt(frogId),
+        addresseeId: frog.id,
         status: FriendshipStatus.Pending
       },
       include: {

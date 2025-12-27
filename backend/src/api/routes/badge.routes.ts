@@ -51,11 +51,23 @@ router.get('/', async (req, res) => {
 /**
  * GET /api/badges/:frogId
  * 获取所有徽章（含解锁状态）
+ * 注意: frogId 参数为 NFT tokenId，非数据库 id
  */
 router.get('/:frogId', async (req, res) => {
   try {
-    const frogId = parseInt(req.params.frogId);
-    const badges = await badgeService.getAllBadgesWithStatus(frogId);
+    const tokenId = parseInt(req.params.frogId);
+    
+    // 先根据 tokenId 查找青蛙
+    const frog = await prisma.frog.findUnique({
+      where: { tokenId }
+    });
+    
+    if (!frog) {
+      return res.status(404).json({ success: false, error: 'Frog not found' });
+    }
+    
+    // 使用数据库 id 查询徽章
+    const badges = await badgeService.getAllBadgesWithStatus(frog.id);
     res.json({ success: true, data: badges });
   } catch (error) {
     console.error('Error fetching badges:', error);
@@ -66,11 +78,23 @@ router.get('/:frogId', async (req, res) => {
 /**
  * GET /api/badges/:frogId/unlocked
  * 获取已解锁徽章
+ * 注意: frogId 参数为 NFT tokenId，非数据库 id
  */
 router.get('/:frogId/unlocked', async (req, res) => {
   try {
-    const frogId = parseInt(req.params.frogId);
-    const badges = await badgeService.getUserBadges(frogId);
+    const tokenId = parseInt(req.params.frogId);
+    
+    // 先根据 tokenId 查找青蛙
+    const frog = await prisma.frog.findUnique({
+      where: { tokenId }
+    });
+    
+    if (!frog) {
+      return res.status(404).json({ success: false, error: 'Frog not found' });
+    }
+    
+    // 使用数据库 id 查询徽章
+    const badges = await badgeService.getUserBadges(frog.id);
     res.json({ success: true, data: badges });
   } catch (error) {
     console.error('Error fetching unlocked badges:', error);

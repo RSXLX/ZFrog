@@ -17,6 +17,7 @@ model Frog {
   status           FrogStatus          @default(Idle)
   xp               Int                 @default(0)
   level            Int                 @default(1)
+  personality      Personality         @default(PHILOSOPHER)  // 新增：性格
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   p0Travels        Int                 @default(0)
@@ -27,6 +28,7 @@ model Frog {
   souvenirs        Souvenir[]
   travels          Travel[]
   badges           UserBadge[]
+  chatSessions     ChatSession[]       // 新增：关联聊天会话
 
   @@index([ownerAddress])
 }
@@ -118,7 +120,7 @@ model TravelStatusMessage {
 
 model Souvenir {
   id          Int        @id @default(autoincrement())
-  tokenId     Int        @unique
+  tokenId     Int
   frogId      Int
   name        String
   rarity      Rarity
@@ -129,8 +131,9 @@ model Souvenir {
   frog        Frog       @relation(fields: [frogId], references: [id])
   travels     Travel[]
 
+  @@unique([tokenId, chainType])
   @@index([frogId])
-  @@index([chainType])                                               // 新增索引
+  @@index([chainType])
 }
 
 model WalletObservation {
@@ -354,4 +357,86 @@ enum BadgeUnlockType {
   MULTI_CHAIN
   RARE_FIND
   SPECIAL
+}
+
+// ============ 新增：聊天相关 ============
+
+// 聊天会话
+model ChatSession {
+  id           Int           @id @default(autoincrement())
+  frogId       Int
+  ownerAddress String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  
+  frog         Frog          @relation(fields: [frogId], references: [id])
+  messages     ChatMessage[]
+  
+  @@index([ownerAddress])
+  @@index([frogId])
+}
+
+// 聊天消息
+model ChatMessage {
+  id           Int           @id @default(autoincrement())
+  sessionId    Int
+  role         MessageRole   // user | assistant
+  content      String        @db.Text
+  intent       ChatIntent?   // 识别出的意图
+  intentParams Json?         // 意图参数
+  createdAt    DateTime      @default(now())
+  
+  session      ChatSession   @relation(fields: [sessionId], references: [id])
+  
+  @@index([sessionId])
+}
+
+// 价格缓存（减少 API 调用）
+model PriceCache {
+  id           Int      @id @default(autoincrement())
+  symbol       String   // ETH, BTC, ZETA...
+  priceUsd     Float
+  change24h    Float?   // 24h 涨跌幅
+  source       String   // coingecko, dexscreener...
+  updatedAt    DateTime @updatedAt
+  
+  @@unique([symbol, source])
+  @@index([symbol])
+}
+
+// 用户资产快照（可选，用于快速查询）
+model AssetSnapshot {
+  id           Int      @id @default(autoincrement())
+  ownerAddress String
+  chainId      Int
+  assets       Json     // { tokens: [...], nfts: [...], totalValueUsd: ... }
+  updatedAt    DateTime @updatedAt
+  
+  @@unique([ownerAddress, chainId])
+  @@index([ownerAddress])
+}
+
+// ============ 新增枚举 ============
+
+enum MessageRole {
+  user
+  assistant
+}
+
+enum ChatIntent {
+  price_query      // 价格查询
+  asset_query      // 资产查询
+  frog_status      // 青蛙状态
+  travel_info      // 旅行信息
+  start_travel     // 开始旅行
+  chitchat         // 闲聊
+  help             // 帮助
+  unknown          // 未识别
+}
+
+enum Personality {
+  PHILOSOPHER  // 哲学家：深沉、爱思考
+  COMEDIAN     // 段子手：吐槽、搞笑
+  POET         // 诗人：浪漫、文艺
+  GOSSIP       // 八卦蛙：爱打听、爱爆料
 }

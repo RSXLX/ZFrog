@@ -106,14 +106,14 @@ export class NFTImageOrchestratorService {
       try {
         const tokenId = parseInt(input.souvenirId);
         if (!isNaN(tokenId)) {
-          const souvenir = await prisma.souvenir.findUnique({
+          const souvenir = await prisma.souvenir.findFirst({
             where: { tokenId },
           });
 
           if (souvenir) {
             console.log(`[Orchestrator] 更新 Souvenir ${tokenId} 的 metadataUri`);
             await prisma.souvenir.update({
-              where: { tokenId },
+              where: { id: souvenir.id },
               data: { metadataUri: ipfsResult.ipfsUrl },
             });
           }

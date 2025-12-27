@@ -80,12 +80,24 @@ router.get('/', async (req, res) => {
 /**
  * GET /api/souvenirs/:frogId
  * 获取特定青蛙的所有纪念品
+ * 注意: frogId 参数为 NFT tokenId，非数据库 id
  */
 router.get('/:frogId', async (req, res) => {
   try {
-    const frogId = parseInt(req.params.frogId);
+    const tokenId = parseInt(req.params.frogId);
+    
+    // 先根据 tokenId 查找青蛙
+    const frog = await prisma.frog.findUnique({
+      where: { tokenId }
+    });
+    
+    if (!frog) {
+      return res.status(404).json({ success: false, error: 'Frog not found' });
+    }
+    
+    // 使用数据库 id 查询纪念品
     const souvenirs = await prisma.souvenir.findMany({
-      where: { frogId },
+      where: { frogId: frog.id },
       orderBy: { createdAt: 'desc' }
     });
     

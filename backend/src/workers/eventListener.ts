@@ -60,7 +60,15 @@ class EventListener {
         this.watchNewEvents();
 
         // 定期扫描（防止遗漏）
-        setInterval(() => this.scanHistoricalEvents(), 60 * 1000);
+        setInterval(() => {
+            logger.info('[EventListener] Triggering scheduled historical scan...');
+            this.scanHistoricalEvents();
+        }, 30 * 1000); 
+
+        // [Self-Healing] Health Check Interval (every 10s)
+        setInterval(() => {
+            this.runHealthCheck();
+        }, 10 * 1000);
 
         logger.info('Event listener started successfully');
     }
@@ -71,10 +79,11 @@ class EventListener {
             const fromBlock = this.lastProcessedBlock + BigInt(1);
 
             if (fromBlock > currentBlock) {
+                // logger.debug(`[EventListener] Up to date. Current block: ${currentBlock}`);
                 return;
             }
 
-            logger.info(`Scanning blocks ${fromBlock} to ${currentBlock}`);
+            logger.info(`[EventListener] Scanning blocks ${fromBlock} to ${currentBlock} (Delta: ${currentBlock - fromBlock})`);
 
             // 监听 FrogMinted 事件
             const mintLogs = await this.publicClient.getLogs({
@@ -95,6 +104,10 @@ class EventListener {
                 fromBlock,
                 toBlock: currentBlock,
             });
+
+            if (travelLogs.length > 0) {
+                logger.info(`[EventListener] Found ${travelLogs.length} TravelStarted events!`);
+            }
 
             for (const log of travelLogs) {
                 await this.handleTravelStarted(log);
@@ -302,7 +315,7 @@ class EventListener {
             const isRandom = (targetWallet as string).toLowerCase() === '0x0000000000000000000000000000000000000000';
 
             // 创建旅行记录
-            await prisma.travel.create({
+            const travel = await prisma.travel.create({
                 data: {
                     frogId: frog.id,
                     targetWallet: (targetWallet as string).toLowerCase(),
@@ -317,6 +330,21 @@ class EventListener {
             });
 
             logger.info(`Travel started for frog ${tokenId} to chain ${targetChainId} (isRandom: ${isRandom})`);
+
+            // 通知前端更新状态
+            try {
+                const { notifyTravelStarted } = await import('../websocket');
+                notifyTravelStarted(frog.tokenId, {
+                    travelId: travel.id,
+                    targetWallet: travel.targetWallet,
+                    startTime: travel.startTime,
+                    endTime: travel.endTime,
+                    status: 'Active',
+                    chainId: travel.chainId
+                });
+            } catch (wsError) {
+                logger.error('Failed to send WebSocket notification:', wsError);
+            }
 
         } catch (error) {
             logger.error(`Error handling TravelStarted event:`, error);
@@ -337,7 +365,7 @@ class EventListener {
                 return;
             }
 
-            // 更新青蛙状态
+            // 更新青蛙状态和旅行次数（基于链上事件统计，这是唯一递增 totalTravels 的地方）
             await prisma.frog.update({
                 where: { id: frog.id },
                 data: {
@@ -359,7 +387,7 @@ class EventListener {
                 // 查找纪念品的数据库主键 ID，以避免 P2003 外键约束错误
                 let dbSouvenirId = null;
                 if (souvenirId && Number(souvenirId) > 0) {
-                    const dbSouvenir = await prisma.souvenir.findUnique({
+                    const dbSouvenir = await prisma.souvenir.findFirst({
                         where: { tokenId: Number(souvenirId) }
                     });
                     if (dbSouvenir) {
@@ -485,7 +513,12 @@ class EventListener {
             const rarityStr = rarityMap[Number(rarity)] || 'Common';
 
             await prisma.souvenir.upsert({
-                where: { tokenId: Number(souvenirId) },
+                where: { 
+                    tokenId_chainType: {
+                        tokenId: Number(souvenirId),
+                        chainType: 'ZETACHAIN_ATHENS'
+                    }
+                },
                 update: {
                     name: name as string,
                     rarity: rarityStr as any,
@@ -496,6 +529,7 @@ class EventListener {
                     frogId: frog.id,
                     name: name as string,
                     rarity: rarityStr as any,
+                    chainType: 'ZETACHAIN_ATHENS',
                     mintedAt: new Date(),
                 },
             });
@@ -511,7 +545,7 @@ class EventListener {
             });
 
             if (unlinkedTravel) {
-                const dbSouvenir = await prisma.souvenir.findUnique({
+                const dbSouvenir = await prisma.souvenir.findFirst({
                     where: { tokenId: Number(souvenirId) }
                 });
                 if (dbSouvenir) {
@@ -577,6 +611,10 @@ class EventListener {
                 });
 
                 logger.info(`Manually synced frog ${tokenId}`);
+                
+                // [Self-Healing] Check and restore active travel if needed
+                await this.checkActiveTravelOnChain(tokenId);
+
                 return true;
             }
             return false;
@@ -584,6 +622,111 @@ class EventListener {
         } catch (error) {
             logger.error(`Error syncing frog ${tokenId}:`, error);
             return false;
+        }
+    }
+
+    /**
+     * [Self-Healing] Check and restore active travel from chain
+     */
+    async checkActiveTravelOnChain(tokenId: number) {
+        try {
+            // Read active travel from contract
+            const result = await this.publicClient.readContract({
+                address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+                abi: ZETAFROG_ABI,
+                functionName: 'getActiveTravel',
+                args: [BigInt(tokenId)],
+            }) as [bigint, bigint, string, bigint, boolean];
+
+            const [startTime, endTime, targetWallet, targetChainId, completed] = result;
+
+            // Check validity: startTime > 0 and not completed
+            if (completed || Number(startTime) === 0) {
+                return; // No active travel
+            }
+
+            const frog = await prisma.frog.findUnique({ where: { tokenId } });
+            if (!frog) return;
+
+            // Check if DB record exists
+            const existingTravel = await prisma.travel.findFirst({
+                where: {
+                    frogId: frog.id,
+                    startTime: new Date(Number(startTime) * 1000),
+                }
+            });
+
+            if (!existingTravel) {
+                logger.warn(`[Self-Healing] Missing active travel for frog ${tokenId}. Restoring...`);
+                
+                const isRandom = (targetWallet as string).toLowerCase() === '0x0000000000000000000000000000000000000000';
+                
+                const newTravel = await prisma.travel.create({
+                    data: {
+                        frogId: frog.id,
+                        targetWallet: (targetWallet as string).toLowerCase(),
+                        chainId: Number(targetChainId),
+                        startTime: new Date(Number(startTime) * 1000),
+                        endTime: new Date(Number(endTime) * 1000),
+                        status: 'Active',
+                        isRandom: isRandom,
+                        observedTxCount: 0,
+                        observedTotalValue: "0",
+                    },
+                });
+
+                // Ensure frog status is Traveling
+                await prisma.frog.update({
+                    where: { id: frog.id },
+                    data: { status: FrogStatus.Traveling }
+                });
+
+                logger.info(`[Self-Healing] Restored travel ${newTravel.id} for frog ${tokenId}`);
+
+                // Notify frontend
+                try {
+                    const { notifyTravelStarted } = await import('../websocket');
+                    notifyTravelStarted(frog.tokenId, {
+                        travelId: newTravel.id,
+                        targetWallet: newTravel.targetWallet,
+                        startTime: newTravel.startTime,
+                        endTime: newTravel.endTime,
+                        status: 'Active',
+                        chainId: newTravel.chainId
+                    });
+                } catch (e) {
+                    logger.warn('Failed to send websocket update during self-healing');
+                }
+            } else if (existingTravel.status !== 'Active' && existingTravel.status !== 'Processing') {
+                // Recover from stuck "Failed" state if chain says Active
+                if (existingTravel.status === 'Failed') {
+                    logger.info(`[Self-Healing] Reactivating Failed travel ${existingTravel.id} as it is active on-chain`);
+                    await prisma.travel.update({
+                        where: { id: existingTravel.id },
+                        data: { status: 'Active' }
+                    });
+                }
+            }
+
+        } catch (error) {
+            // logger.error(`[Self-Healing] Error checking travel for frog ${tokenId}:`, error);
+        }
+    }
+
+    /**
+     * [Self-Healing] Periodically scan all frogs
+     */
+    async runHealthCheck() {
+        logger.info('[Self-Healing] Starting health check scan...');
+        try {
+            const frogs = await prisma.frog.findMany({ select: { tokenId: true } });
+            
+            for (const f of frogs) {
+                await this.checkActiveTravelOnChain(f.tokenId);
+            }
+            logger.info(`[Self-Healing] Completed health check for ${frogs.length} frogs`);
+        } catch (error) {
+            logger.error('[Self-Healing] Health check failed:', error);
         }
     }
 

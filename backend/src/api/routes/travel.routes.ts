@@ -174,7 +174,31 @@ router.get('/stats', async (req, res) => {
             }
         });
 
-        const frogIds = frogs.map(f => f.id);
+        // 如果指定了具体青蛙，则只统计该青蛙的数据
+        let frogIds = frogs.map(f => f.id);
+        const requestFrogId = req.query.frogId;
+        
+        if (requestFrogId && requestFrogId !== 'all') {
+            const targetFrog = frogs.find(f => f.tokenId === parseInt(requestFrogId as string));
+            if (targetFrog) {
+                frogIds = [targetFrog.id];
+            } else {
+                // 如果请求的青蛙不在用户列表中，返回空数据
+                return res.json({
+                    success: true,
+                    data: {
+                        totalTrips: 0,
+                        bscTrips: 0,
+                        ethTrips: 0,
+                        zetaTrips: 0,
+                        totalDiscoveries: 0,
+                        rareFinds: 0,
+                        totalFrogs: frogs.length,
+                        recentTravel: null
+                    }
+                });
+            }
+        }
 
         // 统计数据 - 按链分类统计
         const [totalTravels, bscTravels, ethTravels, zetaTravels] = await Promise.all([
@@ -339,13 +363,12 @@ router.get('/:frogId/active', async (req, res) => {
                 status: {
                     in: [TravelStatus.Active, TravelStatus.Processing],
                 },
-                endTime: {
-                    gt: now  // 只返回还未结束的旅行
-                }
+                // endTime: { gt: now }  // 移除时间限制
             },
         });
         
         if (!activeTravel) {
+            console.log(`[API] No active travel found for frog ${frogId}. Query criteria met?`);
             return res.status(404).json({ error: 'No active travel' });
         }
         

@@ -15,6 +15,8 @@ interface TravelData {
     targetWallet: string;
     startTime: Date;
     endTime: Date;
+    chainId?: number;
+    status?: string;
 }
 
 interface TravelProgress {

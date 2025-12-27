@@ -6,8 +6,14 @@ const prisma = new PrismaClient();
 
 class TravelService {
     constructor() {
-        this.provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
-        this.wallet = new ethers.Wallet(process.env.BACKEND_PRIVATE_KEY, this.provider);
+        // Use chain-specific RPC URLs for better reliability
+        const rpcUrl = process.env.ZETACHAIN_RPC_URL || process.env.RPC_URL || 'https://zetachain-athens.g.allthatnode.com/archive/tendermint';
+        this.provider = new ethers.JsonRpcProvider(rpcUrl);
+        const privateKey = process.env.BACKEND_PRIVATE_KEY || process.env.RELAYER_PRIVATE_KEY;
+        if (!privateKey) {
+            console.warn('[TravelService] WARNING: No private key found (BACKEND_PRIVATE_KEY or RELAYER_PRIVATE_KEY). Read-only mode.');
+        }
+        this.wallet = privateKey ? new ethers.Wallet(privateKey, this.provider) : null;
 
         // Load contract ABIs
         const frogABI = require('../abi/ZetaFrogNFT.json');
@@ -17,13 +23,13 @@ class TravelService {
         this.frogContract = new ethers.Contract(
             process.env.ZETAFROG_NFT_ADDRESS,
             frogABI,
-            this.wallet
+            this.wallet || this.provider
         );
 
         this.souvenirContract = new ethers.Contract(
             process.env.SOUVENIR_NFT_ADDRESS,
             souvenirABI,
-            this.wallet
+            this.wallet || this.provider
         );
     }
 
@@ -182,6 +188,28 @@ class TravelService {
     async observeWallet(walletAddress, chainId, startTime, endTime) {
         console.log(`[TravelService] Observing wallet ${walletAddress} on chain ${chainId}`);
 
+        // Special handling for zero address (random exploration)
+        if (walletAddress.toLowerCase() === '0x0000000000000000000000000000000000000000') {
+            console.log('[TravelService] Zero address detected - observing chain activity');
+            return this.observeChainActivity(chainId);
+        }
+
+        // Try API first
+        const apiResult = await this.observeWalletViaAPI(walletAddress, chainId, startTime, endTime);
+        if (apiResult) {
+            console.log('[TravelService] Successfully fetched data via API');
+            return apiResult;
+        }
+
+        // Fallback to RPC
+        console.log('[TravelService] API failed, falling back to RPC observation');
+        return this.observeWalletViaRPC(walletAddress, chainId);
+    }
+
+    /**
+     * Observe wallet via blockchain explorer API
+     */
+    async observeWalletViaAPI(walletAddress, chainId, startTime, endTime) {
         const apiKey = process.env.ETHERSCAN_API_KEY;
         const baseUrl = this.getExplorerApiUrl(chainId);
 
@@ -196,12 +224,12 @@ class TravelService {
                     sort: 'desc',
                     apikey: apiKey
                 },
-                timeout: 10000
+                timeout: 8000
             });
 
             if (response.data.status !== '1') {
-                console.warn('[TravelService] Failed to fetch transactions, using mock data');
-                return this.getMockWalletData();
+                console.warn('[TravelService] API returned error status');
+                return null;
             }
 
             const transactions = response.data.result;
@@ -223,7 +251,7 @@ class TravelService {
                 totalValueWei += BigInt(tx.value || 0);
 
                 // Identify large transactions
-                if (BigInt(tx.value) > ethers.parseEther('1')) {
+                if (BigInt(tx.value) > ethers.parseEther('0.1')) {
                     notableEvents.push({
                         type: 'large_transfer',
                         hash: tx.hash,
@@ -236,11 +264,138 @@ class TravelService {
                 transactions: filteredTxs.slice(0, 50),
                 totalTxCount: filteredTxs.length,
                 totalValueWei: totalValueWei.toString(),
-                notableEvents
+                notableEvents,
+                source: 'API'
             };
 
         } catch (error) {
-            console.error('[TravelService] Error observing wallet:', error.message);
+            console.error('[TravelService] API call failed:', error.message);
+            return null;
+        }
+    }
+
+    /**
+     * Observe wallet via RPC (fallback when API fails)
+     */
+    async observeWalletViaRPC(walletAddress, chainId) {
+        try {
+            console.log('[TravelService] Querying wallet via RPC...');
+            
+            // Get current balance
+            const balance = await this.provider.getBalance(walletAddress);
+            
+            // Get transaction count (nonce)
+            const txCount = await this.provider.getTransactionCount(walletAddress);
+            
+            // Try to get recent blocks to find transactions
+            const latestBlock = await this.provider.getBlockNumber();
+            const blocksToCheck = Math.min(100, latestBlock); // Check last 100 blocks
+            
+            let foundTxCount = 0;
+            let totalValue = BigInt(0);
+            const notableEvents = [];
+            
+            // Sample recent blocks (check every 10th block for efficiency)
+            for (let i = 0; i < blocksToCheck && i < 10; i += 10) {
+                try {
+                    const blockNum = latestBlock - i;
+                    const block = await this.provider.getBlock(blockNum, true);
+                    
+                    if (block && block.transactions) {
+                        for (const txHash of block.transactions) {
+                            if (typeof txHash === 'string') {
+                                const tx = await this.provider.getTransaction(txHash);
+                                if (tx && (tx.from?.toLowerCase() === walletAddress.toLowerCase() || 
+                                          tx.to?.toLowerCase() === walletAddress.toLowerCase())) {
+                                    foundTxCount++;
+                                    totalValue += tx.value || BigInt(0);
+                                    
+                                    if (tx.value > ethers.parseEther('0.1')) {
+                                        notableEvents.push({
+                                            type: 'large_transfer',
+                                            hash: tx.hash,
+                                            value: tx.value.toString()
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (blockError) {
+                    // Skip block errors
+                    continue;
+                }
+            }
+            
+            return {
+                transactions: [],
+                totalTxCount: Math.max(txCount, foundTxCount),
+                totalValueWei: totalValue.toString(),
+                balance: balance.toString(),
+                notableEvents,
+                source: 'RPC'
+            };
+            
+        } catch (error) {
+            console.error('[TravelService] RPC observation failed:', error.message);
+            return this.getMockWalletData();
+        }
+    }
+
+    /**
+     * Observe general chain activity for random exploration
+     */
+    async observeChainActivity(chainId) {
+        try {
+            console.log('[TravelService] Observing chain activity for random exploration');
+            
+            const latestBlock = await this.provider.getBlockNumber();
+            const block = await this.provider.getBlock(latestBlock, true);
+            
+            const chainNames = {
+                7001: 'ZetaChain Athens',
+                11155111: 'Ethereum Sepolia',
+                97: 'BSC Testnet',
+                80002: 'Polygon Amoy'
+            };
+            
+            // Analyze recent block
+            let txCount = 0;
+            let totalGas = BigInt(0);
+            
+            if (block && block.transactions) {
+                txCount = block.transactions.length;
+                // Sample a few transactions to get gas info
+                for (let i = 0; i < Math.min(5, block.transactions.length); i++) {
+                    const txHash = block.transactions[i];
+                    if (typeof txHash === 'string') {
+                        const tx = await this.provider.getTransaction(txHash);
+                        if (tx) {
+                            totalGas += tx.gasLimit || BigInt(0);
+                        }
+                    }
+                }
+            }
+            
+            return {
+                transactions: [],
+                totalTxCount: txCount,
+                totalValueWei: '0',
+                notableEvents: [
+                    {
+                        type: 'chain_exploration',
+                        chainName: chainNames[chainId] || `Chain ${chainId}`,
+                        latestBlock: latestBlock,
+                        blockTxCount: txCount,
+                        timestamp: block?.timestamp || Date.now() / 1000
+                    }
+                ],
+                source: 'CHAIN_EXPLORATION',
+                isRandomExploration: true
+            };
+            
+        } catch (error) {
+            console.error('[TravelService] Chain observation failed:', error.message);
             return this.getMockWalletData();
         }
     }
@@ -263,16 +418,66 @@ class TravelService {
     async generateJournal(frog, walletData) {
         const txCount = walletData.totalTxCount;
         const totalValue = ethers.formatEther(walletData.totalValueWei || '0');
+        const dataSource = walletData.source || 'MOCK';
+        const isRandomExploration = walletData.isRandomExploration || false;
 
-        const prompt = `你是一只名叫 ${frog.name} 的旅行青蛙，刚刚完成了一次观察区块链钱包的旅行。
+        let prompt;
+
+        if (isRandomExploration && walletData.notableEvents && walletData.notableEvents.length > 0) {
+            // Chain exploration prompt
+            const chainEvent = walletData.notableEvents[0];
+            prompt = `你是一只名叫 ${frog.name} 的旅行青蛙，刚刚完成了一次探索 ${chainEvent.chainName} 区块链的冒险。
+
+探索数据:
+- 探索的链: ${chainEvent.chainName}
+- 最新区块高度: ${chainEvent.latestBlock}
+- 该区块交易数: ${chainEvent.blockTxCount} 笔
+- 链上氛围: ${chainEvent.blockTxCount > 50 ? '非常繁忙' : chainEvent.blockTxCount > 20 ? '比较活跃' : '相对安静'}
+
+请以第一人称（青蛙的视角）写一篇100-150字的随机探险日记，描述你在这条区块链上看到的有趣景象。
+要求：
+1. 温馨可爱，富有想象力
+2. 把区块链想象成一个神奇的数字世界
+3. 用比喻和童话的方式描述链上活动
+4. 不要直接提及技术术语如"区块"、"交易"等
+5. 表达出探险的新奇感
+`;
+        } else if (dataSource === 'RPC' && walletData.balance) {
+            // RPC data prompt
+            const balance = ethers.formatEther(walletData.balance);
+            prompt = `你是一只名叫 ${frog.name} 的旅行青蛙，刚刚完成了一次观察神秘地址的旅行。
+
+旅行数据:
+- 观察方式: 链上直接查询
+- 地址活跃度: ${txCount} 次历史互动
+- 当前财富: ${balance > 0 ? '富有' : '朴素'}
+- 特殊发现: ${walletData.notableEvents?.length || 0} 个有趣事件
+
+请以第一人称（青蛙的视角）写一篇100-150字的旅行日记，描述这个地址的"生活"。
+要求：
+1. 温馨可爱，富有想象力
+2. 把钱包地址想象成一个居住者的家
+3. 根据互动次数和余额推测"主人"的性格
+4. 不直接提及技术术语
+5. 像童话故事般温馨
+`;
+        } else {
+            // Default/API data prompt
+            prompt = `你是一只名叫 ${frog.name} 的旅行青蛙，刚刚完成了一次观察区块链钱包的旅行。
 
 旅行数据:
 - 交易数量: ${txCount} 笔
 - 总交易额: ${totalValue} ETH
-- 特殊事件: ${walletData.notableEvents.length} 个
+- 特殊事件: ${walletData.notableEvents?.length || 0} 个
+- 数据来源: ${dataSource === 'API' ? '详细观察' : '快速扫描'}
 
-请以第一人称(青蛙的视角)写一篇100-200字的旅行日记，描述你观察到的有趣现象。
-要求: 温馨可爱，富有想象力，不要直接提及技术术语，要像童话故事一样。`;
+请以第一人称(青蛙的视角)写一篇100-150字的旅行日记，描述你观察到的有趣现象。
+要求: 
+1. 温馨可爱，富有想象力
+2. 不要直接提及技术术语，要像童话故事一样
+3. 根据数据特点展开想象
+`;
+        }
 
         try {
             const response = await axios.post(
@@ -282,7 +487,7 @@ class TravelService {
                     input: { prompt },
                     parameters: {
                         max_tokens: 500,
-                        temperature: 0.8
+                        temperature: 0.9
                     }
                 },
                 {
@@ -301,14 +506,18 @@ class TravelService {
         } catch (error) {
             console.error('[TravelService] Error generating journal:', error.message);
 
-            // Fallback journal
-            const fallbackJournals = [
-                `今天我去了一个神秘的地方观察，看到了 ${txCount} 个忙碌的身影在数字世界中穿梭。${frog.name} 觉得这个世界真奇妙！`,
-                `呱呱~ ${frog.name} 今天的旅行充满惊喜！遇到了许多勤劳的小伙伴，他们搬运着闪闪发光的宝藏，一共有 ${txCount} 次呢！`,
-                `亲爱的日记，今天 ${frog.name} 去了一个繁华的市集，看到很多人在交换宝物。数了数，一共看到 ${txCount} 次交易，真热闹啊！`
-            ];
-
-            return fallbackJournals[Math.floor(Math.random() * fallbackJournals.length)];
+            // Fallback journal based on data source
+            if (isRandomExploration) {
+                const chainEvent = walletData.notableEvents?.[0];
+                return `今天${frog.name}去了一个神秘的数字世界冒险！那里的路标显示着高达${chainEvent?.latestBlock || '未知'}的数字，看到${chainEvent?.blockTxCount || '很多'}个忙碌的身影在穿梭。这个世界${chainEvent?.blockTxCount > 50 ? '热闹极了' : '安静祥和'}，真是一次奇妙的探险！`;
+            } else {
+                const fallbackJournals = [
+                    `今天我去了一个神秘的地方观察，看到了 ${txCount} 个忙碌的身影在数字世界中穿梭。${frog.name} 觉得这个世界真奇妙！`,
+                    `呱呱~ ${frog.name} 今天的旅行充满惊喜！遇到了许多勤劳的小伙伴，他们搬运着闪闪发光的宝藏，一共有 ${txCount} 次呢！`,
+                    `亲爱的日记，今天 ${frog.name} 去了一个繁华的市集，看到很多人在交换宝物。数了数，一共看到 ${txCount} 次交易，真热闹啊！`
+                ];
+                return fallbackJournals[Math.floor(Math.random() * fallbackJournals.length)];
+            }
         }
     }
 

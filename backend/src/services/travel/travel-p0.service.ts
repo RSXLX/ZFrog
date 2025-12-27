@@ -120,6 +120,44 @@ class TravelP0Service {
       );
 
       // 3. 生成旅行日记
+      // Build prompt with enriched data
+      const prompt = `
+Generate a travel diary for a frog named ${frogName}.
+Location: ${chain} blockchain, Block #${blockNumber}.
+Time: ${exploration.timestamp.toLocaleTimeString()}.
+
+Wallet Visited: ${exploration.snapshot.address}
+- Balance: ${exploration.snapshot.nativeBalance} ${exploration.snapshot.nativeSymbol}
+- Transactions: ${exploration.snapshot.txCount}
+- Wallet Age: ${exploration.snapshot.walletAge}
+${exploration.snapshot.tokens && exploration.snapshot.tokens.length > 0 ? `- Token Holdings: ${exploration.snapshot.tokens.map(t => `${t.balance} ${t.symbol}`).join(', ')}` : ''}
+
+Context of this visit:
+${exploration.transactionContext ? `- Observed Transaction: Hash ${exploration.transactionContext.hash.slice(0, 10)}...` : ''}
+${exploration.transactionContext ? `- Action: ${exploration.transactionContext.method}` : ''}
+${exploration.transactionContext && parseFloat(exploration.transactionContext.value) > 0 ? `- Value: ${exploration.transactionContext.value} ${exploration.snapshot.nativeSymbol}` : ''}
+
+Network Conditions:
+${exploration.networkStatus ? `- Gas Price: ${exploration.networkStatus.gasPrice} Gwei` : ''}
+
+Discoveries made:
+${exploration.discoveries.map(d => `- [${d.type}] ${d.title}: ${d.description}`).join('\n')}
+
+The frog's personality is: Curious, slightly philosophical, loves observing blockchain activity.
+Write a short, engaging diary entry (max 200 words) describing this visit.
+Include specific details about what the frog saw (the wallet's status, the specific transaction action if any, the network atmosphere).
+If the gas price is high, mention traffic/congestion. If token holdings are found, mention them.
+User Language: Chinese
+
+IMPORTANT: Return the result in STRICT JSON format with the following structure:
+{
+  "title": "A short creative title for the diary",
+  "content": "The diary content here...",
+  "mood": "One of: HAPPY, CURIOUS, EXCITED, TIRED, MELANCHOLIC"
+}
+Do not include any markdown formatting (like \`\`\`json) in the response. Just the raw JSON string.
+`;
+
       const diaryResult = await this.generateTravelDiary({
         frogName,
         chain,
@@ -129,6 +167,7 @@ class TravelP0Service {
         snapshot: exploration.snapshot,
         discoveries: exploration.discoveries,
         souvenir,
+        overridePrompt: prompt,
       });
 
       // 4. 计算经验值 (每小时 10 XP + 稀有发现额外 XP)
@@ -219,7 +258,7 @@ class TravelP0Service {
    * 生成旅行日记
    */
   private async generateTravelDiary(params: any): Promise<{ content: string; mood: string; title: string }> {
-    const prompt = buildTravelDiaryPrompt(params);
+    const prompt = params.overridePrompt || buildTravelDiaryPrompt(params);
 
     try {
       // 使用 AI 服务生成日记
