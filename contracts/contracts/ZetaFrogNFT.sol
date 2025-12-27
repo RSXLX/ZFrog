@@ -17,7 +17,7 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
     uint256 public constant MAX_SUPPLY = 1000;
     uint256 public constant MIN_TRAVEL_DURATION = 1 minutes;
     uint256 public constant MAX_TRAVEL_DURATION = 24 hours;
-    uint256 public constant COOLDOWN_PERIOD = 10 minutes;
+    uint256 public constant COOLDOWN_PERIOD = 1 minutes;
 
     // ============ Enums ============
     enum FrogStatus {
