@@ -94,9 +94,34 @@ export function TravelP0Form({ frogId, frogName, onSuccess }: TravelP0FormProps)
 
     useEffect(() => {
         if (isSuccess && onSuccess) {
+            // 立即触发一次刷新
             onSuccess();
+            
+            // 触发全局事件通知其他组件，前端可以先使用临时状态
+            window.dispatchEvent(new CustomEvent('travel:started', { 
+                detail: { 
+                    frogId, 
+                    timestamp: Date.now(), 
+                    targetWallet: travelType === 'RANDOM' ? '0x0000000000000000000000000000000000000000' : 
+                     (LANDMARKS[CHAIN_MAPPING[targetChain || 'ZETACHAIN_ATHENS']]?.[Math.floor(Math.random() * (LANDMARKS[CHAIN_MAPPING[targetChain || 'ZETACHAIN_ATHENS']]?.length || 1))]?.address || '0x0000000000000000000000000000000000000000'), 
+                    duration, 
+                    chainId: travelType === 'RANDOM' ? Object.values(CHAIN_MAPPING)[Math.floor(Math.random() * Object.values(CHAIN_MAPPING).length)] : CHAIN_MAPPING[targetChain || 'ZETACHAIN_ATHENS'],
+                    isRandom: travelType === 'RANDOM'
+                } 
+            }));
+            
+            // 多次延迟刷新，确保后端数据完全同步
+            const timer1 = setTimeout(() => onSuccess(), 1000);
+            const timer2 = setTimeout(() => onSuccess(), 3000);
+            const timer3 = setTimeout(() => onSuccess(), 5000);
+            
+            return () => {
+                clearTimeout(timer1);
+                clearTimeout(timer2);
+                clearTimeout(timer3);
+            };
         }
-    }, [isSuccess, onSuccess]);
+    }, [isSuccess, onSuccess, frogId, duration, travelType, targetChain]);
 
     return (
         <motion.div

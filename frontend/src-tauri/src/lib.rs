@@ -1,10 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, WebviewWindowBuilder, WebviewUrl, Listener};
+
+mod native_window;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct PetState {
@@ -72,6 +73,34 @@ async fn save_app_state(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// 设置窗口点击穿透状态
+/// 
+/// # Arguments
+/// * `window_label` - 窗口标签 (可选，为空时使用当前窗口)
+/// * `enabled` - true = 启用点击穿透, false = 禁用
+#[tauri::command]
+async fn set_click_through(
+    app: AppHandle, 
+    window_label: Option<String>,
+    enabled: bool
+) -> Result<(), String> {
+    let label = window_label.unwrap_or_else(|| "frog-main".to_string());
+    
+    if let Some(window) = app.get_webview_window(&label) {
+        native_window::set_window_click_through(&window, enabled)?;
+        log::info!("窗口 {} 点击穿透: {}", label, enabled);
+        Ok(())
+    } else {
+        Err(format!("未找到窗口: {}", label))
+    }
+}
+
+/// 检查点击穿透功能是否支持
+#[tauri::command]
+fn is_click_through_supported() -> bool {
+    native_window::is_click_through_supported()
+}
+
 fn create_pet_window(app: &AppHandle, label: &str, x: f64, y: f64) -> tauri::Result<()> {
     // If window already exists, ignore
     if app.get_webview_window(label).is_some() {
@@ -107,7 +136,12 @@ fn create_pet_window(app: &AppHandle, label: &str, x: f64, y: f64) -> tauri::Res
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_opener::init())
-    .invoke_handler(tauri::generate_handler![spawn_new_pet, save_app_state])
+    .invoke_handler(tauri::generate_handler![
+        spawn_new_pet, 
+        save_app_state,
+        set_click_through,
+        is_click_through_supported
+    ])
     .setup(|app| {
         #[cfg(debug_assertions)]
         {

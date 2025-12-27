@@ -11,6 +11,9 @@ export interface TravelStatusProps {
 }
 
 export function TravelStatus({ travel, frogName }: TravelStatusProps) {
+    // 添加调试信息
+    console.log('TravelStatus组件渲染，travel数据:', travel);
+    
     const [timeRemaining, setTimeRemaining] = useState<string>('');
     const [progress, setProgress] = useState(0);
     const [stage, setStage] = useState<string>('ACTIVE');

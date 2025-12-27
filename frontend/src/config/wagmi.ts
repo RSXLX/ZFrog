@@ -1,6 +1,6 @@
 import { createConfig, http } from 'wagmi';
 import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors';
-import { zetachainAthens, supportedChains } from './chains';
+import { zetachainAthens, sepolia, bscTestnet, polygonAmoy, supportedChains } from './chains';
 
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
 
@@ -40,6 +40,9 @@ export const wagmiConfig = createConfig({
   ],
   transports: {
     [zetachainAthens.id]: http(),
+    [sepolia.id]: http(),
+    [bscTestnet.id]: http(),
+    [polygonAmoy.id]: http(),
   },
 });
 

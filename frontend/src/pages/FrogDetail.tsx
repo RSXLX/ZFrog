@@ -5,9 +5,10 @@ import { TravelForm } from '../components/travel/TravelForm';
 import { TravelStatus } from '../components/travel/TravelStatus';
 import { TravelJournal } from '../components/travel/TravelJournal';
 import { Loading } from '../components/common/Loading';
+import { TravelPending } from '../components/travel/TravelPending';
 import { TravelP0Form } from '../components/travel/TravelP0Form';
 import { useWebSocket, useTravelEvents } from '../hooks/useWebSocket';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { apiService, type Frog } from '../services/api';
 import { useAccount } from 'wagmi';
 import FriendInteractionModal from '../components/frog/FriendInteraction';
@@ -77,15 +78,31 @@ export function FrogDetail() {
 
             // Check for status transition: Traveling -> Idle
             if (prevStatus === 'Traveling' && frogData?.status === 'Idle') {
-                setShowCelebration(true);
-                setTimeout(() => {
-                    setShowCelebration(false);
-                    // 跳转到最新的旅行详情页面
-                    if (travels.length > 0) {
-                        window.location.href = `/travel/${travels[0].id}`;
-                    }
-                }, 5000); // Hide after 5s and navigate
+                // 如果是通过 fetchData 轮询发现的状态变化（非 WebSocket触发），也显示庆祝并跳转
+                // 但为了避免冲突，我们检查一下是否已经由 WebSocket 处理了
+                if (!showCelebration) {
+                    setShowCelebration(true);
+                    setTimeout(() => {
+                        setShowCelebration(false);
+                        if (travels.length > 0) {
+                            window.location.href = `/travel/${travels[0].id}`;
+                        }
+                    }, 3000);
+                }
             }
+            // 状态保护逻辑：如果本地刚发起旅行，忽略后端的 Idle 状态
+            if (pendingTravelRef.current && frogData?.status === 'Idle') {
+                console.log('⏳ 后端尚未同步，维持乐观更新状态 (Traveling)...');
+                // 强制修正数据状态，避免 UI 闪烁
+                if (frogData) {
+                    frogData.status = 'Traveling';
+                }
+                // 此时不要清除 activeTravel，保留之前的 optimistic state
+            } else if (frogData?.status === 'Traveling') {
+                // 后端已确认进入 Traveling 状态，清除 pending 标记
+                pendingTravelRef.current = false;
+            }
+
             setPrevStatus(frogData?.status || null);
             setFrog(frogData);
             if (frogData) setCurrentFrog(frogData);
@@ -94,32 +111,52 @@ export function FrogDetail() {
             if (frogData?.travels) {
                 setTravels(frogData.travels.filter((t: TravelDetail) => t.status === 'Completed'));
             }
+
+            // 获取活跃旅行逻辑
             if (frogData?.status === 'Traveling') {
                 try {
-                    const response = await apiService.get(`/travels/${tokenId}/active`);
-                    if (response.success && response.data) {
-                        const travelData = response.data;
-                        setActiveTravel({
-                            ...travelData,
-                            startTime: new Date(travelData.startTime).toISOString(),
-                            endTime: new Date(travelData.endTime).toISOString(),
-                            completed: travelData.status === 'Completed'
-                        });
+                    // 如果还在 pending 状态且 API 返回还是 Idle (被我们强制改为 Traveling了)，
+                    // 此时去 /active 接口拿可能也是空的，所以如果是 pending 状态，先跳过 active 查询或者容忍失败
+                    if (pendingTravelRef.current && !activeTravel) {
+                        // 保持当前的乐观 activeTravel，不做任何事
                     } else {
-                        // 如果没有活跃旅行数据，但状态是Traveling，可能是数据延迟
-                        // 只在没有现有活跃旅行时才重试，避免重复调用
-                        if (!activeTravel) {
-                            setTimeout(() => {
-                                if (frog?.status === 'Traveling' && !activeTravel) {
-                                    fetchData();
+                        const response = await apiService.get(`/travels/${tokenId}/active`);
+                        if (response.success && response.data) {
+                            const travelData = response.data;
+                            
+                            // [DEBUG] Log unexpected state
+                            console.log(`[FrogDetail] Active travel check: ${travelData ? 'Found' : 'Null'}, Status: ${travelData?.status}`);
+                            
+                            setActiveTravel({
+                                ...travelData,
+                                startTime: new Date(travelData.startTime).toISOString(),
+                                endTime: new Date(travelData.endTime).toISOString(),
+                                completed: travelData.status === 'Completed'
+                            });
+                        } else {
+                            // [DEBUG] No active travel found from API
+                            console.log('[FrogDetail] No active travel data from API yet.');
+
+                            // 如果没有活跃旅行数据，但状态是Traveling
+                            // 1. 如果是 pending，说明后端还没生成，保持前端乐观数据
+                            if (pendingTravelRef.current) { 
+                                console.log('[FrogDetail] Keeping optimistic travel state pending backend sync...');
+                            } else {
+                                // 2. 否则可能是数据延迟，重试
+                                if (!activeTravel) {
+                                    console.log('[FrogDetail] Retry fetching active travel in 2s...');
+                                    setTimeout(() => {
+                                        if (frog?.status === 'Traveling' && !activeTravel) {
+                                            fetchData();
+                                        }
+                                    }, 2000);
                                 }
-                            }, 2000);
+                            }
                         }
                     }
                 } catch (error) {
-                    console.error('获取活跃旅行失败:', error);
-                    // 只在没有现有活跃旅行时才重试
-                    if (!activeTravel) {
+                    console.error('[FrogDetail] 获取活跃旅行失败:', error);
+                    if (!activeTravel && !pendingTravelRef.current) {
                         setTimeout(() => {
                             if (frog?.status === 'Traveling' && !activeTravel) {
                                 fetchData();
@@ -128,7 +165,10 @@ export function FrogDetail() {
                     }
                 }
             } else {
-                setActiveTravel(null);
+                // 只有在非 pending 且非 Traveling 时才清除 ActiveTravel
+                if (!pendingTravelRef.current) {
+                    setActiveTravel(null);
+                }
             }
 
             // 如果不是所有者且用户已登录，获取用户自己的青蛙列表以支持“加好友”
@@ -153,91 +193,152 @@ export function FrogDetail() {
     const { subscribeFrog, unsubscribeFrog, on } = useWebSocket();
     const travelEvent = useTravelEvents(tokenId);
 
-    // 监听旅行事件
+    // 监听旅行事件 - 统一处理所有旅行状态变更
     useEffect(() => {
         if (travelEvent) {
             switch (travelEvent.type) {
                 case 'started':
                     console.log('旅行开始事件:', travelEvent.data);
-                    // 延迟一点时间再获取数据，确保后端状态已更新
+                    // 立即创建临时旅行状态，提升响应速度
+                    const { targetWallet, duration, chainId } = travelEvent.data as any; // 这里的类型可能需要根据实际 event 调整，或者直接 trust event data
+                    // 如果 event data 不包含所有字段，可能需要 fallback
+                    
+                    // 刷新数据以获取最新状态
                     setTimeout(fetchData, 1000);
                     break;
+                    
                 case 'progress':
                     console.log('旅行进度事件:', travelEvent.data);
+                    // 这里可以添加进度提示，目前 TravelStatus 组件会处理具体的 WebSocket 进度更新
                     break;
+                    
                 case 'completed':
                     console.log('旅行完成事件:', travelEvent.data);
-                    fetchData().then(() => {
-                        // 跳转到旅行详情页面，使用后端返回的旅行ID
-                        window.location.href = `/travel/${travelEvent.data.travelId}`;
-                    });
+                    // 1. 设置完成标志，可能触发庆祝动画
+                    setShowCelebration(true);
+                    
+                    // 2. 延迟跳转，让用户看到庆祝动画
+                    setTimeout(() => {
+                        setShowCelebration(false);
+                        // 跳转到旅行详情页面
+                        if (travelEvent.data.travelId) {
+                            window.location.href = `/travel/${travelEvent.data.travelId}`;
+                        } else {
+                            //在这个fallback情况，重新拉取数据看看有没有最新旅行
+                            fetchData().then(() => {
+                                if (travels.length > 0) {
+                                    window.location.href = `/travel/${travels[0].id}`;
+                                }
+                            });
+                        }
+                    }, 3000); 
                     break;
             }
         }
     }, [travelEvent]);
 
-    useEffect(() => {
-        const handleTravelCompleted = () => {
-            fetchData().then(() => {
-                // 如果有完成的旅行，跳转到详情页面
-                if (travels.length > 0) {
-                    const latestTravel = travels[0];
-                    window.location.href = `/travel/${latestTravel.id}`;
-                }
-            });
-        };
+    // Ref to track locally initiated travel that might not be synced yet
+    const pendingTravelRef = useRef(false);
 
+    // [Feature] Aggressive Polling for Travel Start Sync
+    // 当处于 Processing 状态时，每 2 秒轮询一次后端，检查是否已同步
+    useEffect(() => {
+        let pollTimer: NodeJS.Timeout;
+
+        if (activeTravel?.status === 'Processing') {
+            console.log('[TravelSync] Starting aggressive polling for travel sync...');
+            
+            pollTimer = setInterval(async () => {
+                try {
+                    console.log('[TravelSync] Polling active travel status...');
+                    const response = await apiService.get(`/travels/${tokenId}/active`);
+                    
+                    if (response.success && response.data) {
+                        console.log('[TravelSync] Travel synced! Switching to Active state.', response.data);
+                        
+                        // 后端已同步，清除 pending 标记
+                        pendingTravelRef.current = false;
+                        
+                        // 更新为后端返回的正式数据
+                        const travelData = response.data;
+                        setActiveTravel({
+                            ...travelData,
+                            startTime: new Date(travelData.startTime).toISOString(),
+                            endTime: new Date(travelData.endTime).toISOString(),
+                            completed: travelData.status === 'Completed'
+                        });
+                        
+                        // 同时也更新一下青蛙状态
+                        if (frog && frog.status !== 'Traveling') {
+                            setFrog({ ...frog, status: 'Traveling' });
+                        }
+                    } else {
+                        console.log('[TravelSync] Still waiting for backend sync...');
+                    }
+                } catch (e) {
+                    console.warn('[TravelSync] Poll failed:', e);
+                }
+            }, 2000);
+        }
+
+        return () => {
+            if (pollTimer) clearInterval(pollTimer);
+        };
+    }, [activeTravel?.status, tokenId, frog]);
+    
+    // 监听 window 自定义事件 (从 TravelForm 发出)
+    useEffect(() => {
         const handleTravelStarted = (event: any) => {
-            const { frogId, targetWallet, duration, chainId } = event.detail;
+            const { frogId, targetWallet, duration, chainId, isRandom } = event.detail;
             if (frogId === tokenId) {
+                console.log('收到本地旅行开始事件，创建临时状态:', event.detail);
+                
+                // 标记为等待同步状态
+                pendingTravelRef.current = true;
+                // 30秒后自动清除标记，防止死锁
+                setTimeout(() => {
+                    pendingTravelRef.current = false;
+                }, 30000);
+                
                 // 立即创建临时旅行状态
                 const now = new Date();
                 const endTime = new Date(now.getTime() + duration * 1000);
                 
-                setActiveTravel({
-                    id: 0, // 临时ID，等待后端更新
+                const tempTravel: TravelDetail = {
+                    id: 0, // 临时ID
                     tokenId: tokenId,
-                    frogId: 0, // 临时ID，等待后端更新
+                    frogId: tokenId,
                     startTime: now.toISOString(),
                     endTime: endTime.toISOString(),
                     targetWallet: targetWallet,
                     chainId: chainId,
-                    status: 'Active',
+                    status: 'Processing', // 使用 Processing 状态触发 Pending UI
                     completed: false,
-                });
+                    journalHash: undefined,
+                    journalContent: undefined,
+                    journal: undefined,
+                    souvenir: undefined,
+                    completedAt: undefined
+                };
                 
-                // 立即刷新青蛙数据
-                fetchData();
+                setActiveTravel(tempTravel);
+                // 乐观更新：将青蛙状态设为 Traveling
+                if (frog) {
+                    setFrog({ ...frog, status: 'Traveling' });
+                }
+                
+                // 稍后刷新以确保后端同步
+                setTimeout(fetchData, 2000);
             }
         };
 
-        window.addEventListener('travel:completed', handleTravelCompleted);
         window.addEventListener('travel:started', handleTravelStarted);
         
         return () => {
-            window.removeEventListener('travel:completed', handleTravelCompleted);
             window.removeEventListener('travel:started', handleTravelStarted);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tokenId]);
-
-    useEffect(() => {
-        if (frog?.status === 'Traveling' && activeTravel && !activeTravel.completed) {
-            const checkInterval = setInterval(() => {
-                const now = Date.now();
-                const endTime = new Date(activeTravel.endTime).getTime();
-
-                // 只有在旅行结束超过5秒后才检查
-                if (now >= endTime + 5000) {
-                    clearInterval(checkInterval); // 先清除定时器避免重复调用
-                    fetchData();
-                }
-            }, 5000);
-
-            return () => clearInterval(checkInterval);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [frog?.status, activeTravel, tokenId]);
+    }, [tokenId, frog]);
 
     if (isLoading) {
         return (
@@ -369,9 +470,18 @@ export function FrogDetail() {
                         <div>
                             {isOwner ? (
                                 activeTravel && !activeTravel.completed ? (
-                                    <TravelStatus travel={activeTravel} frogName={frog.name} />
+                                    <>
+                                        {console.log('显示旅行状态，activeTravel:', activeTravel)}
+                                        {activeTravel.status === 'Processing' ? (
+                                            <TravelPending />
+                                        ) : (
+                                            <TravelStatus travel={activeTravel} frogName={frog.name} />
+                                        )}
+                                    </>
                                 ) : (
-                                    <div className="space-y-4">
+                                    <>
+                                        {console.log('不显示旅行状态，activeTravel:', activeTravel, 'completed:', activeTravel?.completed)}
+                                        <div className="space-y-4">
                                         {/* 模式切换选项卡 */}
                                         <div className="flex bg-white/50 backdrop-blur p-1 rounded-xl border border-gray-200">
                                             <button
@@ -411,7 +521,8 @@ export function FrogDetail() {
                                                 onSuccess={fetchData}
                                             />
                                         )}
-                                    </div>
+                                        </div>
+                                    </>
                                 )
                             ) : (
                                 <motion.div

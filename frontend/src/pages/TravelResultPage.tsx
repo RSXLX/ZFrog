@@ -171,12 +171,7 @@ export function TravelResultPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center mb-8"
                 >
-                    <h1 className="text-4xl font-bold text-green-600 mb-2">
-                        🐸 青蛙回来啦！
-                    </h1>
-                    <p className="text-gray-700">
-                        带回了有趣的旅行故事和纪念品~
-                    </p>
+              
                 </motion.div>
 
                 {/* 旅行结果 */}

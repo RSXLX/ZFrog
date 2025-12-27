@@ -1,0 +1,56 @@
+/* frontend/src/styles/animations.css */
+
+/* 青蛙点击动画 */
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+/* 打字指示器动画 */
+@keyframes typing {
+  0%, 60%, 100% { 
+    opacity: 0.3; 
+    transform: translateY(0); 
+  }
+  30% { 
+    opacity: 1; 
+    transform: translateY(-4px); 
+  }
+}
+
+/* 脉冲动画 */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* 消息容器滚动条样式 */
+.messages-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.messages-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  background: rgba(74, 222, 128, 0.3);
+  border-radius: 3px;
+}
+
+/* 快捷回复按钮悬停效果 */
+.quick-reply-btn:hover {
+  background: rgba(74, 222, 128, 0.2) !important;
+  border-color: #4ade80 !important;
+}
+
+/* 输入框聚焦效果 */
+.chat-input:focus {
+  border-color: rgba(74, 222, 128, 0.5) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 发送按钮悬停效果 */
+.send-btn:hover:not(:disabled) {
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.5) !important;
+}

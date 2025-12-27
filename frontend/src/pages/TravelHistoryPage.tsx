@@ -132,8 +132,12 @@ export function TravelHistoryPage() {
             });
             
             // 获取统计数据
+            const statsParams: any = { address };
+            if (fId && fId !== 'all') {
+                statsParams.frogId = fId;
+            }
             const statsResponse = await apiService.get('/travels/stats', {
-                params: { address }
+                params: statsParams
             });
             
             if (travelsResponse.success && travelsResponse.data) {

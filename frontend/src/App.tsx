@@ -9,6 +9,8 @@ import { BadgesPage } from './pages/BadgesPage';
 import { SouvenirsPage } from './pages/SouvenirsPage';
 import { TravelHistoryPage } from './pages/TravelHistoryPage';
 import { TravelDetailPage } from './pages/TravelDetailPage';
+import { AnimationDemoPage } from './pages/AnimationDemoPage';
+import { HomeScenePage } from './pages/HomeScenePage';
 import { Navbar } from './components/common/Navbar';
 import { FrogPet } from './components/frog/FrogPet';
 import { useWalletConnect } from './hooks/useWalletConnect';
@@ -79,6 +81,8 @@ export function App() {
               <Route path="/badges/:frogId" element={<BadgesPage />} />
               <Route path="/souvenirs/:frogId" element={<SouvenirsPage />} />
               <Route path="/travel-history" element={<TravelHistoryPage />} />
+              <Route path="/animation-demo" element={<AnimationDemoPage />} />
+              <Route path="/home-scene" element={<HomeScenePage />} />
             </Routes>
           </main>
           

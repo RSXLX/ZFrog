@@ -9,12 +9,14 @@ import { zhCN } from 'date-fns/locale';
 
 interface SouvenirDisplay {
     id: string | number;
+    tokenId?: number;      // NFT Token ID
     name: string;
     description: string;
     rarity: string;
     type: string;
     emoji?: string;
     imageUrl?: string;
+    ipfsHash?: string;     // IPFS Hash
     sourceChain?: string;
     date: Date;
     travelId?: number;
@@ -327,12 +329,40 @@ export function SouvenirsPage() {
                                 <p className="text-gray-600 leading-relaxed italic border-l-4 border-gray-100 pl-4 mb-6">
                                     "{selectedSouvenir.description}"
                                 </p>
+                                
+                                {/* Token ID 和 IPFS 信息 */}
+                                <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-2">
+                                    {selectedSouvenir.tokenId && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-gray-500">Token ID</span>
+                                            <span className="font-mono text-sm font-bold text-gray-700">#{selectedSouvenir.tokenId}</span>
+                                        </div>
+                                    )}
+                                    {selectedSouvenir.ipfsHash && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-gray-500">IPFS</span>
+                                            <a 
+                                                href={`https://gateway.pinata.cloud/ipfs/${selectedSouvenir.ipfsHash.replace('ipfs://', '')}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="font-mono text-xs text-blue-500 hover:text-blue-700 truncate max-w-[180px]"
+                                            >
+                                                {selectedSouvenir.ipfsHash.slice(0, 20)}...
+                                            </a>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-gray-500">类型</span>
+                                        <span className="text-sm text-gray-700">{selectedSouvenir.type === 'NFT' ? '🎨 NFT' : '📦 收藏品'}</span>
+                                    </div>
+                                </div>
+                                
                                 <div className="flex items-center justify-between pt-6 border-t border-gray-50">
                                     <div className="flex items-center gap-2">
                                         <span className="text-xl">🌐</span>
                                         <div className="text-xs">
                                             <p className="text-gray-400">发现于</p>
-                                            <p className="font-bold text-gray-700">{selectedSouvenir.sourceChain}</p>
+                                            <p className="font-bold text-gray-700">{selectedSouvenir.sourceChain || '未知链'}</p>
                                         </div>
                                     </div>
                                     {selectedSouvenir.travelId && (

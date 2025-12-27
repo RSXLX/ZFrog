@@ -113,7 +113,7 @@ export function Home() {
                     <FeatureCard
                       emoji="🎨"
                       title="独特 NFT"
-                      description="每只 ZetaFrog 都是 ZetaChain 上独一无二的 NFT"
+                      description="每次旅行都能生成独一无二的NFT"
                     />
                     <FeatureCard
                       emoji="🔍"

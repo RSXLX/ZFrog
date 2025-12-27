@@ -3,10 +3,12 @@ import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import { useFrogState } from '../../hooks/useFrogState';
 import { useChainMonitor } from '../../hooks/useChainMonitor';
 import { useFrogInteraction } from '../../hooks/useFrogInteraction';
+import { useClickThrough } from '../../hooks/useClickThrough';
 import { PetManager } from '../../utils/PetManager';
 import { ParticleEffect } from './ParticleEffect';
 import { SpeechBubble, ChainEventBubble } from './SpeechBubble';
 import { FrogState, FrogMood } from '../../types/frogAnimation';
+import { ChatBubble } from '../chat/ChatBubble';
 
 interface FrogPetProps {
   frogId: number;
@@ -56,6 +58,14 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
     getFrogMood,
   } = useFrogInteraction();
   
+  // 桌面宠物点击穿透 (仅 Tauri 环境生效)
+  const {
+    isTauri,
+    isSupported: isClickThroughSupported,
+    handleMouseEnterFrog,
+    handleMouseLeaveFrog,
+  } = useClickThrough({ enabled: true });
+  
   // 当前动画帧
   const [currentFrame, setCurrentFrame] = useState(0);
   const [showSpeech, setShowSpeech] = useState(false);
@@ -65,6 +75,7 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
   const [clickCount, setClickCount] = useState(0);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [showChat, setShowChat] = useState(false);
   
   // 动画配置
   const animConfig = getCurrentAnimationConfig();
@@ -243,7 +254,18 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
   // 右键菜单处理
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    
+    // 获取FrogPet容器的位置
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      // 计算相对于FrogPet容器的位置
+      const relativeX = e.clientX - rect.left;
+      const relativeY = e.clientY - rect.top;
+      setContextMenuPosition({ x: relativeX, y: relativeY });
+    } else {
+      // 如果容器引用不可用，回退到原始方法
+      setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    }
     setShowContextMenu(true);
   }, []);
   
@@ -257,6 +279,9 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
     closeContextMenu();
     
     switch (action) {
+      case 'chat':
+        setShowChat(true);
+        break;
       case 'newPet':
         PetManager.spawnNewPet();
         break;
@@ -333,6 +358,8 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
         className="relative cursor-pointer"
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
+        onMouseEnter={handleMouseEnterFrog}
+        onMouseLeave={handleMouseLeaveFrog}
         animate={controls}
         style={{
           transform: `scaleX(${direction === 'left' ? -1 : 1})`,
@@ -562,7 +589,7 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
       <AnimatePresence>
         {showContextMenu && (
           <motion.div
-            className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[150px]"
+            className="absolute z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[150px]"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
@@ -571,6 +598,13 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
               top: contextMenuPosition.y,
             }}
           >
+            <button
+              onClick={() => handleContextMenuAction('chat')}
+              className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2"
+            >
+              <span>💬</span>
+              <span>开始聊天</span>
+            </button>
             <button
               onClick={() => handleContextMenuAction('newPet')}
               className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2"
@@ -600,6 +634,31 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
               <span>❌</span>
               <span>关闭</span>
             </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* 聊天窗口 - 显示在页面中部 */}
+      <AnimatePresence>
+        {showChat && (
+          <motion.div
+            className="fixed z-50"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            style={{
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <ChatBubble
+              frogId={frogId}
+              frogName={name}
+              personality="COMEDIAN"
+              onClose={() => setShowChat(false)}
+              onClickOutside={() => setShowChat(false)}
+            />
           </motion.div>
         )}
       </AnimatePresence>
