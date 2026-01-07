@@ -1,0 +1,8 @@
+{
+  "contractName": "FrogFootprint",
+  "network": "ethSepolia",
+  "chainId": "11155111",
+  "address": "0x319421300114065F601a0103ec1eC3AB2652C5Da",
+  "connectorAddress": "0xBfE0D6341E52345d5384D3DD4f106464A377D241",
+  "deployedAt": "2026-01-06T18:15:13.188Z"
+}

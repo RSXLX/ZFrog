@@ -56,7 +56,7 @@ export const priceApi = {
    */
   async getPrice(symbol: string): Promise<PriceResponse> {
     const response = await api.get<PriceResponse>(`/price/${symbol}`);
-    return response.data;
+    return response;
   },
 
   /**
@@ -67,7 +67,7 @@ export const priceApi = {
     const response = await api.get<BatchPriceResponse>('/price/batch', {
       params: { symbols: symbolsParam }
     });
-    return response.data;
+    return response;
   },
 
   /**
@@ -75,7 +75,7 @@ export const priceApi = {
    */
   async getTrendingPrices(): Promise<TrendingResponse> {
     const response = await api.get<TrendingResponse>('/price/trending');
-    return response.data;
+    return response;
   },
 
   /**
@@ -83,6 +83,6 @@ export const priceApi = {
    */
   async searchPrices(query: string): Promise<SearchResponse> {
     const response = await api.get<SearchResponse>(`/price/search/${query}`);
-    return response.data;
+    return response;
   }
 };

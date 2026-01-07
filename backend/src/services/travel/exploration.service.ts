@@ -4,6 +4,7 @@ import { createPublicClient, http, formatEther, formatUnits, parseAbiItem, decod
 import { bscTestnet, sepolia, polygonMumbai, arbitrumGoerli } from 'viem/chains';
 import { SUPPORTED_CHAINS, ChainKey, CHAIN_KEYS, getChainConfig } from '../../config/chains';
 import { logger } from '../../utils/logger';
+import { blockExplorerService, WalletInfo } from '../block-explorer.service';
 
 // Minimal ERC20 ABI for balance checking
 const ERC20_ABI = [
@@ -45,6 +46,14 @@ const KNOWN_SELECTORS: Record<string, string> = {
   '0xa0712d68': 'mint',     // Another mint signature
 };
 
+const FOOTPRINT_CONTRACTS: Record<string, string> = {
+  BSC_TESTNET: '0x9571ce7FdaBfe3A234dABE3eaa01704A62AF643e',
+  ETH_SEPOLIA: '0x319421300114065F601a0103ec1eC3AB2652C5Da',
+  ZETACHAIN_ATHENS: '',
+  POLYGON_MUMBAI: '',
+  ARBITRUM_GOERLI: '',
+};
+
 export interface ExplorationResult {
   chain: ChainKey;
   blockNumber: bigint;
@@ -77,6 +86,7 @@ export interface TransactionContext {
   method: string; // e.g. "transfer", "swap", "unknown"
   value: string;  // Native value sent
   to: string;     // Target address (contract?)
+  from: string;
 }
 
 export interface NetworkStatus {
@@ -84,11 +94,21 @@ export interface NetworkStatus {
   baseFee?: string;
 }
 
+export interface FootprintEvent {
+  frogId: number;
+  location: string;
+  observation: string;
+  timestamp: Date;
+  txHash: string;
+  blockNumber: string;
+}
+
 export interface Discovery {
   type: 'balance' | 'activity' | 'timing' | 'fun_fact' | 'cross_chain' | 'token_holding' | 'tx_action' | 'gas_price';
   title: string;
   description: string;
   rarity: number; // 1-5
+  metadata?: any;
 }
 
 class ExplorationService {
@@ -157,33 +177,208 @@ class ExplorationService {
     logger.info(`Exploring ${chain} block ${blockNumber} for wallet ${targetAddress}`);
     const client = this.clients[chain];
     const config = SUPPORTED_CHAINS[chain];
-
-    const block = await client.getBlock({ blockNumber, includeTransactions: true });
-    const timestamp = new Date(Number(block.timestamp) * 1000);
-
-    // 1. Snapshot with Tokens
-    const snapshot = await this.getWalletSnapshot(client, targetAddress, blockNumber, config);
-
-    // 2. Transaction Analysis
-    let transactionContext: TransactionContext | undefined;
-    const targetTx = block.transactions.find((tx: any) => 
-      tx.from.toLowerCase() === targetAddress.toLowerCase() || 
-      (tx.to && tx.to.toLowerCase() === targetAddress.toLowerCase())
-    );
     
-    if (targetTx) {
-      transactionContext = this.analyzeTransaction(targetTx);
-    }
-
-    // 3. Network Status
-    const networkStatus: NetworkStatus = {
-      gasPrice: block.baseFeePerGas ? formatUnits(block.baseFeePerGas, 9) : 'Unknown', // Gwei
+    const timestamp = new Date();
+    let snapshot: WalletSnapshot;
+    let transactionContext: TransactionContext | undefined;
+    let networkStatus: NetworkStatus = { gasPrice: 'Unknown' };
+    
+    // Map chain key to block explorer format
+    const explorerChainMap: Record<string, string> = {
+      'BSC_TESTNET': 'BSC_TESTNET',
+      'ETH_SEPOLIA': 'ETH_SEPOLIA',
     };
+    const explorerChain = explorerChainMap[chain];
+    
+    // Try Block Explorer API first (richer data, less RPC)
+    if (explorerChain) {
+      try {
+        logger.info(`[Exploration] Using Block Explorer API for ${chain}`);
+        const walletInfo = await blockExplorerService.getWalletInfo(explorerChain, targetAddress);
+        
+        // Convert WalletInfo to WalletSnapshot format
+        snapshot = {
+          address: targetAddress,
+          nativeBalance: walletInfo.nativeBalanceFormatted,
+          nativeSymbol: config.nativeSymbol,
+          txCount: walletInfo.recentTxCount,
+          isActive: walletInfo.recentTxCount > 0,
+          walletAge: walletInfo.lastActivity ? this.formatTimestamp(walletInfo.lastActivity) : '未知',
+          isContract: walletInfo.isContract,
+          tokens: walletInfo.tokens.map(t => ({
+            symbol: t.symbol,
+            balance: t.balance,
+            address: '', // Not available from explorer
+          })),
+        };
+        
+        // Generate enhanced discoveries from explorer data
+        const discoveries = this.generateEnhancedDiscoveries(walletInfo, config, chain);
+        
+        return { chain, blockNumber, timestamp, snapshot, discoveries, transactionContext, networkStatus };
+        
+      } catch (explorerError) {
+        logger.warn(`[Exploration] Block Explorer API failed, falling back to RPC: ${explorerError}`);
+      }
+    }
+    
+    // Fallback to RPC (original logic)
+    try {
+      const block = await client.getBlock({ blockNumber, includeTransactions: true });
+      const blockTimestamp = new Date(Number(block.timestamp) * 1000);
 
-    // 4. Generate Discoveries
-    const discoveries = this.generateDiscoveries(snapshot, timestamp, config, chain, transactionContext, networkStatus);
+      // 1. Snapshot with Tokens
+      snapshot = await this.getWalletSnapshot(client, targetAddress, blockNumber, config);
 
-    return { chain, blockNumber, timestamp, snapshot, discoveries, transactionContext, networkStatus };
+      // 2. Transaction Analysis
+      const targetTx = block.transactions.find((tx: any) => 
+        tx.from.toLowerCase() === targetAddress.toLowerCase() || 
+        (tx.to && tx.to.toLowerCase() === targetAddress.toLowerCase())
+      );
+      
+      if (targetTx) {
+        transactionContext = this.analyzeTransaction(targetTx);
+      }
+
+      // 3. Network Status
+      networkStatus = {
+        gasPrice: block.baseFeePerGas ? formatUnits(block.baseFeePerGas, 9) : 'Unknown',
+      };
+
+      // 4. Generate Discoveries
+      const discoveries = this.generateDiscoveries(snapshot, blockTimestamp, config, chain, transactionContext, networkStatus);
+
+      return { chain, blockNumber, timestamp: blockTimestamp, snapshot, discoveries, transactionContext, networkStatus };
+    } catch (rpcError) {
+      logger.error(`[Exploration] RPC also failed: ${rpcError}`);
+      // Return minimal result
+      return {
+        chain,
+        blockNumber,
+        timestamp,
+        snapshot: {
+          address: targetAddress,
+          nativeBalance: '0',
+          nativeSymbol: config.nativeSymbol,
+          txCount: 0,
+          isActive: false,
+          walletAge: '未知',
+          isContract: false,
+          tokens: [],
+        },
+        discoveries: [{
+          type: 'fun_fact',
+          title: '探索失败',
+          description: '这片区域被迷雾笼罩，什么也看不清...',
+          rarity: 1,
+        }],
+      };
+    }
+  }
+
+  /**
+   * Generate enhanced discoveries from Block Explorer API data
+   */
+  private generateEnhancedDiscoveries(walletInfo: WalletInfo, config: any, chain: ChainKey): Discovery[] {
+    const discoveries: Discovery[] = [];
+    
+    // 1. Balance discovery
+    const balanceNum = parseFloat(walletInfo.nativeBalanceFormatted);
+    if (balanceNum > 0) {
+      let rarity = 1;
+      if (balanceNum > 10) rarity = 3;
+      if (balanceNum > 100) rarity = 5;
+      
+      discoveries.push({
+        type: 'balance',
+        title: '💰 发现财富',
+        description: `这个钱包有 ${walletInfo.nativeBalanceFormatted}！`,
+        rarity,
+      });
+    } else {
+      discoveries.push({
+        type: 'balance',
+        title: '💸 空钱包',
+        description: '这个钱包空空如也，主人可能把钱都转走了...',
+        rarity: 1,
+      });
+    }
+    
+    // 2. Token discoveries
+    if (walletInfo.tokens.length > 0) {
+      const tokenNames = walletInfo.tokens.map(t => t.symbol).join(', ');
+      discoveries.push({
+        type: 'token_holding',
+        title: '🪙 代币收藏',
+        description: `发现持有代币: ${tokenNames}`,
+        rarity: Math.min(walletInfo.tokens.length + 1, 4),
+      });
+    }
+    
+    // 3. NFT discoveries
+    if (walletInfo.nfts.length > 0) {
+      const nftList = walletInfo.nfts.slice(0, 3).map(n => `${n.name}#${n.tokenId}`).join(', ');
+      discoveries.push({
+        type: 'fun_fact',
+        title: '🖼️ NFT 收藏家',
+        description: `拥有 ${walletInfo.nfts.length} 个 NFT！包括: ${nftList}`,
+        rarity: Math.min(walletInfo.nfts.length + 2, 5),
+      });
+    }
+    
+    // 4. Activity discovery
+    if (walletInfo.lastActivity) {
+      const lastDate = new Date(walletInfo.lastActivity);
+      const now = new Date();
+      const daysDiff = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysDiff === 0) {
+        discoveries.push({
+          type: 'activity',
+          title: '⚡ 活跃用户',
+          description: '今天刚有过活动，是个活跃的链上居民！',
+          rarity: 3,
+        });
+      } else if (daysDiff < 7) {
+        discoveries.push({
+          type: 'activity',
+          title: '🔥 近期活跃',
+          description: `${daysDiff} 天前有过活动`,
+          rarity: 2,
+        });
+      } else {
+        discoveries.push({
+          type: 'activity',
+          title: '😴 沉睡账户',
+          description: `已经 ${daysDiff} 天没有动静了...`,
+          rarity: 1,
+        });
+      }
+    }
+    
+    // 5. Contract discovery
+    if (walletInfo.isContract) {
+      discoveries.push({
+        type: 'fun_fact',
+        title: '🤖 智能合约',
+        description: '这不是普通钱包，而是一个智能合约！',
+        rarity: 4,
+      });
+    }
+    
+    return discoveries;
+  }
+  
+  private formatTimestamp(isoString: string): string {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return '今天';
+    if (diffDays === 1) return '昨天';
+    if (diffDays < 7) return `${diffDays}天前`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}周前`;
+    return `${Math.floor(diffDays / 30)}个月前`;
   }
 
   private async getWalletSnapshot(
@@ -282,7 +477,8 @@ class ExplorationService {
       hash: tx.hash,
       method,
       value: formatEther(tx.value),
-      to: tx.to
+      to: tx.to,
+      from: tx.from
     };
   }
 
@@ -378,11 +574,120 @@ class ExplorationService {
     return discoveries;
   }
 
-  async getRandomTargetAddress(chain: ChainKey): Promise<string> {
+  /**
+   * Scan the latest block for ambient network activity (contracts, active wallets, behaviors)
+   */
+  async scanLatestBlock(chain: ChainKey): Promise<Discovery[]> {
+    try {
+      const client = this.clients[chain];
+      const latest = await client.getBlockNumber();
+      const block = await client.getBlock({ blockNumber: latest, includeTransactions: true });
+      
+      if (!block || !block.transactions || block.transactions.length === 0) {
+        return [];
+      }
+
+      const discoveries: Discovery[] = [];
+      const txs = block.transactions;
+      
+      // Analyze up to 2 random transactions to find interesting activity
+      const sampleSize = Math.min(2, txs.length);
+      const indices = new Set<number>();
+      while (indices.size < sampleSize) {
+        indices.add(Math.floor(Math.random() * txs.length));
+      }
+
+      for (const idx of indices) {
+        const tx = txs[idx];
+        const context = this.analyzeTransaction(tx); // Reuse existing analyzer
+        // 1. Transaction Activity
+        const config = getChainConfig(chain);
+        const isContractInteraction = context.method !== 'unknown' && context.method !== 'native_transfer';
+        
+        let discovery: Discovery = {
+             type: 'tx_action',
+             title: '网络活动',
+             description: `观察到地址 ${tx.from.slice(0, 6)}... 的行为`,
+             rarity: 1,
+             metadata: { 
+                 txHash: context.hash, 
+                 from: context.from, 
+                 to: context.to,
+                 address: context.to || context.from, // Primary focus address
+                 isContract: false 
+             }
+        };
+
+        if (isContractInteraction) {
+            discovery.title = '智能合约交互';
+            discovery.description = `正在调用合约 ${context.method} 方法`;
+            discovery.rarity = 3;
+            // Explicitly mark as contract
+            discovery.metadata = {
+                ...discovery.metadata,
+                isContract: true,
+                address: context.to, // The contract address
+                method: context.method
+            };
+        } else if (context.method === 'native_transfer') {
+            discovery.title = '资产流动';
+            discovery.description = `监测到 ${parseFloat(context.value).toFixed(4)} ${config.nativeSymbol} 的转账`;
+            discovery.rarity = 2;
+        }
+
+        discoveries.push(discovery);
+      }
+
+      return discoveries;
+    } catch (error) {
+      logger.error(`Scan latest block failed for ${chain}:`, error);
+      return [];
+    }
+  }
+
+  async scanFootprints(chain: ChainKey, frogId: number, fromBlock: bigint): Promise<FootprintEvent[]> {
+    const footprintAddress = FOOTPRINT_CONTRACTS[chain];
+    if (!footprintAddress) return [];
+
+    try {
+      const client = this.clients[chain];
+      const latestBlock = await client.getBlockNumber();
+      // Ensure fromBlock is within reasonable range (e.g. last 1000 blocks to avoid RPC errors)
+      let startBlock = fromBlock;
+      if (latestBlock - startBlock > BigInt(1000) || startBlock === BigInt(0)) {
+          startBlock = latestBlock - BigInt(1000);
+          if (startBlock < BigInt(0)) startBlock = BigInt(0);
+      }
+      
+      const logs = await client.getLogs({
+        address: footprintAddress as `0x${string}`,
+        event: parseAbiItem('event FootprintLeft(uint256 indexed frogId, address indexed location, string observation, uint256 timestamp)'),
+        args: { frogId: BigInt(frogId) },
+        fromBlock: startBlock,
+        toBlock: latestBlock
+      });
+
+      return logs.map((log: any) => ({
+        frogId: Number(log.args.frogId),
+        location: log.args.location,
+        observation: log.args.observation,
+        timestamp: new Date(Number(log.args.timestamp) * 1000),
+        txHash: log.transactionHash,
+        blockNumber: log.blockNumber.toString()
+      }));
+    } catch (error) {
+      logger.warn(`Failed to scan footprints on ${chain}: ${error}`);
+      return [];
+    }
+  }
+
+  async getRandomTargetAddress(chain: ChainKey, excludeAddresses: string[] = []): Promise<string> {
+    const excludeSet = new Set(excludeAddresses.map(a => a.toLowerCase()));
+    
     for (let attempt = 1; attempt <= this.MAX_RETRY; attempt++) {
       try {
         logger.info(`Attempt ${attempt}/${this.MAX_RETRY} to discover address on ${chain}`);
-        const address = await this.discoverLuckyAddress(chain);
+        const address = await this.discoverLuckyAddress(chain, excludeSet);
         if (address && address !== '0x0000000000000000000000000000000000000000') {
           return address;
         }
@@ -394,7 +699,7 @@ class ExplorationService {
     return this.getFallbackAddress(chain);
   }
 
-  async discoverLuckyAddress(chain: ChainKey): Promise<string> {
+  async discoverLuckyAddress(chain: ChainKey, excludeSet: Set<string> = new Set()): Promise<string> {
     const client = this.clients[chain];
     const latest = await client.getBlockNumber();
     const randomBlockOffset = BigInt(Math.floor(Math.random() * 50)); // Keep it recent
@@ -405,8 +710,19 @@ class ExplorationService {
       throw new Error('Empty block');
     }
 
-    const txs = block.transactions; 
-    const randomTx = txs[Math.floor(Math.random() * txs.length)];
+    const txs = block.transactions;
+    
+    // Filter out excluded addresses
+    const validTxs = txs.filter((tx: any) => !excludeSet.has(tx.from.toLowerCase()));
+    
+    if (validTxs.length === 0) {
+      // If all addresses are excluded, just pick from all txs
+      logger.warn(`[Exploration] All addresses in block excluded, using any address`);
+      const randomTx = txs[Math.floor(Math.random() * txs.length)];
+      return randomTx.from;
+    }
+    
+    const randomTx = validTxs[Math.floor(Math.random() * validTxs.length)];
     return randomTx.from;
   }
 

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FrogPet } from '../components/frog/FrogPet';
+import { FrogScene } from '../components/frog/FrogScene';
 import { ChainEventPanel, WhaleAlert, PriceAlert } from '../components/frog/ChainEventPanel';
 import { FeedingSystem, FoodShop } from '../components/frog/FeedingSystem';
 import { ConnectButton } from '../components/wallet/ConnectButton';
 import { useWallet } from '../hooks/useWallet';
 import { useChainMonitor } from '../hooks/useChainMonitor';
-import { useFrogInteraction } from '../hooks/useFrogInteraction';
+import { useFrogInteraction, FOOD_ITEMS } from '../hooks/useFrogInteraction';
 import { useFrogData } from '../hooks/useFrogData';
 import { FoodItem } from '../types/frogAnimation';
 // TRAVEL_DESTINATIONS 将在组件内部定义
@@ -23,7 +24,7 @@ const TRAVEL_DESTINATIONS = [
 export function Desktop() {
   const { isConnected, address } = useWallet();
   const { whaleAlert, priceChange, clearAlerts } = useChainMonitor();
-  const { travel, FOOD_ITEMS } = useFrogInteraction();
+  const { travel } = useFrogInteraction();
   const { frog: activeFrog, loading } = useFrogData(address);
   
   const [inventory, setInventory] = useState({
@@ -122,14 +123,8 @@ const handleFeed = (food: FoodItem) => {
   
   // 处理青蛙互动
   const handleFrogInteract = (interaction: string) => {
-    if (activeFrog) {
-      setActiveFrog(prev => prev ? {
-        ...prev,
-        lastInteraction: Date.now(),
-      } : null);
-    }
-    
-    console.log('青蛙互动:', interaction);
+    // TODO: 实现青蛙互动的状态更新（如调用后端或更新本地状态）
+    console.log('青蛙互动:', interaction, activeFrog);
   };
   
   return (
@@ -244,11 +239,16 @@ const handleFeed = (food: FoodItem) => {
                 <p className="text-gray-600">加载中...</p>
               </div>
             ) : activeFrog ? (
-              <FrogPet
-                frogId={activeFrog.id}
-                name={activeFrog.name}
-                initialState={activeFrog?.status as any || 'IDLE'}
-                onInteract={handleFrogInteract}
+              <FrogScene
+                frogId={activeFrog.tokenId}
+                frogName={activeFrog.name}
+                frogDbId={activeFrog.id}
+                isOwner={true}
+                showVisitorControls={true}
+                onGroupTravel={(companion) => {
+                  console.log(`结伴旅行: ${activeFrog.name} 和 ${companion.name}`);
+                  // TODO: 实现结伴旅行逻辑
+                }}
               />
             ) : (
               <div className="text-center">

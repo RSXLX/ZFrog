@@ -157,6 +157,36 @@ export const SOUVENIR_PROMPTS: Record<string, SouvenirPromptConfig> = {
   },
 };
 
+// 结伴旅行提示词配置
+export const GROUP_TRAVEL_PROMPTS: Record<string, SouvenirPromptConfig> = {
+  TWO_FROGS_ADVENTURE: {
+    name: 'Two Frogs Adventure',
+    nameZh: '双蛙冒险',
+    basePrompt: 'two cute cartoon frogs traveling together, wearing matching small backpacks, holding hands or hopping together, adventure companions, friendship theme, scenic blockchain landscape background',
+    colors: 'bright green frogs, colorful backpacks, warm sunset colors',
+    rarityEnhance: {
+      COMMON: 'simple background, basic style, peaceful meadow',
+      UNCOMMON: 'scenic path, flowers and butterflies, happy expressions',
+      RARE: 'magical forest, glowing fireflies, rainbow bridge, sparkling effects',
+      EPIC: 'floating islands, aurora sky, sparkling trail, treasure chest',
+      LEGENDARY: 'cosmic adventure, galaxy background, legendary companions, divine light, epic journey',
+    }
+  },
+  TWO_FROGS_PHOTO: {
+    name: 'Two Frogs Photo',
+    nameZh: '双蛙合照',
+    basePrompt: 'polaroid photo of two cute cartoon frogs posing together, friendship selfie, victory sign, happy smiles, white polaroid frame',
+    colors: 'warm filters, vintage colors, soft glow',
+    rarityEnhance: {
+      COMMON: 'simple pose, basic background',
+      UNCOMMON: 'landmark in background, cute stickers',
+      RARE: 'famous destination, hearts and sparkles',
+      EPIC: 'magical moment, animated effects',
+      LEGENDARY: 'once in a lifetime shot, rainbow effects, legendary landmark',
+    }
+  },
+};
+
 // 链主题配置
 export const CHAIN_THEMES: Record<number, ChainTheme> = {
   1: {
@@ -189,7 +219,75 @@ export const CHAIN_THEMES: Record<number, ChainTheme> = {
     colors: 'green and teal, omnichain glow',
     elements: 'Zeta symbol, cross-chain bridges, universal connection',
   },
+  97: {
+    name: 'BSC Testnet',
+    symbol: 'tBNB',
+    colors: 'golden yellow, warm orange',
+    elements: 'BNB coin, test network badge',
+  },
+  11155111: {
+    name: 'Sepolia',
+    symbol: 'SepoliaETH',
+    colors: 'light purple, silver',
+    elements: 'Ethereum diamond, testnet indicator',
+  },
 };
+
+// 跨链探索观察模板
+export const EXPLORATION_OBSERVATION_PROMPTS = {
+  // 发现合约
+  contract_discovery: [
+    '🏛️ 发现了一座神秘的合约建筑！代码闪烁着智慧的光芒。',
+    '📜 路过一个繁忙的智能合约，里面有很多有趣的函数。',
+    '🏗️ 遇到了一个正在施工的合约地址，开发者正在努力建设。',
+    '🏰 发现了一座古老的合约城堡，已经处理了无数交易。',
+    '🔮 看到一个充满魔力的合约，能量在代码中流动。',
+  ],
+  
+  // 发现空地址
+  empty_address: [
+    '🏜️ 来到一片荒野地址，这里还没有任何故事。',
+    '🌌 漂浮在地址空间中，周围一片寂静。',
+    '🚪 发现了一个空置的地址房间，主人可能外出旅行了。',
+    '🌾 路过一块未开发的地址草地，充满可能性。',
+  ],
+  
+  // DEX相关
+  dex_observation: [
+    '💱 发现了热闹的交易市场！代币们在这里交换着。',
+    '🏊 拜访了一个流动性池，LP们正在愉快地提供服务。',
+    '📊 观察到大量的swap交易，价格曲线在跳动。',
+  ],
+  
+  // NFT相关
+  nft_observation: [
+    '🎨 发现了一个NFT画廊，里面挂满了数字艺术品。',
+    '🖼️ 路过一个收藏家的地址，各种稀有NFT琳琅满目。',
+    '🃏 遇到了一个NFT项目，小图片们正在开派对。',
+  ],
+  
+  // 路过大户
+  whale_encounter: [
+    '🐋 远远看到一只巨鲸的地址，太壮观了！',
+    '💎 发现了一个鲸鱼的豪宅，余额数字闪闪发光。',
+    '🌊 感觉到巨大的资金波动，一定是大户在活动。',
+  ],
+  
+  // 随机事件
+  random_events: [
+    '✨ 突然看到一道闪光，是一笔刚确认的交易！',
+    '🌈 遇到了一条彩虹桥，连接着不同的协议。',
+    '🔔 听到了区块确认的声音，链在稳定运行。',
+    '⚡ 感受到Gas价格的波动，网络变得繁忙了。',
+    '🍀 发现了一个幸运数字结尾的地址！',
+  ],
+};
+
+// 根据探索类型获取随机观察文本
+export function getRandomObservation(type: keyof typeof EXPLORATION_OBSERVATION_PROMPTS): string {
+  const templates = EXPLORATION_OBSERVATION_PROMPTS[type];
+  return templates[Math.floor(Math.random() * templates.length)];
+}
 
 // 类型定义
 interface SouvenirPromptConfig {

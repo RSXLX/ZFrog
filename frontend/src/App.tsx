@@ -1,20 +1,24 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Home } from './pages/Home';
-import { MyFrogs } from './pages/MyFrogs';
+import { MyFrog } from './pages/MyFrog';
 import { FrogDetail } from './pages/FrogDetail';
 import { Desktop } from './pages/Desktop';
 import { Friends } from './pages/Friends';
-import { TravelResultPage } from './pages/TravelResultPage';
-import { BadgesPage } from './pages/BadgesPage';
-import { SouvenirsPage } from './pages/SouvenirsPage';
-import { TravelHistoryPage } from './pages/TravelHistoryPage';
-import { TravelDetailPage } from './pages/TravelDetailPage';
-import { AnimationDemoPage } from './pages/AnimationDemoPage';
-import { HomeScenePage } from './pages/HomeScenePage';
+import { GardenPage } from './pages/GardenPage';
 import { Navbar } from './components/common/Navbar';
+import { LoadingSkeleton } from './components/common/LoadingSkeleton';
 import { FrogPet } from './components/frog/FrogPet';
 import { useWalletConnect } from './hooks/useWalletConnect';
-import { useEffect, useState } from 'react';
+
+// Lazy loaded pages for code splitting
+const TravelResultPage = lazy(() => import('./pages/TravelResultPage').then(m => ({ default: m.TravelResultPage })));
+const TravelHistoryPage = lazy(() => import('./pages/TravelHistoryPage').then(m => ({ default: m.TravelHistoryPage })));
+const TravelDetailPage = lazy(() => import('./pages/TravelDetailPage').then(m => ({ default: m.TravelDetailPage })));
+const BadgesPage = lazy(() => import('./pages/BadgesPage').then(m => ({ default: m.BadgesPage })));
+const SouvenirsPage = lazy(() => import('./pages/SouvenirsPage').then(m => ({ default: m.SouvenirsPage })));
+const AnimationDemoPage = lazy(() => import('./pages/AnimationDemoPage').then(m => ({ default: m.AnimationDemoPage })));
+const HomeScenePage = lazy(() => import('./pages/HomeScenePage').then(m => ({ default: m.HomeScenePage })));
 
 // Helper to check if running in Tauri
 const isTauri = () => !!(window as any).__TAURI_INTERNALS__;
@@ -69,21 +73,43 @@ export function App() {
         <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50">
           <Navbar />
           <main className="container mx-auto px-4 py-8">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/my-frogs" element={<MyFrogs />} />
-              <Route path="/frog/:id" element={<FrogDetail />} />
-              <Route path="/friends/:frogId" element={<Friends />} />
-              <Route path="/desktop" element={<Desktop />} />
-              <Route path="/travel/:travelId" element={<TravelResultPage />} />
-              <Route path="/travel-detail/:travelId" element={<TravelDetailPage />} />
-              <Route path="/badges" element={<BadgesPage />} />
-              <Route path="/badges/:frogId" element={<BadgesPage />} />
-              <Route path="/souvenirs/:frogId" element={<SouvenirsPage />} />
-              <Route path="/travel-history" element={<TravelHistoryPage />} />
-              <Route path="/animation-demo" element={<AnimationDemoPage />} />
-              <Route path="/home-scene" element={<HomeScenePage />} />
-            </Routes>
+            <Suspense fallback={<LoadingSkeleton type="page" />}>
+              <Routes>
+                {/* 首页 */}
+                <Route path="/" element={<Home />} />
+                
+                {/* 我的青蛙（每个钱包一个） */}
+                <Route path="/my-frog" element={<MyFrog />} />
+                
+                {/* 查看青蛙详情（支持查看他人青蛙） */}
+                <Route path="/frog/:tokenId" element={<FrogDetail />} />
+                
+                {/* 好友系统（自动获取当前用户青蛙） */}
+                <Route path="/friends" element={<Friends />} />
+                
+                {/* 我的家园（自动获取当前用户青蛙） */}
+                <Route path="/garden" element={<GardenPage />} />
+                
+                {/* 访问他人家园 */}
+                <Route path="/visit/:address" element={<GardenPage />} />
+                
+                {/* 我的纪念品（自动获取当前用户青蛙） */}
+                <Route path="/souvenirs" element={<SouvenirsPage />} />
+                
+                {/* 我的徽章（自动获取当前用户青蛙） */}
+                <Route path="/badges" element={<BadgesPage />} />
+                
+                {/* 旅行相关 */}
+                <Route path="/travel/:travelId" element={<TravelResultPage />} />
+                <Route path="/travel-detail/:travelId" element={<TravelDetailPage />} />
+                <Route path="/travel-history" element={<TravelHistoryPage />} />
+                
+                {/* 其他 */}
+                <Route path="/desktop" element={<Desktop />} />
+                <Route path="/animation-demo" element={<AnimationDemoPage />} />
+                <Route path="/home-scene" element={<HomeScenePage />} />
+              </Routes>
+            </Suspense>
           </main>
           
           {/* Footer */}

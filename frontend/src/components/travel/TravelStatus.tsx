@@ -1,8 +1,12 @@
 // frontend/src/components/travel/TravelStatus.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { LANDMARKS } from '../../config/landmarks';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { CrossChainTravelTracker } from './CrossChainTravelTracker';
+import { OnChainStats } from './OnChainStats';
+import { DiscoveryList } from './DiscoveryList';
+import type { DiscoveryData } from './DiscoveryCard';
 import type { Travel } from '../../types';
 
 export interface TravelStatusProps {
@@ -10,9 +14,9 @@ export interface TravelStatusProps {
     frogName: string;
 }
 
-export function TravelStatus({ travel, frogName }: TravelStatusProps) {
+export const TravelStatus = memo(function TravelStatus({ travel, frogName }: TravelStatusProps) {
     // 添加调试信息
-    console.log('TravelStatus组件渲染，travel数据:', travel);
+    // console.log('TravelStatus组件渲染，travel数据:', travel);
     
     const [timeRemaining, setTimeRemaining] = useState<string>('');
     const [progress, setProgress] = useState(0);
@@ -20,8 +24,52 @@ export function TravelStatus({ travel, frogName }: TravelStatusProps) {
     const [message, setMessage] = useState('');
     const [targetAddress, setTargetAddress] = useState<string>('');
     const [isDiscovering, setIsDiscovering] = useState(false);
+    
+    // Visualization Data
+    const [discoveries, setDiscoveries] = useState<DiscoveryData[]>([]);
+    const [onChainData, setOnChainData] = useState<{
+        blockHeight?: number;
+        gasUsed?: string;
+        exploredAddress?: string;
+    }>({});
 
     const { socket } = useWebSocket();
+
+    // Check if this is a cross-chain travel
+    const isCrossChain = travel.isCrossChain || travel.crossChainStatus;
+
+    // Fetch visualization data
+    const fetchVisualizationData = useCallback(async () => {
+        try {
+            const response = await fetch(`/api/cross-chain/travel/${travel.id}/discoveries`);
+            const data = await response.json();
+            
+            if (data.success && data.data) {
+                if (data.data.discoveries) {
+                    setDiscoveries(data.data.discoveries);
+                }
+                if (data.data.onChainStats) {
+                    setOnChainData({
+                        blockHeight: data.data.onChainStats.exploredBlock,
+                        gasUsed: data.data.onChainStats.gasUsed,
+                        exploredAddress: data.data.onChainStats.exploredAddress,
+                    });
+                    if (data.data.onChainStats.exploredAddress) {
+                        setTargetAddress(data.data.onChainStats.exploredAddress);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Failed to fetch visualization data:', error);
+        }
+    }, [travel.id]);
+
+    // Initial fetch and polling
+    useEffect(() => {
+        if (!isCrossChain && (travel.status === 'Active' || travel.status === 'Processing')) {
+             fetchVisualizationData();
+        }
+    }, [isCrossChain, travel.status, fetchVisualizationData]);
 
     useEffect(() => {
         const updateTime = () => {
@@ -35,7 +83,6 @@ export function TravelStatus({ travel, frogName }: TravelStatusProps) {
             if (remaining <= 0) {
                 setTimeRemaining('即将返回...');
                 setProgress(100);
-                // 旅行结束，但不要在这里触发状态更新，让父组件处理
                 return;
             }
 
@@ -68,25 +115,28 @@ export function TravelStatus({ travel, frogName }: TravelStatusProps) {
 
         // 监听旅行更新
         socket.on('travel:update', (data) => {
-            if (data.payload.travelId !== travel.id) return;
+            if (data.travelId !== travel.id) return;
 
-            setStage(data.payload.stage);
-            setMessage(data.payload.message?.text || '');
+            setStage(data.stage);
+            setMessage(data.message?.text || '');
+
+            // 如果有新的发现类型消息，刷新数据
+            if (data.message?.type === 'DISCOVERY' || data.stage === 'DISCOVERING') {
+                fetchVisualizationData();
+            }
 
             // 处理地址发现阶段
-            if (data.payload.stage === 'DISCOVERING') {
+            if (data.stage === 'DISCOVERING') {
                 setIsDiscovering(true);
                 
-                // 从消息中提取地址
-                const addressMatch = data.payload.message?.text.match(/0x[a-fA-F0-9]{40}/);
+                const addressMatch = data.message?.text.match(/0x[a-fA-F0-9]{40}/);
                 if (addressMatch) {
                     setTargetAddress(addressMatch[0]);
-                    setIsDiscovering(false);
+                    setIsDiscovering(false); // Found
                 }
                 
-                // 从 payload 中直接获取地址
-                if (data.payload.message?.address) {
-                    setTargetAddress(data.payload.message.address);
+                if (data.message?.address) {
+                    setTargetAddress(data.message.address);
                     setIsDiscovering(false);
                 }
             }
@@ -94,21 +144,50 @@ export function TravelStatus({ travel, frogName }: TravelStatusProps) {
 
         // 监听旅行错误
         socket.on('travel:error', (data) => {
-            if (data.payload.travelId !== travel.id) return;
-            setMessage(data.payload.error || '发生错误');
+            if (data.travelId !== travel.id) return;
+            setMessage(data.error || '发生错误');
             setIsDiscovering(false);
+        });
+
+        // 监听旅行完成进度
+        socket.on('travel:progress', (data: { frogId: number; phase: string; message: string; percentage?: number }) => {
+            if (travel.frog && data.frogId !== travel.frog.tokenId) return;
+            setStage(data.phase.toUpperCase());
+            setMessage(data.message);
+            if (data.percentage) {
+                setProgress(data.percentage);
+            }
         });
 
         return () => {
             socket.off('travel:update');
             socket.off('travel:error');
+            socket.off('travel:progress');
         };
-    }, [socket, travel.id]);
+    }, [socket, travel.id, fetchVisualizationData]);
 
     const shortenAddress = (address: string) => {
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
     };
 
+    // If this is a cross-chain travel, render the specialized tracker
+    if (isCrossChain && travel.frog) {
+        return (
+            <CrossChainTravelTracker
+                tokenId={travel.frog.tokenId}
+                travelId={travel.id}
+                targetChain={travel.targetChain || 'Unknown Chain'}
+                isActive={travel.status === 'Active' || travel.status === 'Processing'}
+                startTime={travel.startTime}
+                endTime={travel.endTime}
+                onCompleted={() => {
+                    console.log('Cross-chain travel completed, triggering refresh');
+                }}
+            />
+        );
+    }
+
+    // Otherwise, render the standard travel status (Now Enhanced!)
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -116,9 +195,14 @@ export function TravelStatus({ travel, frogName }: TravelStatusProps) {
             className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl shadow-lg p-6 space-y-4"
         >
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-800">
-                    🌍 {frogName} 正在旅行中...
-                </h3>
+                <div>
+                    <h3 className="text-lg font-bold text-gray-800">
+                        🌍 {frogName} 正在旅行中...
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                        {isDiscovering ? '🔎 正在寻找目标...' : `📍 ${onChainData.exploredAddress ? '已锁定目标' : '随机探索'}`}
+                    </p>
+                </div>
                 <span className="text-2xl animate-bounce">✈️</span>
             </div>
 
@@ -136,88 +220,49 @@ export function TravelStatus({ travel, frogName }: TravelStatusProps) {
                         transition={{ duration: 0.5 }}
                     />
                 </div>
+                <div className="flex justify-between text-xs text-gray-400">
+                     <span>剩余: {timeRemaining}</span>
+                </div>
             </div>
 
-            {/* 地址发现状态 */}
-            {isDiscovering && (
-                <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4">
-                    <div className="flex items-center space-x-3">
-                        <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                            className="text-2xl"
-                        >
-                            🎲
-                        </motion.div>
-                        <div>
-                            <p className="font-medium text-purple-800">正在发现目标地址...</p>
-                            <p className="text-sm text-purple-600">青蛙正在寻找有趣的探索目标</p>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* 显示发现的地址 */}
-            {targetAddress && (
-                <div className="bg-green-50 rounded-lg p-3">
-                    <p className="text-sm text-green-600 mb-1">发现目标地址：</p>
-                    <a 
-                        href={`https://etherscan.io/address/${targetAddress}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono text-sm text-green-800 hover:underline"
-                    >
-                        {targetAddress.slice(0, 6)}...{targetAddress.slice(-4)}
-                    </a>
-                </div>
-            )}
-
-            {/* 消息显示 */}
+            {/* 实时消息 */}
             {message && (
-                <div className="bg-blue-50 rounded-lg p-3">
-                    <p className="text-sm text-blue-800">{message}</p>
+                <div className="bg-blue-50 rounded-lg p-3 flex items-center gap-3 animate-pulse">
+                    <span className="text-lg">📡</span>
+                    <p className="text-sm text-blue-800 font-medium">{message}</p>
                 </div>
             )}
 
-            {/* 旅行信息 */}
-            <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="bg-white/50 rounded-lg p-3">
-                    <p className="text-gray-500">目的地</p>
-                    <div className="font-mono font-medium text-gray-800">
-                        {(() => {
-                            // 如果是随机探索且已发现地址，显示发现的地址
-                            if (travel.isRandom && targetAddress) {
-                                return shortenAddress(targetAddress);
-                            }
-                            // 尝试在所有链的推荐地点中查找名称
-                            for (const chainId in LANDMARKS) {
-                                const found = LANDMARKS[chainId].find(
-                                    l => l.address.toLowerCase() === travel.targetWallet.toLowerCase()
-                                );
-                                if (found) return found.name;
-                            }
-                            return travel.isRandom ? '🎲 随机探索' : shortenAddress(travel.targetWallet);
-                        })()}
-                    </div>
-                </div>
-                <div className="bg-white/50 rounded-lg p-3">
-                    <p className="text-gray-500">剩余时间</p>
-                    <p className="font-medium text-gray-800">{timeRemaining}</p>
-                </div>
-            </div>
+            {/* 链上数据统计 (New) */}
+            {(targetAddress || onChainData.exploredAddress) && (
+                <OnChainStats
+                    blockHeight={onChainData.blockHeight}
+                    gasUsed={onChainData.gasUsed}
+                    targetChain="ZetaChain"
+                    exploredAddress={onChainData.exploredAddress || targetAddress}
+                />
+            )}
+
+            {/* 链上发现列表 (New) */}
+            <DiscoveryList
+                travelId={travel.id}
+                discoveries={discoveries}
+                isLoading={false}
+                showCategories={false}
+            />
 
             {/* 动画提示 */}
-            <div className="text-center text-gray-500 text-sm">
+            <div className="text-center text-gray-500 text-sm mt-4">
                 <motion.span
                     animate={{ opacity: [1, 0.5, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}
                 >
                     {isDiscovering ? 
                         `🎲 ${frogName} 正在寻找探索目标...` : 
-                        `🐸 ${frogName} 正在探索新世界...`
+                        `🐸 ${frogName} 正在收集链上数据...`
                     }
                 </motion.span>
             </div>
         </motion.div>
     );
-}
+});

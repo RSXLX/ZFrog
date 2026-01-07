@@ -15,8 +15,6 @@ const AddFriend: React.FC<AddFriendProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<Frog[]>([]);
-  // @ts-ignore
-  const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [sendingRequest, setSendingRequest] = useState<number | null>(null);
 
@@ -35,16 +33,16 @@ const AddFriend: React.FC<AddFriendProps> = ({
       if (response.success && response.data.length > 0) {
         // 过滤掉自己
         const filteredResults = response.data.filter((frog: Frog) => 
-          frog.id !== currentFrogId
+          frog.tokenId !== currentFrogId
         );
         
         // 获取当前青蛙的好友列表，进一步过滤
         try {
           const friendsResponse = await apiService.get(`/friends/list/${currentFrogId}`);
-          const friendIds = friendsResponse.success ? friendsResponse.data.map((friend: any) => friend.id) : [];
+          const friendIds = friendsResponse.success ? friendsResponse.data.map((friend: any) => friend.tokenId) : [];
           
           const finalResults = filteredResults.filter((frog: Frog) => 
-            !friendIds.includes(frog.id)
+            !friendIds.includes(frog.tokenId)
           );
           
           setSearchResults(finalResults);
@@ -79,7 +77,7 @@ const AddFriend: React.FC<AddFriendProps> = ({
       await apiService.post('/friends/request', requestData);
       
       // 从搜索结果中移除已发送请求的青蛙
-      setSearchResults(searchResults.filter(frog => frog.id !== targetFrogId));
+      setSearchResults(searchResults.filter(frog => frog.tokenId !== targetFrogId));
       onFriendAdded?.();
       alert('好友请求已发送！');
     } catch (err: any) {
@@ -90,12 +88,12 @@ const AddFriend: React.FC<AddFriendProps> = ({
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusClass = (status: string) => {
     switch (status) {
-      case 'Idle': return 'text-green-600';
-      case 'Traveling': return 'text-blue-600';
-      case 'Returning': return 'text-orange-600';
-      default: return 'text-gray-600';
+      case 'Idle': return 'idle';
+      case 'Traveling': return 'traveling';
+      case 'Returning': return 'returning';
+      default: return '';
     }
   };
 
@@ -109,73 +107,73 @@ const AddFriend: React.FC<AddFriendProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg sm:text-xl font-semibold">添加好友</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-xl"
-          >
-            ✕
-          </button>
+    <div className="friend-modal-overlay active" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="friend-modal" style={{ maxWidth: '450px' }}>
+        <div className="friend-modal-header">
+          <h3 className="friend-modal-title">🔍 搜索添加</h3>
+          <button className="friend-modal-close" onClick={onClose}>×</button>
         </div>
 
         {/* 搜索框 */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            通过钱包地址添加蛙友
+        <div className="friend-form-group">
+          <label className="friend-form-label">
+            通过昵称或ID搜索蛙友
           </label>
-          <div className="flex gap-2">
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="输入钱包地址 (0x...)"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="输入昵称或ID..."
+              className="friend-form-input"
             />
             <button
               onClick={handleSearch}
               disabled={searching || !searchTerm.trim()}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+              className="friend-btn friend-btn-primary"
+              style={{ whiteSpace: 'nowrap' }}
             >
-              {searching ? '搜索中...' : '搜索'}
+              {searching ? '⏳' : '搜索'}
             </button>
           </div>
         </div>
 
         {/* 搜索结果 */}
-        <div className="max-h-80 overflow-y-auto">
+        <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
           {searchResults.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              {searching ? '搜索中...' : '输入钱包地址查找并添加蛙友'}
+            <div className="empty-requests" style={{ marginTop: '1rem' }}>
+              <span style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔍</span>
+              <p style={{ fontSize: '0.9rem' }}>
+                {searching ? '搜索中...' : '输入关键词查找并添加蛙友'}
+              </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
               {searchResults.map((frog) => (
-                <div key={frog.id} className="border rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold">{frog.name}</h4>
-                    <span className={`text-sm ${getStatusColor(frog.status)}`}>
+                <div key={frog.id} className="request-card">
+                  <div className="request-header">
+                    <div className="request-info">
+                      <div className="request-avatar">🐸</div>
+                      <div>
+                        <div className="request-name">{frog.name}</div>
+                        <div className="request-meta">
+                          Lv.{frog.level} • 旅行 {frog.totalTravels} 次
+                        </div>
+                      </div>
+                    </div>
+                    <span className={`friend-status ${getStatusClass(frog.status)}`}>
                       {getStatusText(frog.status)}
                     </span>
                   </div>
                   
-                  <div className="text-sm text-gray-600 mb-3">
-                    等级 {frog.level} • 经验值 {frog.xp} • 旅行 {frog.totalTravels} 次
-                  </div>
-                  
-                  <div className="text-xs text-gray-500 mb-3 font-mono bg-gray-100 p-2 rounded">
-                    钱包地址: {frog.ownerAddress}
-                  </div>
-                  
                   <button
-                    onClick={() => sendFriendRequest(frog.id, frog.ownerAddress)}
-                    disabled={sendingRequest === frog.id}
-                    className="w-full px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+                    onClick={() => sendFriendRequest(frog.tokenId, frog.ownerAddress)}
+                    disabled={sendingRequest === frog.tokenId}
+                    className="action-btn primary"
+                    style={{ width: '100%', marginTop: '0.5rem' }}
                   >
-                    {sendingRequest === frog.id ? '发送中...' : '发送好友请求'}
+                    {sendingRequest === frog.tokenId ? '⏳ 发送中...' : '➕ 发送好友请求'}
                   </button>
                 </div>
               ))}
@@ -183,9 +181,9 @@ const AddFriend: React.FC<AddFriendProps> = ({
           )}
         </div>
 
-        <div className="mt-4 pt-4 border-t">
-          <p className="text-xs text-gray-500">
-            💡 提示：输入完整的钱包地址(0x...)来添加蛙友，这是最准确的添加方式
+        <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e0e0e0' }}>
+          <p style={{ fontSize: '0.75rem', color: '#999' }}>
+            💡 提示：输入准确的名字可以更快找到蛙友
           </p>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { useReadContract } from 'wagmi';
 import { ZETAFROG_ADDRESS, ZETAFROG_ABI } from '../config/contracts';
+import { usePendingTravel } from './usePendingTravel';
 
 /**
  * 获取青蛙数据
@@ -167,9 +168,13 @@ export function useFrogStatus(frogId: number | undefined) {
         },
     });
 
-    const status = (data && Array.isArray(data))
-        ? (['Idle', 'Traveling', 'Returning'] as const)[Number(data[3])]
-        : 'Idle';
+    const { pendingTravel } = usePendingTravel(frogId);
+
+    const status = (pendingTravel) 
+        ? 'Traveling' 
+        : (data && Array.isArray(data))
+            ? (['Idle', 'Traveling', 'Returning'] as const)[Number(data[3])]
+            : 'Idle';
 
     return { status, isLoading };
 }

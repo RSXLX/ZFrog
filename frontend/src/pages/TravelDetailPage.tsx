@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '../components/common/Button';
 import { apiService } from '../services/api';
+import { ExplorationList } from '../components/travel/ExplorationList';
 
 interface TravelDetail {
     id: number;
@@ -256,6 +257,12 @@ export function TravelDetailPage() {
                                 <p className="text-gray-500 italic">这次旅行没有留下日记...</p>
                             )}
                         </div>
+
+                        {/* 链上探索记录 */}
+                        <ExplorationList 
+                            travelId={parseInt(travelId || '0')} 
+                            className="mt-6"
+                        />
                     </motion.div>
 
                     {/* 右侧：信息面板 */}

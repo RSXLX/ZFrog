@@ -1,48 +1,97 @@
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 
-export function TravelPending() {
-    console.log('[TravelPending] Rendered: Waiting for blockchain confirmation...');
+interface TravelPendingProps {
+    txHash: string;
+    onReset: () => void; // Allow user to manually reset if stuck
+}
+
+export function TravelPending({ txHash, onReset }: TravelPendingProps) {
+    const [step, setStep] = useState(0);
+
+    // Simulated progress steps
+    useEffect(() => {
+        const timers: NodeJS.Timeout[] = [];
+        
+        timers.push(setTimeout(() => setStep(1), 2000)); // Packing
+        timers.push(setTimeout(() => setStep(2), 5000)); // Walking to Bridge
+        timers.push(setTimeout(() => setStep(3), 10000)); // Crossing
+        
+        return () => timers.forEach(clearTimeout);
+    }, []);
+
+    const steps = [
+        { icon: '📝', text: '正在签署旅行协议...' },
+        { icon: '🎒', text: '青蛙正在打包干粮...' },
+        { icon: '🌉', text: '正在前往跨链桥...' },
+        { icon: '📡', text: '等待 ZetaChain 网络确认...' },
+    ];
+
+    const currentStep = steps[Math.min(step, steps.length - 1)];
+
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl shadow-lg p-8 space-y-6 text-center"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-100 rounded-2xl shadow-xl p-8 text-center space-y-6"
         >
             <div className="relative w-24 h-24 mx-auto">
                 <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-0 border-4 border-green-100 rounded-full"
-                />
-                <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-0 border-4 border-t-green-500 border-r-transparent border-b-transparent border-l-transparent rounded-full"
+                    animate={{ 
+                        rotate: 360,
+                        scale: [1, 1.1, 1]
+                    }}
+                    transition={{ 
+                        rotate: { duration: 3, repeat: Infinity, ease: "linear" },
+                        scale: { duration: 2, repeat: Infinity }
+                    }}
+                    className="absolute inset-0 border-4 border-dashed border-purple-300 rounded-full"
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-4xl">
-                    ⏳
+                    {currentStep.icon}
                 </div>
             </div>
 
             <div className="space-y-2">
-                <h3 className="text-xl font-bold text-gray-800">交易已确认，正在同步...</h3>
-                <p className="text-gray-500">
-                    区块链已确认您的旅行请求
-                    <br />
-                    <span className="text-xs text-gray-400">正在等待数据同步 (通常需 5-10 秒)</span>
+                <h3 className="text-xl font-bold text-gray-800">
+                    旅行准备中...
+                </h3>
+                <p className="text-purple-600 font-medium animate-pulse">
+                    {currentStep.text}
+                </p>
+                <p className="text-xs text-gray-500 max-w-xs mx-auto">
+                    交易已提交，请耐心等待区块确认。这通常需要 15-30 秒。
                 </p>
             </div>
 
-            <div className="flex justify-center space-x-1">
-                {[0, 1, 2].map((i) => (
-                    <motion.div
-                        key={i}
-                        animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
-                        transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                        className="w-2 h-2 bg-green-500 rounded-full"
-                    />
-                ))}
+            <div className="pt-4 border-t border-purple-100">
+                <a 
+                    href={`https://athens.explorer.zetachain.com/tx/${txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-500 hover:text-blue-700 flex items-center justify-center gap-1"
+                >
+                    <span>🔍</span>
+                    <span>查看链上交易</span>
+                </a>
             </div>
+
+            {/* Failsafe reset after 30s */}
+            {step >= 3 && (
+                <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 5 }}
+                    className="pt-2"
+                >
+                    <button 
+                        onClick={onReset}
+                        className="text-xs text-gray-400 hover:text-gray-600 underline"
+                    >
+                        如果长时间卡住，点击此处重置界面
+                    </button>
+                </motion.div>
+            )}
         </motion.div>
     );
 }

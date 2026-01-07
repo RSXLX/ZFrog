@@ -1,0 +1,10 @@
+{
+  "contractName": "FrogConnector",
+  "version": "v3",
+  "network": "ethSepolia",
+  "chainId": "11155111",
+  "address": "0xca54986f91129D1AF3de67b331eBB36b330863C9",
+  "omniTravelAddress": "0x52B090700Ca9fb2EBBbc964fDde60A0513Df7cd7",
+  "footprintAddress": "0x319421300114065F601a0103ec1eC3AB2652C5Da",
+  "deployedAt": "2026-01-06T18:26:23.649Z"
+}

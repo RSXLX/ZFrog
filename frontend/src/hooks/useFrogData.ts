@@ -14,9 +14,8 @@ export function useFrogData(tokenIdOrAddress: number | string | null | undefined
       let data: Frog | null = null;
       
       if (typeof tokenIdOrAddress === 'string') {
-        // 如果是address，获取该地址的所有青蛙
-        const frogs = await apiService.getFrogsByOwner(tokenIdOrAddress);
-        data = frogs.length > 0 ? frogs[0] : null;
+        // 如果是address，获取该地址的青蛙（单钱包单青蛙）
+        data = await apiService.getMyFrog(tokenIdOrAddress);
       } else {
         // 如果是tokenId，获取特定青蛙
         data = await apiService.getFrogDetail(tokenIdOrAddress);

@@ -1,22 +1,9 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { Frog } from '../types';
+export type { Frog };
 
-export interface Frog {
-  id: number;
-  tokenId: number;
-  name: string;
-  ownerAddress: string;
-  birthday: Date;
-  totalTravels: number;
-  status: 'Idle' | 'Traveling' | 'Returning';
-  createdAt: Date;
-  updatedAt: Date;
-  travels?: any[];
-  souvenirs?: any[];
-  xp?: number;
-  friendshipStatus?: 'Pending' | 'Accepted' | 'Declined' | 'None';
-  friendshipId?: number;
-  level?: number;
-}
+
+
 
 class ApiService {
   private async request(endpoint: string, options?: RequestInit) {
@@ -62,7 +49,7 @@ class ApiService {
     return { success: true, data: json }; // 统一返回结构
   }
 
-  async get(endpoint: string, config?: { params?: Record<string, any> }) {
+  async get<T = any>(endpoint: string, config?: { params?: Record<string, any> }): Promise<T> {
     let url = endpoint;
     if (config?.params) {
       const qs = new URLSearchParams(config.params).toString();
@@ -71,30 +58,47 @@ class ApiService {
     return this.request(url, { method: 'GET' });
   }
 
-  async post(endpoint: string, data?: any) {
+  async post<T = any>(endpoint: string, data?: any): Promise<T> {
     return this.request(endpoint, {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async put(endpoint: string, data?: any) {
+  async put<T = any>(endpoint: string, data?: any): Promise<T> {
     return this.request(endpoint, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
-  async delete(endpoint: string) {
+  async delete<T = any>(endpoint: string): Promise<T> {
     return this.request(endpoint, { method: 'DELETE' });
   }
 
   /**
    * 获取某地址拥有的所有青蛙
+   * @deprecated 使用 getMyFrog 替代（每个钱包只有一个青蛙）
    */
   async getFrogsByOwner(address: string): Promise<Frog[]> {
+    console.warn('[API] getFrogsByOwner is deprecated. Use getMyFrog instead (single frog per wallet).');
     const res = await this.get(`/api/frogs/owner/${address.toLowerCase()}`);
     return res.data;
+  }
+
+  /**
+   * 获取某地址的唯一青蛙（单钱包单青蛙）
+   */
+  async getMyFrog(address: string): Promise<Frog | null> {
+    try {
+      const res = await this.get(`/api/frogs/my/${address.toLowerCase()}`);
+      return res.data;
+    } catch (error) {
+      if ((error as any).response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   /**

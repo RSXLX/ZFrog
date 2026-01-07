@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { isAddress } from 'viem';
 import { motion } from 'framer-motion';
-import { ZETAFROG_ADDRESS, ZETAFROG_ABI } from '../../config/contracts';
+import { TRAVEL_ADDRESS, TRAVEL_ABI } from '../../config/contracts';
 import { Button } from '../common/Button';
+import { api } from '../../services/api';
 
 interface TravelFormProps {
     frogId: number;
@@ -12,6 +13,22 @@ interface TravelFormProps {
 }
 
 import { LANDMARKS } from '../../config/landmarks';
+
+// 后端随机探险 API
+const startRandomTravelAPI = async (frogId: number, duration: number) => {
+    const response = await api.post<{
+        success: boolean;
+        data: { travelId: number; targetChain: string; chainName: string };
+        message: string;
+    }>('/travels/start', {
+        frogId,
+        duration,
+        travelType: 'RANDOM'
+        // 不传 targetChain，让后端随机选择
+    });
+    return response;
+};
+
 
 const DURATION_OPTIONS = [
     { label: '1 分钟', value: 60, description: '闪电测试' },
@@ -28,11 +45,13 @@ const CHAIN_OPTIONS = [
     { label: 'ZetaChain Athens', value: 7001, icon: '🟢' },
 ];
 
-export function TravelForm({ frogId, frogName, onSuccess }: TravelFormProps) {
+export const TravelForm = memo(function TravelForm({ frogId, frogName, onSuccess }: TravelFormProps) {
     const [targetWallet, setTargetWallet] = useState('');
     const [duration, setDuration] = useState(3600);
     const [chainId, setChainId] = useState(7001);
     const [error, setError] = useState('');
+    const [isRandomLoading, setIsRandomLoading] = useState(false);
+    const [randomResult, setRandomResult] = useState<{ chainName: string } | null>(null);
 
     const {
         data: hash,
@@ -62,43 +81,63 @@ export function TravelForm({ frogId, frogName, onSuccess }: TravelFormProps) {
         setError(`正在前往: ${landmark.name}`);
     };
 
-    const handleStartTravel = () => {
+    // 一键随机探险 (直接调用合约)
+    const handleQuickRandomTravel = async () => {
         setError('');
-
-        // 验证地址
-        if (!isAddress(targetWallet)) {
-            setError('请输入有效的以太坊地址');
-            return;
-        }
-
-        // 检查合约地址是否已配置
-        if (!ZETAFROG_ADDRESS) {
-            setError('合约地址未配置，请检查环境变量 VITE_ZETAFROG_ADDRESS');
-            console.error('ZETAFROG_ADDRESS 未配置');
-            return;
-        }
-
-        // 调试信息
-        console.log('发起旅行参数:', {
-            frogId,
-            targetWallet,
-            duration,
-            chainId,
-            contractAddress: ZETAFROG_ADDRESS,
-        });
-
+        setIsRandomLoading(true);
+        setRandomResult(null);
+        
         try {
-            writeContract({
-                address: ZETAFROG_ADDRESS,
-                abi: ZETAFROG_ABI,
-                functionName: 'startTravel',
-                args: [BigInt(frogId), targetWallet as `0x${string}`, BigInt(duration), BigInt(chainId)],
+            // 1. 本地探索仅支持 ZetaChain，避免随机到不支持的链(如 Amoy)导致 Revert
+            const selectedChainId = 7001; 
+            setChainId(selectedChainId);
+            
+            // 如果需要显示链名称
+            const chainName = CHAIN_OPTIONS.find(c => c.value === selectedChainId)?.label || 'ZetaChain';
+
+            // 2. 随机旅行目标地址设为零地址 (合约以此判断 isRandom=true)
+            const randomWallet = '0x0000000000000000000000000000000000000000';
+            setTargetWallet(randomWallet);
+
+            // 3. 发起合约交易
+            if (!TRAVEL_ADDRESS) {
+                throw new Error('Travel合约地址未配置');
+            }
+
+            console.log('发起随机旅行:', {
+                frogId,
+                targetWallet: randomWallet,
+                duration,
+                chainId: selectedChainId
             });
+
+            // @ts-ignore
+            writeContract({
+                address: TRAVEL_ADDRESS,
+                abi: TRAVEL_ABI,
+                functionName: 'startTravel',
+                args: [BigInt(frogId), randomWallet as `0x${string}`, BigInt(duration), BigInt(selectedChainId)],
+            });
+
+            setRandomResult({ chainName: chainName });
+
         } catch (e) {
-            console.error('合约调用失败:', e);
-            setError(`发起旅行失败: ${e instanceof Error ? e.message : '未知错误'}`);
+            console.error('随机探险失败:', e);
+            setError(`随机探险失败: ${e instanceof Error ? e.message : '未知错误'}`);
+            setIsRandomLoading(false); // 只有失败时才重置loading，成功等待交易回执
         }
     };
+
+    // 监听交易状态以关闭 loading
+    useEffect(() => {
+        if (writeError) {
+             setIsRandomLoading(false);
+             setError(writeError.message);
+        }
+    }, [writeError]);
+
+    // 不需要旧的 handleStartTravel 了 (已整合进 handleQuickRandomTravel 且 UI 中无调用)
+
 
     useEffect(() => {
         if (isSuccess && onSuccess) {
@@ -124,10 +163,10 @@ export function TravelForm({ frogId, frogName, onSuccess }: TravelFormProps) {
     }, [isSuccess, onSuccess, frogId, targetWallet, duration, chainId]);
 
     // 如果合约未配置，显示提示
-    if (!ZETAFROG_ADDRESS) {
+    if (!TRAVEL_ADDRESS) {
         return (
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
-                <p className="text-yellow-800">⚠️ 合约地址未配置，无法发起旅行</p>
+                <p className="text-yellow-800">⚠️ Travel合约地址未配置，无法发起旅行</p>
             </div>
         );
     }
@@ -142,59 +181,10 @@ export function TravelForm({ frogId, frogName, onSuccess }: TravelFormProps) {
                 派 {frogName} 去冒险！🌍
             </h3>
 
-            {/* 链选择 */}
-            <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                    选择目标链
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                    {CHAIN_OPTIONS.map((option) => (
-                        <button
-                            key={option.value}
-                            onClick={() => setChainId(option.value)}
-                            className={`p-3 rounded-lg border-2 transition-all ${
-                                chainId === option.value
-                                    ? 'border-green-500 bg-green-50'
-                                    : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                        >
-                            <span className="text-xl">{option.icon}</span>
-                            <span className="ml-2 text-sm">{option.label}</span>
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-    {/* 目标钱包输入 */}
-            <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                    <label className="block text-sm font-medium text-gray-700">
-                        目标钱包地址
-                    </label>
-                    <button
-                        onClick={handleRandomExplore}
-                        className="text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1"
-                    >
-                        <span>🎲</span>
-                        <span>主要地标</span>
-                    </button>
-                </div>
-                <input
-                    type="text"
-                    value={targetWallet}
-                    onChange={(e) => setTargetWallet(e.target.value)}
-                    placeholder="0x..."
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500">
-                    青蛙将前往这个地址"旅行"
-                </p>
-            </div>
-
             {/* 时长选择 */}
             <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
-                    旅行时长
+                    选择旅行时长
                 </label>
                 <div className="space-y-2">
                     {DURATION_OPTIONS.map((option) => (
@@ -214,26 +204,34 @@ export function TravelForm({ frogId, frogName, onSuccess }: TravelFormProps) {
                 </div>
             </div>
 
+            {/* 一键随机探险 */}
+            <div className="bg-gradient-to-r from-green-100 to-blue-100 rounded-xl p-4">
+                <Button
+                    onClick={handleQuickRandomTravel}
+                    disabled={isRandomLoading}
+                    className="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
+                    size="lg"
+                >
+                    {isRandomLoading ? '🎲 随机探险中...' : '🚀 开始随机探险'}
+                </Button>
+                <p className="text-xs text-gray-600 text-center mt-2">
+                    系统将随机选择目标链和有趣地址，开启未知之旅！
+                </p>
+                {randomResult && (
+                    <div className="mt-3 bg-white rounded-lg p-3 text-center">
+                        <span className="text-green-600 font-medium">
+                            ✨ {frogName} 已出发去 {randomResult.chainName}！
+                        </span>
+                    </div>
+                )}
+            </div>
+
             {/* 错误提示 */}
-            {(error || writeError) && (
+            {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
-                    {error || writeError?.message}
+                    {error}
                 </div>
             )}
-
-            {/* 提交按钮 */}
-            <Button
-                onClick={handleStartTravel}
-                disabled={isPending || isConfirming || !targetWallet}
-                className="w-full"
-                size="lg"
-            >
-                {isPending
-                    ? '确认交易中...'
-                    : isConfirming
-                    ? '等待确认...'
-                    : '🚀 开始旅行'}
-            </Button>
 
             {/* 成功提示 */}
             {isSuccess && (
@@ -248,4 +246,4 @@ export function TravelForm({ frogId, frogName, onSuccess }: TravelFormProps) {
             )}
         </motion.div>
     );
-}
+});

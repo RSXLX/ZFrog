@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { useFrogData } from '../hooks/useFrogData';
+import { Link } from 'react-router-dom';
+import { useMyFrog } from '../hooks/useMyFrog';
 import FriendsList from '../components/frog/FriendsList';
 import FriendRequests from '../components/frog/FriendRequests';
 import FriendInteractionModal from '../components/frog/FriendInteraction';
@@ -8,10 +8,11 @@ import AddFriend from '../components/frog/AddFriend';
 import AddFriendByWallet from '../components/frog/AddFriendByWallet';
 import WorldOnlineList from '../components/frog/WorldOnlineList';
 import { Frog } from '../types';
+import '../styles/friend-system.css';
 
 export const Friends: React.FC = () => {
-  const { frogId } = useParams<{ frogId: string }>();
-  const { frog, loading } = useFrogData(parseInt(frogId || '0'));
+  // 使用 useMyFrog 自动获取当前用户的唯一青蛙
+  const { frog, loading, isConnected, hasFrog } = useMyFrog();
   
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [showAddFriendByWallet, setShowAddFriendByWallet] = useState(false);
@@ -20,9 +21,22 @@ export const Friends: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'world'>('friends');
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // 未连接钱包
+  if (!isConnected) {
+    return (
+      <div className="friend-main-container">
+        <div className="friend-empty-state">
+          <div className="empty-illustration">🔗</div>
+          <h2 className="empty-text">请先连接钱包</h2>
+          <p className="empty-subtext">连接钱包后即可使用好友系统</p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="friend-main-container">
         <div className="flex justify-center items-center h-64">
           <div className="text-gray-500">加载中...</div>
         </div>
@@ -30,12 +44,19 @@ export const Friends: React.FC = () => {
     );
   }
 
-  if (!frog) {
+  // 没有青蛙
+  if (!hasFrog || !frog) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">青蛙未找到</h1>
-          <p className="text-gray-600">请检查青蛙ID是否正确</p>
+      <div className="friend-main-container">
+        <div className="friend-empty-state">
+          <div className="empty-illustration">🐸</div>
+          <h2 className="empty-text">还没有青蛙</h2>
+          <p className="empty-subtext">先去铸造一只青蛙才能使用好友系统哦！</p>
+          <div className="action-buttons">
+            <Link to="/?mint=true" className="friend-btn friend-btn-primary">
+              🎉 立即铸造
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -65,137 +86,134 @@ export const Friends: React.FC = () => {
     setRefreshKey(prev => prev + 1);
   };
 
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'Idle': return '空闲中';
+      case 'Traveling': return '旅行中';
+      case 'Returning': return '返回中';
+      default: return status;
+    }
+  };
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* 页面标题 */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">
-          {frog.name} 的好友系统
-        </h1>
-        <div className="flex items-center gap-4 text-sm text-gray-600">
-          <span>等级 {frog.level}</span>
-          <span>•</span>
-          <span>经验值 {frog.xp}</span>
-          <span>•</span>
-          <span>旅行 {frog.totalTravels} 次</span>
-          <span>•</span>
-          <span className={`font-medium ${
-            frog.status === 'Idle' ? 'text-green-600' :
-            frog.status === 'Traveling' ? 'text-blue-600' : 'text-orange-600'
-          }`}>
-            {frog.status === 'Idle' ? '空闲' :
-             frog.status === 'Traveling' ? '旅行中' : '返回中'}
-          </span>
+    <>
+      {/* 顶部统计栏 */}
+      <div className="stats-bar">
+        <div className="stat-item">
+          <span className="stat-icon">👑</span> 等级 {frog.level}
+        </div>
+        <div className="stat-item">
+          <span className="stat-icon">💧</span> 蝌蚪值 {frog.xp}
+        </div>
+        <div className="stat-item">
+          <span className="stat-icon">🗺️</span> 旅行 {frog.totalTravels} 次
+        </div>
+        <div className="stat-item">
+          <span className="stat-icon">✈️</span> {getStatusText(frog.status)}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-        {/* 左侧：好友请求 */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-sm border p-3 sm:p-4">
+      {/* 主容器 */}
+      <main className="friend-main-container">
+        
+        {/* 左侧边栏 */}
+        <aside className="friend-sidebar">
+          {/* 我的青蛙卡片 */}
+          <div className="sidebar-card">
+            <div className="sidebar-title">
+              我的青蛙
+              <span style={{ color: '#ccc', cursor: 'pointer' }}>⚙️</span>
+            </div>
+            <div className="frog-avatar-lg">
+              <div className="frog-emoji">🐸</div>
+            </div>
+            <div className="frog-info-center">
+              <h3>{frog.name}</h3>
+              <p>Ready to hop!</p>
+            </div>
+          </div>
+
+          {/* 好友请求卡片 */}
+          <div className="sidebar-card">
+            <div className="sidebar-title">
+              好友请求
+              <span className="badge" id="request-badge">0</span>
+            </div>
             <FriendRequests
-              frogId={frog.id}
+              frogId={frog.tokenId}
               onRequestProcessed={handleRequestProcessed}
             />
           </div>
-        </div>
+        </aside>
 
-        {/* 右侧：好友列表 */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-sm border p-3 sm:p-4">
-{/* 标签页导航 */}
-          <div className="border-b border-gray-200 mb-4">
-            <nav className="flex space-x-8">
-              <button
-                onClick={() => setActiveTab('friends')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'friends'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                好友列表
-              </button>
-              <button
-                onClick={() => setActiveTab('requests')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'requests'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                好友请求
-              </button>
-              <button
-                onClick={() => setActiveTab('world')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'world'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                🌍 世界在线
-              </button>
-            </nav>
+        {/* 右侧内容面板 */}
+        <section className="friend-content-panel">
+          {/* 标签页头部 */}
+          <div className="friend-tabs-header">
+            <button 
+              className={`friend-tab-btn ${activeTab === 'friends' ? 'active' : ''}`}
+              onClick={() => setActiveTab('friends')}
+            >
+              好友列表
+            </button>
+            <button 
+              className={`friend-tab-btn ${activeTab === 'requests' ? 'active' : ''}`}
+              onClick={() => setActiveTab('requests')}
+            >
+              好友请求
+            </button>
+            <button 
+              className={`friend-tab-btn ${activeTab === 'world' ? 'active' : ''}`}
+              onClick={() => setActiveTab('world')}
+            >
+              世界在线
+            </button>
           </div>
 
-            {/* 添加好友按钮 - 只在好友列表和世界在线标签页显示 */}
-            {(activeTab === 'friends' || activeTab === 'world') && (
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg sm:text-xl font-semibold">
-                  {activeTab === 'friends' ? '好友列表' : '世界在线青蛙'}
-                </h2>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowAddFriendByWallet(true)}
-                    className="px-3 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm"
-                  >
-                    钱包地址添加
-                  </button>
-                  <button
-                    onClick={() => setShowAddFriend(true)}
-                    className="px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"
-                  >
-                    搜索添加
-                  </button>
-                </div>
+          {/* 标签页内容 */}
+          <div className="friend-tab-content">
+            {/* 好友列表 */}
+            {activeTab === 'friends' && (
+              <div className="friend-tab-pane active">
+                <FriendsList
+                  key={refreshKey}
+                  frogId={frog.tokenId}
+                  onInteractionClick={handleInteractionClick}
+                  onAddFriendClick={() => setShowAddFriendByWallet(true)}
+                  onSearchClick={() => setShowAddFriend(true)}
+                />
               </div>
             )}
 
-            {/* 好友列表标签页 */}
-            {activeTab === 'friends' && (
-              <FriendsList
-                key={refreshKey}
-                frogId={frog.id}
-                onInteractionClick={handleInteractionClick}
-              />
-            )}
-
-            {/* 好友请求标签页 */}
+            {/* 好友请求 */}
             {activeTab === 'requests' && (
-              <FriendRequests
-                frogId={frog.id}
-                onRequestProcessed={handleRequestProcessed}
-              />
+              <div className="friend-tab-pane active">
+                <FriendRequests
+                  frogId={frog.tokenId}
+                  onRequestProcessed={handleRequestProcessed}
+                />
+              </div>
             )}
 
-            {/* 世界在线标签页 */}
+            {/* 世界在线 */}
             {activeTab === 'world' && (
-              <WorldOnlineList
-                currentFrogId={frog.id}
-                onFriendAdded={handleFriendAdded}
-              />
+              <div className="friend-tab-pane active">
+                <WorldOnlineList
+                  currentFrogId={frog.tokenId}
+                  onFriendAdded={handleFriendAdded}
+                />
+              </div>
             )}
           </div>
-        </div>
-      </div>
+        </section>
+      </main>
 
       {/* 互动弹窗 */}
       {selectedFriend && selectedFriendshipId && (
         <FriendInteractionModal
           friend={selectedFriend}
           friendshipId={selectedFriendshipId}
-          currentFrogId={frog.id}
+          currentFrogId={frog.tokenId}
           onClose={handleCloseInteraction}
           onInteractionComplete={handleInteractionComplete}
         />
@@ -204,7 +222,7 @@ export const Friends: React.FC = () => {
       {/* 添加好友弹窗 */}
       {showAddFriend && (
         <AddFriend
-          currentFrogId={frog.id}
+          currentFrogId={frog.tokenId}
           onFriendAdded={handleFriendAdded}
           onClose={() => setShowAddFriend(false)}
         />
@@ -213,11 +231,11 @@ export const Friends: React.FC = () => {
       {/* 钱包地址添加好友弹窗 */}
       {showAddFriendByWallet && (
         <AddFriendByWallet
-          currentFrogId={frog.id}
+          currentFrogId={frog.tokenId}
           onFriendAdded={handleFriendAdded}
           onClose={() => setShowAddFriendByWallet(false)}
         />
       )}
-    </div>
+    </>
   );
 };

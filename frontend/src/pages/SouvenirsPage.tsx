@@ -1,22 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAccount } from 'wagmi';
-import { apiService, type Frog } from '../services/api';
+import { useMyFrog } from '../hooks/useMyFrog';
+import { apiService } from '../services/api';
 import { Loading } from '../components/common/Loading';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
 interface SouvenirDisplay {
     id: string | number;
-    tokenId?: number;      // NFT Token ID
+    tokenId?: number;
     name: string;
     description: string;
     rarity: string;
     type: string;
     emoji?: string;
     imageUrl?: string;
-    ipfsHash?: string;     // IPFS Hash
+    ipfsHash?: string;
     sourceChain?: string;
     date: Date;
     travelId?: number;
@@ -31,140 +31,44 @@ const rarityConfig: Record<string, { color: string, label: string }> = {
 };
 
 export function SouvenirsPage() {
-    const { frogId } = useParams<{ frogId: string }>();
     const navigate = useNavigate();
-    const { address } = useAccount();
-    const [frog, setFrog] = useState<Frog | null>(null);
-    const [allFrogs, setAllFrogs] = useState<Frog[]>([]);
-    const [selectedFrogId, setSelectedFrogId] = useState<string>('all');
+    const { frog, loading: frogLoading, isConnected, hasFrog } = useMyFrog();
     const [souvenirs, setSouvenirs] = useState<SouvenirDisplay[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedSouvenir, setSelectedSouvenir] = useState<SouvenirDisplay | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
-            if (!address) return;
+            if (!frog) {
+                setIsLoading(false);
+                return;
+            }
             
             try {
                 setIsLoading(true);
+                const allSouvenirs: SouvenirDisplay[] = [];
                 
-                // 获取用户的所有青蛙
-                const frogs = await apiService.getFrogsByOwner(address);
-                setAllFrogs(frogs);
+                const souvenirData = await apiService.getSouvenirs(frog.tokenId);
                 
-                // 如果URL中有frogId参数，优先使用它
-                if (frogId) {
-                    setSelectedFrogId(frogId);
-                    const frogData = await apiService.getFrogDetail(parseInt(frogId));
-                    setFrog(frogData);
-                    
-                    // 获取纪念品
-                    const souvenirData = await apiService.getSouvenirs(parseInt(frogId));
-                    const allSouvenirs: SouvenirDisplay[] = [];
-                    
-                    if (souvenirData && Array.isArray(souvenirData)) {
-                        souvenirData.forEach((souvenir: any) => {
-                            allSouvenirs.push({
-                                id: souvenir.id,
-                                name: souvenir.name,
-                                description: `${souvenir.rarity} 纪念品`,
-                                rarity: souvenir.rarity,
-                                type: 'NFT',
-                                emoji: '🎁',
-                                imageUrl: souvenir.metadataUri,
-                                date: new Date(souvenir.mintedAt || souvenir.createdAt),
-                                travelId: souvenir.travelId || 0
-                            });
+                if (souvenirData && Array.isArray(souvenirData)) {
+                    souvenirData.forEach((souvenir: any) => {
+                        allSouvenirs.push({
+                            id: souvenir.id,
+                            name: souvenir.name,
+                            description: `${souvenir.rarity} 纪念品`,
+                            rarity: souvenir.rarity,
+                            type: 'NFT',
+                            emoji: '🎁',
+                            imageUrl: souvenir.metadataUri,
+                            date: new Date(souvenir.mintedAt || souvenir.createdAt),
+                            travelId: souvenir.travelId || 0
                         });
-                    }
-                    
-                    setSouvenirs(allSouvenirs);
-                } else if (selectedFrogId !== 'all' && selectedFrogId !== '') {
-                    // 获取选中青蛙的纪念品
-                    const frogData = await apiService.getFrogDetail(parseInt(selectedFrogId));
-                    setFrog(frogData);
-                    
-                    const souvenirData = await apiService.getSouvenirs(parseInt(selectedFrogId));
-                    const allSouvenirs: SouvenirDisplay[] = [];
-                    
-                    if (souvenirData && Array.isArray(souvenirData)) {
-                        souvenirData.forEach((souvenir: any) => {
-                            allSouvenirs.push({
-                                id: souvenir.id,
-                                name: souvenir.name,
-                                description: `${souvenir.rarity} 纪念品`,
-                                rarity: souvenir.rarity,
-                                type: 'NFT',
-                                emoji: '🎁',
-                                imageUrl: souvenir.metadataUri,
-                                date: new Date(souvenir.mintedAt || souvenir.createdAt),
-                                travelId: souvenir.travelId || 0
-                            });
-                        });
-                    }
-                    
-                    setSouvenirs(allSouvenirs);
-                } else {
-                    // 获取所有青蛙的纪念品
-                    const allSouvenirsData = await apiService.getSouvenirs(undefined, address);
-                    const allSouvenirs: SouvenirDisplay[] = [];
-                    
-                    allSouvenirsData.forEach((frogData: any) => {
-                        if (frogData.souvenirs && Array.isArray(frogData.souvenirs)) {
-                            frogData.souvenirs.forEach((souvenir: any) => {
-                                allSouvenirs.push({
-                                    id: souvenir.id,
-                                    name: `${frogData.frogName} - ${souvenir.name}`,
-                                    description: `${souvenir.rarity} 纪念品`,
-                                    rarity: souvenir.rarity,
-                                    type: 'NFT',
-                                    emoji: '🎁',
-                                    imageUrl: souvenir.metadataUri,
-                                    date: new Date(souvenir.mintedAt || souvenir.createdAt),
-                                    travelId: souvenir.travelId || 0
-                                });
-                            });
-                        }
                     });
-                    
-                    setSouvenirs(allSouvenirs);
                 }
-
-                travels.forEach((t: any) => {
-                    // 1. 处理普通纪念品关系
-                    if (t.souvenir) {
-                        allSouvenirs.push({
-                            id: t.souvenir.tokenId, // 使用 NFT tokenId 而非数据库 ID
-                            name: t.souvenir.name,
-                            description: t.journal?.title || '旅行纪念',
-                            rarity: t.souvenir.rarity,
-                            type: 'souvenir',
-                            date: new Date(t.completedAt || t.endTime),
-                            travelId: t.id,
-                            sourceChain: getChainName(t.chainId)
-                        });
-                    }
-                    // 2. 处理 P0 随机旅行中的 souvenirData
-                    else if (t.souvenirData) {
-                        const sData = t.souvenirData;
-                        allSouvenirs.push({
-                            id: `p0-${t.id}`,
-                            name: sData.name,
-                            description: sData.description,
-                            rarity: mapRarity(sData.rarity),
-                            type: sData.type,
-                            emoji: sData.emoji,
-                            date: new Date(t.completedAt || t.endTime),
-                            travelId: t.id,
-                            sourceChain: getChainName(t.chainId)
-                        });
-                    }
-                });
-
-                // 按日期排序
+                
                 setSouvenirs(allSouvenirs.sort((a, b) => b.date.getTime() - a.date.getTime()));
                 
-                // 异步获取每个纪念品的图片状态 (如果后端支持通过 souvenirId 查询)
+                // 异步获取图片状态
                 allSouvenirs.forEach(async (s) => {
                     try {
                         const statusRes = await apiService.getSouvenirImageStatus(s.id.toString());
@@ -176,11 +80,10 @@ export function SouvenirsPage() {
                                 ));
                             }
                         }
-                    } catch (e) {
+                    } catch {
                         // 忽略错误
                     }
                 });
-
             } catch (error) {
                 console.error('Failed to fetch souvenirs:', error);
             } finally {
@@ -188,25 +91,43 @@ export function SouvenirsPage() {
             }
         };
 
-        fetchData();
-    }, [address, frogId, selectedFrogId]);
+        if (!frogLoading) {
+            fetchData();
+        }
+    }, [frog, frogLoading]);
 
-    const getChainName = (chainId: number) => {
-        const chains: Record<number, string> = {
-            7001: 'ZetaChain',
-            97: 'BSC Testnet',
-            11155111: 'Sepolia',
-        };
-        return chains[chainId] || `Chain ${chainId}`;
-    };
+    // 未连接钱包
+    if (!isConnected) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                    <div className="text-6xl mb-4">🔗</div>
+                    <h2 className="text-xl font-bold text-gray-700">请先连接钱包</h2>
+                    <p className="text-gray-500 mt-2">连接钱包后查看你的纪念品收藏</p>
+                </div>
+            </div>
+        );
+    }
 
-    const mapRarity = (r: number | string) => {
-        if (typeof r === 'string') return r;
-        const rarities = ['Common', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
-        return rarities[r] || 'Common';
-    };
+    // 没有青蛙
+    if (!frogLoading && !hasFrog) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                    <div className="text-6xl mb-4">🐸</div>
+                    <h2 className="text-xl font-bold text-gray-700">还没有青蛙</h2>
+                    <p className="text-gray-500 mt-2 mb-4">先铸造一只青蛙开始收集纪念品吧！</p>
+                    <Link to="/?mint=true" className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
+                        🎉 立即铸造
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
-    if (isLoading) return <div className="min-h-screen flex items-center justify-center"><Loading /></div>;
+    if (frogLoading || isLoading) {
+        return <div className="min-h-screen flex items-center justify-center"><Loading /></div>;
+    }
 
     return (
         <div className="min-h-screen pb-12">
@@ -223,26 +144,10 @@ export function SouvenirsPage() {
                         <div>
                             <h1 className="text-3xl font-bold text-gray-800">纪念品收藏</h1>
                             <p className="text-gray-500">
-                                {selectedFrogId === 'all' ? '所有青蛙' : frog?.name} 的冒险珍藏 ({souvenirs.length})
+                                {frog?.name} 的冒险珍藏 ({souvenirs.length})
                             </p>
                         </div>
                     </div>
-                    
-                    {/* 青蛙选择器 */}
-                    {allFrogs.length > 0 && (
-                        <select
-                            value={selectedFrogId}
-                            onChange={(e) => setSelectedFrogId(e.target.value)}
-                            className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                        >
-                            <option value="all">🐸 所有青蛙</option>
-                            {allFrogs.map((frog) => (
-                                <option key={frog.id} value={frog.id}>
-                                    🐸 {frog.name} (#{frog.tokenId})
-                                </option>
-                            ))}
-                        </select>
-                    )}
                 </div>
 
                 {souvenirs.length === 0 ? (
@@ -330,39 +235,12 @@ export function SouvenirsPage() {
                                     "{selectedSouvenir.description}"
                                 </p>
                                 
-                                {/* Token ID 和 IPFS 信息 */}
-                                <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-2">
-                                    {selectedSouvenir.tokenId && (
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs text-gray-500">Token ID</span>
-                                            <span className="font-mono text-sm font-bold text-gray-700">#{selectedSouvenir.tokenId}</span>
-                                        </div>
-                                    )}
-                                    {selectedSouvenir.ipfsHash && (
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs text-gray-500">IPFS</span>
-                                            <a 
-                                                href={`https://gateway.pinata.cloud/ipfs/${selectedSouvenir.ipfsHash.replace('ipfs://', '')}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="font-mono text-xs text-blue-500 hover:text-blue-700 truncate max-w-[180px]"
-                                            >
-                                                {selectedSouvenir.ipfsHash.slice(0, 20)}...
-                                            </a>
-                                        </div>
-                                    )}
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-gray-500">类型</span>
-                                        <span className="text-sm text-gray-700">{selectedSouvenir.type === 'NFT' ? '🎨 NFT' : '📦 收藏品'}</span>
-                                    </div>
-                                </div>
-                                
                                 <div className="flex items-center justify-between pt-6 border-t border-gray-50">
                                     <div className="flex items-center gap-2">
                                         <span className="text-xl">🌐</span>
                                         <div className="text-xs">
                                             <p className="text-gray-400">发现于</p>
-                                            <p className="font-bold text-gray-700">{selectedSouvenir.sourceChain || '未知链'}</p>
+                                            <p className="font-bold text-gray-700">{selectedSouvenir.sourceChain || 'ZetaChain'}</p>
                                         </div>
                                     </div>
                                     {selectedSouvenir.travelId && (

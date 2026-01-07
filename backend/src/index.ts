@@ -8,6 +8,8 @@ import { config } from './config';
 import { logger } from './utils/logger';
 import { travelProcessor } from './workers/travelProcessor';
 import { eventListener } from './workers/eventListener';
+import { crossChainListener } from './services/cross-chain-listener.service';
+import { explorationScheduler } from './services/exploration-scheduler.service';
 import { initializeWebSocket, setIO } from './websocket';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 
@@ -15,11 +17,16 @@ import frogRoutes from './api/routes/frog.routes';
 import travelRoutes from './api/routes/travel.routes';
 import healthRoutes from './api/routes/health.routes';
 import friendsRoutes from './api/routes/friends.routes';
+import gardenRoutes from './api/routes/garden.routes';
 import nftImageRoutes from './api/routes/nft-image.routes';
 import badgeRoutes from './api/routes/badge.routes';
 import souvenirRoutes from './api/routes/souvenir.routes';
 import chatRoutes from './api/routes/chat.routes';
 import priceRoutes from './api/routes/price.routes';
+import crossChainRoutes from './api/routes/cross-chain.routes';
+import messageRoutes from './api/routes/message.routes';
+import homesteadRoutes from './api/routes/homestead.routes';
+import crossChainTransferRoutes from './api/routes/crosschain-transfer.routes'; // 🆕 跨链转账
 
 const app = express();
 const httpServer = createServer(app);
@@ -45,12 +52,18 @@ app.use((req, res, next) => {
 app.use('/api/frogs', frogRoutes);
 app.use('/api/travels', travelRoutes);
 app.use('/api/friends', friendsRoutes);
+app.use('/api/garden', gardenRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/nft-image', nftImageRoutes);
 app.use('/api/badges', badgeRoutes);
 app.use('/api/souvenirs', souvenirRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/price', priceRoutes);
+app.use('/api/cross-chain', crossChainRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/homestead', homesteadRoutes); // 🆕 家园系统
+app.use('/api/crosschain-transfer', crossChainTransferRoutes); // 🆕 跨链转账
+
 
 // Root route
 app.get('/', (req, res) => {
@@ -88,6 +101,11 @@ httpServer.listen(config.PORT, async () => {
   try {
     await eventListener.start();
     travelProcessor.start();
+    
+    // Start cross-chain listener and exploration scheduler
+    await crossChainListener.start();
+    await explorationScheduler.start();
+    
     logger.info('✅ All workers started successfully');
   } catch (error) {
     logger.error('❌ Failed to start workers:', error);

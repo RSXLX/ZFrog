@@ -26,14 +26,19 @@ interface TravelProgress {
 }
 
 interface TravelResult {
-    journalHash: string;
-    souvenirId: number;
-    story: {
+    journalHash?: string;
+    souvenirId?: number;
+    story?: {
         title: string;
         content: string;
         mood: string;
         highlights: string[];
     };
+    // Cross-chain completion fields
+    travelId?: number;
+    xpEarned?: number;
+    badges?: string[];
+    totalDiscoveries?: number;
 }
 
 let io: Server | null = null;
@@ -326,4 +331,204 @@ export function getIO(): Server | null {
 
 export function setIO(ioInstance: Server): void {
     io = ioInstance;
+}
+
+// ========== 家园系统 WebSocket 通知函数 ==========
+
+export function notifyGardenVisitRequest(hostFrogId: number, request: any): void {
+    if (io) {
+        io.to(`frog:${hostFrogId}`).emit('garden:visitRequest', {
+            ...request,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified garden:visitRequest for frog ${hostFrogId}`);
+    }
+}
+
+export function notifyGardenVisitorEntered(hostFrogId: number, visit: any): void {
+    if (io) {
+        io.to(`frog:${hostFrogId}`).emit('garden:visitorEntered', {
+            ...visit,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified garden:visitorEntered for frog ${hostFrogId}`);
+    }
+}
+
+export function notifyGardenVisitorLeft(hostFrogId: number, data: { visitId: number; guestFrogId: number }): void {
+    if (io) {
+        io.to(`frog:${hostFrogId}`).emit('garden:visitorLeft', {
+            ...data,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified garden:visitorLeft for frog ${hostFrogId}`);
+    }
+}
+
+export function notifyGardenInteraction(targetFrogId: number, interaction: any): void {
+    if (io) {
+        io.to(`frog:${targetFrogId}`).emit('garden:interaction', {
+            ...interaction,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified garden:interaction for frog ${targetFrogId}`);
+    }
+}
+
+export function notifyGardenMessage(targetFrogId: number, message: any): void {
+    if (io) {
+        io.to(`frog:${targetFrogId}`).emit('garden:message', {
+            ...message,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified garden:message for frog ${targetFrogId}`);
+    }
+}
+
+export function notifyGardenGift(targetFrogId: number, gift: any): void {
+    if (io) {
+        io.to(`frog:${targetFrogId}`).emit('garden:gift', {
+            ...gift,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified garden:gift for frog ${targetFrogId}`);
+    }
+}
+
+// ========== 跨链探险 WebSocket 通知函数 ==========
+
+/**
+ * 通知跨链旅行开始
+ */
+export function notifyCrossChainTravelStarted(tokenId: number, data: {
+    travelId: number;
+    targetChainId: number;
+    messageId: string;
+    duration: number;
+}): void {
+    if (io) {
+        io.to(`frog:${tokenId}`).emit('crosschain:started', {
+            tokenId,
+            ...data,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified crosschain:started for frog ${tokenId}`);
+    }
+}
+
+/**
+ * 通知青蛙抵达目标链
+ */
+export function notifyCrossChainArrival(tokenId: number, data: {
+    chain: string;
+    blockNumber: number;
+    gasPrice: string;
+}): void {
+    if (io) {
+        io.to(`frog:${tokenId}`).emit('crosschain:arrived', {
+            tokenId,
+            ...data,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified crosschain:arrived for frog ${tokenId} at ${data.chain}`);
+    }
+}
+
+/**
+ * 通知发现事件 (宝藏、地标、遇见等)
+ */
+export function notifyCrossChainDiscovery(tokenId: number, discovery: {
+    type: 'treasure' | 'landmark' | 'encounter' | 'wisdom' | 'rare';
+    title: string;
+    description: string;
+    location: string;
+    rarity?: number;
+    metadata?: any;
+}): void {
+    if (io) {
+        io.to(`frog:${tokenId}`).emit('crosschain:event', {
+            tokenId,
+            eventType: 'discovery',
+            discoveryType: discovery.type,
+            ...discovery,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified crosschain:discovery (${discovery.type}) for frog ${tokenId}`);
+    }
+}
+
+/**
+ * 通知跨链旅行完成
+ */
+export function notifyCrossChainTravelCompleted(tokenId: number, data: {
+    returnMessageId: string;
+    totalDiscoveries: number;
+    totalXp: number;
+    journal?: any;
+}): void {
+    if (io) {
+        io.to(`frog:${tokenId}`).emit('crosschain:completed', {
+            tokenId,
+            ...data,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified crosschain:completed for frog ${tokenId}`);
+    }
+}
+
+/**
+ * 通知跨链状态更新
+ */
+export function notifyCrossChainStatus(tokenId: number, status: {
+    stage: 'locking' | 'crossing' | 'exploring' | 'returning' | 'unlocking';
+    message: string;
+    progress?: number;
+}): void {
+    if (io) {
+        io.to(`frog:${tokenId}`).emit('crosschain:status', {
+            tokenId,
+            ...status,
+            timestamp: Date.now()
+        });
+    }
+}
+
+/**
+ * 通知跨链探索互动 (周期性探索足迹)
+ */
+export function notifyTravelInteraction(tokenId: number, interaction: {
+    travelId: number;
+    message: string;
+    exploredAddress: string;
+    blockNumber: string;
+    timestamp: string;
+    isContract?: boolean;
+}): void {
+    if (io) {
+        io.to(`frog:${tokenId}`).emit('travel:interaction', {
+            tokenId,
+            ...interaction,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified travel:interaction for frog ${tokenId}: ${interaction.message.substring(0, 50)}...`);
+    }
+}
+
+/**
+ * 通知跨链阶段变化 (实时推送)
+ */
+export function notifyTravelStageUpdate(tokenId: number, data: {
+    travelId: number;
+    stage: string;
+    progress: number;
+    message?: string;
+}): void {
+    if (io) {
+        io.to(`frog:${tokenId}`).emit('travel:stageUpdate', {
+            tokenId,
+            ...data,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified travel:stageUpdate for frog ${tokenId}: stage=${data.stage}, progress=${data.progress}`);
+    }
 }

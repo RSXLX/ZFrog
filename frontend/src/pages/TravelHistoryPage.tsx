@@ -100,8 +100,8 @@ export function TravelHistoryPage() {
     const fetchFrogs = async () => {
         if (!address) return;
         try {
-            const frogsData = await apiService.getFrogsByOwner(address);
-            setFrogs(frogsData);
+            const frog = await apiService.getMyFrog(address);
+            setFrogs(frog ? [frog] : []);
         } catch (error) {
             console.error('Failed to fetch frogs:', error);
         }

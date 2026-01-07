@@ -1,0 +1,10 @@
+{
+  "contractName": "FrogConnector",
+  "version": "v3",
+  "network": "bscTestnet",
+  "chainId": "97",
+  "address": "0x8E79969718D2ffFf2a16DA65DE8cE097ceA04aec",
+  "omniTravelAddress": "0x52B090700Ca9fb2EBBbc964fDde60A0513Df7cd7",
+  "footprintAddress": "0x9571ce7FdaBfe3A234dABE3eaa01704A62AF643e",
+  "deployedAt": "2026-01-06T18:24:03.845Z"
+}

@@ -44,6 +44,7 @@ export function FrogMint({ onSuccess }: FrogMintProps) {
         }
 
         try {
+            // @ts-ignore
             writeContract({
                 address: ZETAFROG_ADDRESS,
                 abi: ZETAFROG_ABI,
@@ -67,7 +68,7 @@ export function FrogMint({ onSuccess }: FrogMintProps) {
                                 abi: ZETAFROG_ABI,
                                 data: log.data,
                                 topics: log.topics,
-                            });
+                            }) as any;
                             return decoded.eventName === 'FrogMinted';
                         } catch {
                             return false;
@@ -79,7 +80,7 @@ export function FrogMint({ onSuccess }: FrogMintProps) {
                             abi: ZETAFROG_ABI,
                             data: mintLog.data,
                             topics: mintLog.topics,
-                        });
+                        }) as any;
 
                         if (decoded.eventName === 'FrogMinted') {
                             const args = decoded.args as any;

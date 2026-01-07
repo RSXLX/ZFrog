@@ -26,7 +26,8 @@ export const ZETAFROG_ABI = [
         "inputs": [
             {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
             {"internalType": "string", "name": "journalHash", "type": "string"},
-            {"internalType": "uint256", "name": "souvenirId", "type": "uint256"}
+            {"internalType": "uint256", "name": "souvenirId", "type": "uint256"},
+            {"internalType": "bool", "name": "success", "type": "bool"}
         ],
         "name": "completeTravel",
         "outputs": [],
@@ -88,7 +89,8 @@ export const ZETAFROG_ABI = [
             {"internalType": "uint64", "name": "endTime", "type": "uint64"},
             {"internalType": "address", "name": "targetWallet", "type": "address"},
             {"internalType": "uint256", "name": "targetChainId", "type": "uint256"},
-            {"internalType": "bool", "name": "completed", "type": "bool"}
+            {"internalType": "bool", "name": "completed", "type": "bool"},
+            {"internalType": "bool", "name": "isRandom", "type": "bool"}
         ],
         "stateMutability": "view",
         "type": "function"

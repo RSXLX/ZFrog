@@ -9,10 +9,12 @@ import { QuickReplies } from './QuickReplies';
 import { chatApi } from '../../services/chat.api';
 import { ZETAFROG_ADDRESS, ZETAFROG_ABI } from '../../config/contracts';
 
+import { Personality } from '../../types';
+
 interface ChatPanelProps {
   frogId: number;
   frogName: string;
-  personality: string;
+  personality?: Personality | string;
 }
 
 interface Message {
@@ -116,6 +118,7 @@ export function ChatPanel({ frogId, frogName, personality }: ChatPanelProps) {
           
           // 触发合约调用
           try {
+            // @ts-ignore
             writeContract({
               address: ZETAFROG_ADDRESS,
               abi: ZETAFROG_ABI,

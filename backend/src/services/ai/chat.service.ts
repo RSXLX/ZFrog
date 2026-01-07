@@ -288,7 +288,7 @@ export class ChatService {
           return null;
       }
     } catch (error) {
-      logger.error('Error fetching intent data:', error);
+      logger.error('Error fetching intent data:', (error as Error)?.message || String(error));
       return null;
     }
   }

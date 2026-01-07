@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { isAddress } from 'viem';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { Button } from '../common/Button';
-import { ZETAFROG_ADDRESS, ZETAFROG_ABI } from '../../config/contracts';
+import { TRAVEL_ADDRESS, TRAVEL_ABI } from '../../config/contracts';
 import { LANDMARKS } from '../../config/landmarks';
 
 interface TravelP0FormProps {
@@ -46,8 +46,8 @@ export function TravelP0Form({ frogId, frogName, onSuccess }: TravelP0FormProps)
         setError('');
 
         try {
-            if (!ZETAFROG_ADDRESS) {
-                setError('合约地址未配置');
+            if (!TRAVEL_ADDRESS) {
+                setError('Travel合约地址未配置');
                 return;
             }
 
@@ -80,8 +80,8 @@ export function TravelP0Form({ frogId, frogName, onSuccess }: TravelP0FormProps)
             });
 
             (writeContract as any)({
-                address: ZETAFROG_ADDRESS as `0x${string}`,
-                abi: ZETAFROG_ABI,
+                address: TRAVEL_ADDRESS as `0x${string}`,
+                abi: TRAVEL_ABI,
                 functionName: 'startTravel',
                 args: [BigInt(frogId), targetAddress as `0x${string}`, BigInt(duration), BigInt(selectedChainId)],
             });

@@ -1,0 +1,15 @@
+{
+  "contractName": "OmniTravel",
+  "version": "v2-provisions-refund",
+  "network": "zetaAthens",
+  "chainId": 7001,
+  "address": "0x51D60F01B8e19CFd94097933ca26bA0f77eB0241",
+  "gateway": "0x6c533f7fe93fae114d0954697069df33c9b74fd7",
+  "zetaFrogNFT": "0x76e7baA23fce77DA7Edbea58D8B888128D47A1Ff",
+  "deployedAt": "2026-01-07T01:31:18.258Z",
+  "features": [
+    "ProvisionsRefunded event",
+    "_refundRemainingProvisions function",
+    "getRemainingProvisions view function"
+  ]
+}

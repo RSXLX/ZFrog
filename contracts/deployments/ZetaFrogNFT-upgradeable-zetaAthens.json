@@ -1,0 +1,17 @@
+{
+  "contractName": "ZetaFrogNFTUpgradeable",
+  "version": "2.0.0",
+  "network": "zetaAthens",
+  "chainId": "7001",
+  "proxy": "0x0721CDff3291a1Dd2af28633B5dEE5427553F09E",
+  "implementation": "0x9065367EE6d2d8Fa5721498656A57BfA4D9955e1",
+  "admin": "0x53C1844Af058fE3B3195e49fEC8f97E0a4F87772",
+  "deployedAt": "2026-01-07T02:04:02.466Z",
+  "upgradeHistory": [
+    {
+      "version": "2.0.0",
+      "implementation": "0x9065367EE6d2d8Fa5721498656A57BfA4D9955e1",
+      "deployedAt": "2026-01-07T02:04:02.466Z"
+    }
+  ]
+}

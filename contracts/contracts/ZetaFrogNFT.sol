@@ -9,20 +9,18 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title ZetaFrogNFT
- * @notice MVP version of the ZetaFrog Desktop Pet NFT
- * @dev Simplified single-contract implementation for hackathon
+ * @notice Core NFT contract for ZetaFrog
+ * @dev Travel logic moved to Travel.sol
  */
 contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
     // ============ Constants ============
     uint256 public constant MAX_SUPPLY = 1000;
-    uint256 public constant MIN_TRAVEL_DURATION = 1 minutes;
-    uint256 public constant MAX_TRAVEL_DURATION = 24 hours;
-    uint256 public constant COOLDOWN_PERIOD = 1 minutes;
 
     // ============ Enums ============
     enum FrogStatus {
         Idle,
-        Traveling
+        Traveling,
+        CrossChainLocked  // New: locked for cross-chain travel
     }
 
     // ============ Structs ============
@@ -35,28 +33,18 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
         uint256 level;
     }
 
-    struct Travel {
-        uint64 startTime;
-        uint64 endTime;
-        address targetWallet;
-        uint256 targetChainId;
-        bool completed;
-        bool isRandom;          // 新增：是否随机探索
-    }
-
     // ============ State Variables ============
     uint256 private _tokenIdCounter;
     mapping(uint256 => Frog) public frogs;
-    mapping(uint256 => Travel) public activeTravels;
-    mapping(uint256 => uint64) public lastTravelEnd;
-    mapping(uint256 => string[]) public travelJournals;
     
-    // 新增：支持的链 ID
-    mapping(uint256 => bool) public supportedChains;
+    // Single frog per wallet restriction
+    mapping(address => bool) public hasMinted;
+    mapping(address => uint256) public ownerToTokenId;
     
-    address public souvenirNFT;
-    address public travelManager;
+    address public travelContract; // Authorized Travel contract
+    address public omniTravelContract; // Authorized OmniTravel contract for cross-chain
 
+    
     // ============ Events ============
     event FrogMinted(
         address indexed owner,
@@ -65,68 +53,30 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
         uint256 timestamp
     );
 
-    event TravelStarted(
-        uint256 indexed tokenId,
-        address indexed targetWallet,
-        uint256 targetChainId,
-        uint64 startTime,
-        uint64 endTime,
-        bool isRandom              // 新增
-    );
-    
-    event ChainSupportUpdated(uint256 indexed chainId, bool supported);  // 新增
-
-    event TravelCompleted(
-        uint256 indexed tokenId,
-        string journalHash,
-        uint256 souvenirId,
-        uint256 timestamp
-    );
-
-    event TravelCancelled(uint256 indexed tokenId, uint256 timestamp);
     event LevelUp(uint256 indexed tokenId, uint256 newLevel, uint256 timestamp);
+    event FrogStatusUpdated(uint256 indexed tokenId, FrogStatus status);
 
     // ============ Modifiers ============
-    modifier onlyTravelManager() {
-        require(msg.sender == travelManager, "Not travel manager");
-        _;
-    }
-
-    modifier onlyFrogOwner(uint256 tokenId) {
-        require(ownerOf(tokenId) == msg.sender, "Not frog owner");
+    modifier onlyTravelContract() {
+        require(
+            msg.sender == travelContract || msg.sender == omniTravelContract, 
+            "Caller is not authorized"
+        );
         _;
     }
 
     // ============ Constructor ============
-    constructor() ERC721("ZetaFrog", "ZFROG") Ownable(msg.sender) {
-        travelManager = msg.sender;
-        _initializeSupportedChains();
-    }
-    
-    // 新增：初始化支持的链
-    function _initializeSupportedChains() internal {
-        supportedChains[97] = true;       // BSC Testnet
-        supportedChains[11155111] = true; // ETH Sepolia
-        supportedChains[7001] = true;     // ZetaChain Athens
-        supportedChains[80001] = true;    // Polygon Mumbai
-        supportedChains[421613] = true;   // Arbitrum Goerli
-    }
+    constructor() ERC721("ZetaFrog", "ZFROG") Ownable(msg.sender) {}
 
     // ============ Admin Functions ============
-    function setTravelManager(address _manager) external onlyOwner {
-        require(_manager != address(0), "Invalid address");
-        travelManager = _manager;
+    function setTravelContract(address _travelContract) external onlyOwner {
+        require(_travelContract != address(0), "Invalid address");
+        travelContract = _travelContract;
     }
 
-    function setSouvenirNFT(address _souvenir) external onlyOwner {
-        require(_souvenir != address(0), "Invalid address");
-        souvenirNFT = _souvenir;
-    }
-    
-    // 新增：管理支持的链
-    function setSupportedChain(uint256 chainId, bool supported) external onlyOwner {
-        supportedChains[chainId] = supported;
-        emit ChainSupportUpdated(chainId, supported);
+    function setOmniTravelContract(address _omniTravelContract) external onlyOwner {
+        require(_omniTravelContract != address(0), "Invalid address");
+        omniTravelContract = _omniTravelContract;
     }
 
     function pause() external onlyOwner {
@@ -135,6 +85,43 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
 
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    // ============ Emergency Admin Functions ============
+    
+    /**
+     * @notice Emergency reset frog status to Idle (owner only)
+     * @dev Use this when contract upgrades leave frogs in stuck states
+     * @param tokenId The frog token ID to reset
+     */
+    function emergencyResetFrogStatus(uint256 tokenId) external onlyOwner {
+        require(_ownerOf(tokenId) != address(0), "Frog does not exist");
+        frogs[tokenId].status = FrogStatus.Idle;
+        emit FrogStatusUpdated(tokenId, FrogStatus.Idle);
+    }
+
+    /**
+     * @notice Batch reset multiple frogs to Idle (owner only)
+     * @param tokenIds Array of frog token IDs to reset
+     */
+    function batchResetFrogStatus(uint256[] calldata tokenIds) external onlyOwner {
+        for (uint i = 0; i < tokenIds.length; i++) {
+            if (_ownerOf(tokenIds[i]) != address(0)) {
+                frogs[tokenIds[i]].status = FrogStatus.Idle;
+                emit FrogStatusUpdated(tokenIds[i], FrogStatus.Idle);
+            }
+        }
+    }
+
+    /**
+     * @notice Force set frog status (owner only, for migration)
+     * @param tokenId The frog token ID
+     * @param status The new status to set
+     */
+    function adminSetFrogStatus(uint256 tokenId, FrogStatus status) external onlyOwner {
+        require(_ownerOf(tokenId) != address(0), "Frog does not exist");
+        frogs[tokenId].status = status;
+        emit FrogStatusUpdated(tokenId, status);
     }
 
     // ============ Core Functions ============
@@ -152,9 +139,14 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
         bytes memory nameBytes = bytes(name);
         require(nameBytes.length >= 2 && nameBytes.length <= 16, "Name: 2-16 chars");
         require(_tokenIdCounter < MAX_SUPPLY, "Max supply reached");
+        require(!hasMinted[msg.sender], "Already minted a frog");
 
         uint256 tokenId = _tokenIdCounter++;
         _safeMint(msg.sender, tokenId);
+        
+        // Record single frog ownership
+        hasMinted[msg.sender] = true;
+        ownerToTokenId[msg.sender] = tokenId;
 
         frogs[tokenId] = Frog({
             name: name,
@@ -173,103 +165,32 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @notice Start a travel journey
-     * @param tokenId Frog NFT ID
-     * @param targetWallet Wallet address to observe
-     * @param duration Travel duration in seconds
+     * @notice Set frog status (called by Travel contract)
      */
-    function startTravel(
-        uint256 tokenId,
-        address targetWallet,
-        uint256 duration,
-        uint256 targetChainId
-    ) external whenNotPaused nonReentrant onlyFrogOwner(tokenId) {
-        Frog storage frog = frogs[tokenId];
-        require(frog.status == FrogStatus.Idle, "Frog is busy");
-        require(supportedChains[targetChainId], "Chain not supported");
-        require(duration >= MIN_TRAVEL_DURATION, "Duration too short");
-        require(duration <= MAX_TRAVEL_DURATION, "Duration too long");
-        require(
-            block.timestamp >= lastTravelEnd[tokenId] + COOLDOWN_PERIOD,
-            "Still in cooldown"
-        );
+    function setFrogStatus(uint256 tokenId, FrogStatus status) 
+        external 
+        whenNotPaused 
+        onlyTravelContract 
+    {
+        require(_ownerOf(tokenId) != address(0), "Frog does not exist");
+        frogs[tokenId].status = status;
         
-        // 关键修改：允许零地址（随机探索）
-        bool isRandom = (targetWallet == address(0));
-
-        frog.status = FrogStatus.Traveling;
-
-        uint64 startTime = uint64(block.timestamp);
-        uint64 endTime = uint64(block.timestamp + duration);
-
-        activeTravels[tokenId] = Travel({
-            startTime: startTime,
-            endTime: endTime,
-            targetWallet: targetWallet,
-            targetChainId: targetChainId,
-            completed: false,
-            isRandom: isRandom
-        });
-
-        emit TravelStarted(tokenId, targetWallet, targetChainId, startTime, endTime, isRandom);
-    }
-
-    /**
-     * @notice Complete a travel (called by backend)
-     * @param tokenId Frog NFT ID
-     * @param journalHash IPFS hash of the AI-generated journal
-     * @param souvenirId ID of minted souvenir (0 if none)
-     */
-    function completeTravel(
-        uint256 tokenId,
-        string calldata journalHash,
-        uint256 souvenirId
-    ) external onlyTravelManager nonReentrant {
-        Frog storage frog = frogs[tokenId];
-        Travel storage travel = activeTravels[tokenId];
-
-        require(frog.status == FrogStatus.Traveling, "Not traveling");
-        require(!travel.completed, "Already completed");
-        require(block.timestamp >= travel.startTime, "Travel not started");
-
-        frog.status = FrogStatus.Idle;
-        frog.totalTravels++;
-        travel.completed = true;
-        lastTravelEnd[tokenId] = uint64(block.timestamp);
-
-        travelJournals[tokenId].push(journalHash);
-
-        // Add XP reward
-        uint256 xpReward = 50; // Base reward
-        if (block.timestamp >= travel.endTime) {
-            xpReward += 50; // Bonus for completing full journey
+        if (status == FrogStatus.Idle) {
+            frogs[tokenId].totalTravels++;
         }
-        _addExperience(tokenId, xpReward);
-
-        emit TravelCompleted(tokenId, journalHash, souvenirId, block.timestamp);
-    }
-
-    /**
-     * @notice Cancel ongoing travel (emergency)
-     * @param tokenId Frog NFT ID
-     */
-    function cancelTravel(uint256 tokenId) external onlyFrogOwner(tokenId) {
-        Frog storage frog = frogs[tokenId];
-        require(frog.status == FrogStatus.Traveling, "Not traveling");
-
-        frog.status = FrogStatus.Idle;
-        activeTravels[tokenId].completed = true;
         
-        // Apply cooldown penalty for cancellation
-        lastTravelEnd[tokenId] = uint64(block.timestamp + COOLDOWN_PERIOD);
-
-        emit TravelCancelled(tokenId, block.timestamp);
+        emit FrogStatusUpdated(tokenId, status);
     }
 
     /**
-     * @notice Add experience to a frog (internal with external wrapper)
+     * @notice Add experience to a frog (called by Travel contract)
      */
-    function _addExperience(uint256 tokenId, uint256 xpAmount) internal {
+    function addExperience(uint256 tokenId, uint256 xpAmount)
+        external
+        whenNotPaused
+        onlyTravelContract
+    {
+        require(_ownerOf(tokenId) != address(0), "Frog does not exist");
         Frog storage frog = frogs[tokenId];
         frog.xp += xpAmount;
 
@@ -279,19 +200,6 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
             frog.level = newLevel;
             emit LevelUp(tokenId, newLevel, block.timestamp);
         }
-    }
-
-    /**
-     * @notice Add experience to a frog (public interface)
-     * @param tokenId Frog NFT ID
-     * @param xpAmount Amount of XP to add
-     */
-    function addExperience(uint256 tokenId, uint256 xpAmount)
-        external
-        onlyTravelManager
-    {
-        require(tokenId < _tokenIdCounter, "Frog does not exist");
-        _addExperience(tokenId, xpAmount);
     }
 
     // ============ View Functions ============
@@ -318,53 +226,32 @@ contract ZetaFrogNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
             frog.level
         );
     }
-
-    function getActiveTravel(uint256 tokenId)
-        external
-        view
-        returns (
-            uint64 startTime,
-            uint64 endTime,
-            address targetWallet,
-            uint256 targetChainId,
-            bool completed,
-            bool isRandom       // 新增返回值
-        )
-    {
-        Travel memory travel = activeTravels[tokenId];
-        return (
-            travel.startTime,
-            travel.endTime,
-            travel.targetWallet,
-            travel.targetChainId,
-            travel.completed,
-            travel.isRandom
-        );
-    }
     
-    function isChainSupported(uint256 chainId) external view returns (bool) {
-        return supportedChains[chainId];
-    }
-
-    function getTravelJournals(uint256 tokenId)
-        external
-        view
-        returns (string[] memory)
-    {
-        return travelJournals[tokenId];
-    }
-
-    function canTravel(uint256 tokenId) external view returns (bool) {
-        if (tokenId >= _tokenIdCounter) return false;
-        Frog memory frog = frogs[tokenId];
-        if (frog.status != FrogStatus.Idle) return false;
-        if (block.timestamp < lastTravelEnd[tokenId] + COOLDOWN_PERIOD)
-            return false;
-        return true;
+    function getFrogStatus(uint256 tokenId) external view returns (FrogStatus) {
+        return frogs[tokenId].status;
     }
 
     function totalSupply() external view returns (uint256) {
         return _tokenIdCounter;
+    }
+
+    /**
+     * @notice Get token ID by owner address
+     * @param owner The wallet address to query
+     * @return tokenId The frog token ID owned by the address
+     */
+    function getTokenIdByOwner(address owner) external view returns (uint256) {
+        require(hasMinted[owner], "No frog owned by this address");
+        return ownerToTokenId[owner];
+    }
+
+    /**
+     * @notice Check if an address has already minted a frog
+     * @param owner The wallet address to check
+     * @return Whether the address has a frog
+     */
+    function hasFrog(address owner) external view returns (bool) {
+        return hasMinted[owner];
     }
 
     // ============ Internal Functions ============

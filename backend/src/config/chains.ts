@@ -50,8 +50,8 @@ export const SUPPORTED_CHAINS = {
     chainId: 7001,
     rpcUrl: process.env.ZETA_ATHENS_RPC || 'https://zetachain-athens-evm.blockpi.network/v1/rpc/public',
     nativeSymbol: 'aZETA',
-    explorerUrl: 'https://athens.explorer.zetachain.com',
-    explorerApiUrl: 'https://zetachain-athens.blockscout.com/api',  // 新增
+    explorerUrl: 'https://zetachain-athens-3.blockscout.com',
+    explorerApiUrl: 'https://zetachain-athens-3.blockscout.com/api',
     genesisTimestamp: new Date('2023-02-01'),
     avgBlockTime: 6,
     scenery: '连接各个世界的彩虹桥',
@@ -137,4 +137,28 @@ export function getChainKey(chainId: number): ChainKey {
   const key = CHAIN_ID_TO_KEY[chainId];
   if (!key) throw new Error(`Unsupported chain ID: ${chainId}`);
   return key;
+}
+
+/**
+ * 随机选择一条目标链（排除指定链）
+ * 默认仅排除不活跃的测试链（Polygon Mumbai、Arbitrum Goerli）
+ * ZetaChain 主链保留：青蛙可以去系统内其他用户地址串门
+ */
+export function getRandomTargetChain(excludeKeys: ChainKey[] = ['POLYGON_MUMBAI', 'ARBITRUM_GOERLI']): ChainKey {
+  const availableChains = CHAIN_KEYS.filter(key => !excludeKeys.includes(key));
+  if (availableChains.length === 0) {
+    throw new Error('No available chains for random selection');
+  }
+  const randomIndex = Math.floor(Math.random() * availableChains.length);
+  return availableChains[randomIndex];
+}
+
+/**
+ * 获取所有可用的跨链目标链（排除主链）
+ */
+export function getAvailableTargetChains(): ChainKey[] {
+  return CHAIN_KEYS.filter(key => {
+    const chain = SUPPORTED_CHAINS[key];
+    return chain.isZetaSupported && !('isMainChain' in chain && chain.isMainChain);
+  });
 }

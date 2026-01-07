@@ -3,7 +3,7 @@
 import { createPublicClient, http, parseAbiItem } from 'viem';
 import { defineChain } from 'viem';
 import { prisma } from '../database';
-import { FrogStatus } from '@prisma/client';
+import { FrogStatus, CrossChainStatus } from '@prisma/client';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { ZETAFROG_ABI } from '../config/contracts';
@@ -13,8 +13,8 @@ import { ChainKey } from '../config/chains';
 
 
 const zetachainAthens = defineChain({
-    id: 7001,
-    name: 'ZetaChain Athens Testnet',
+    id: config.CHAIN_ID,
+    name: 'ZetaFrog Chain',
     nativeCurrency: {
         decimals: 18,
         name: 'ZETA',
@@ -59,16 +59,22 @@ class EventListener {
         // 开始监听新事件
         this.watchNewEvents();
 
+        // DISABLED: Global polling replaced by on-demand checks in API routes
         // 定期扫描（防止遗漏）
+        /*
         setInterval(() => {
             logger.info('[EventListener] Triggering scheduled historical scan...');
             this.scanHistoricalEvents();
         }, 30 * 1000); 
+        */
 
+        // DISABLED: Self-Healing now triggered on-demand in frog.routes.ts
         // [Self-Healing] Health Check Interval (every 10s)
+        /*
         setInterval(() => {
             this.runHealthCheck();
         }, 10 * 1000);
+        */
 
         logger.info('Event listener started successfully');
     }
@@ -97,10 +103,10 @@ class EventListener {
                 await this.handleFrogMinted(log);
             }
 
-            // 监听 TravelStarted 事件 - 修正事件签名，包含 targetChainId
+            // 监听 TravelStarted 事件 - 从 Travel 合约监听
             const travelLogs = await this.publicClient.getLogs({
-                address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
-                event: parseAbiItem('event TravelStarted(uint256 indexed tokenId, address indexed targetWallet, uint256 targetChainId, uint64 startTime, uint64 endTime)'),
+                address: config.TRAVEL_CONTRACT_ADDRESS as `0x${string}`,
+                event: parseAbiItem('event TravelStarted(uint256 indexed tokenId, address indexed targetWallet, uint256 targetChainId, uint64 startTime, uint64 endTime, bool isRandom)'),
                 fromBlock,
                 toBlock: currentBlock,
             });
@@ -113,10 +119,10 @@ class EventListener {
                 await this.handleTravelStarted(log);
             }
 
-            // 监听 TravelCompleted 事件
+            // 监听 TravelCompleted 事件 - 从 Travel 合约监听
             const completedLogs = await this.publicClient.getLogs({
-                address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
-                event: parseAbiItem('event TravelCompleted(uint256 indexed tokenId, string journalHash, uint256 souvenirId, uint256 timestamp)'),
+                address: config.TRAVEL_CONTRACT_ADDRESS as `0x${string}`,
+                event: parseAbiItem('event TravelCompleted(uint256 indexed tokenId, string journalHash, uint256 souvenirId, uint256 timestamp, uint256 xpReward)'),
                 fromBlock,
                 toBlock: currentBlock,
             });
@@ -137,9 +143,9 @@ class EventListener {
                 await this.handleSouvenirMinted(log);
             }
 
-            // 监听 TravelCancelled 事件
+            // 监听 TravelCancelled 事件 - 从 Travel 合约监听
             const cancelledLogs = await this.publicClient.getLogs({
-                address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+                address: config.TRAVEL_CONTRACT_ADDRESS as `0x${string}`,
                 event: parseAbiItem('event TravelCancelled(uint256 indexed tokenId, uint256 timestamp)'),
                 fromBlock,
                 toBlock: currentBlock,
@@ -161,6 +167,22 @@ class EventListener {
                 await this.handleLevelUp(log);
             }
 
+            // P1 Fix: 监听 CrossChainTravelStarted 事件 - 从 OmniTravel 合约监听
+            const crossChainLogs = await this.publicClient.getLogs({
+                address: config.OMNI_TRAVEL_ADDRESS as `0x${string}`,
+                event: parseAbiItem('event CrossChainTravelStarted(uint256 indexed tokenId, address indexed owner, uint256 targetChainId, bytes32 messageId, uint64 startTime, uint64 maxDuration)'),
+                fromBlock,
+                toBlock: currentBlock,
+            });
+
+            if (crossChainLogs.length > 0) {
+                logger.info(`[EventListener] Found ${crossChainLogs.length} CrossChainTravelStarted events!`);
+            }
+
+            for (const log of crossChainLogs) {
+                await this.handleCrossChainTravelStarted(log);
+            }
+
             this.lastProcessedBlock = currentBlock;
 
         } catch (error) {
@@ -180,10 +202,10 @@ class EventListener {
             },
         });
 
-        // 监听 TravelStarted - 修正事件签名
+        // 监听 TravelStarted - 从 Travel 合约监听
         this.publicClient.watchEvent({
-            address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
-            event: parseAbiItem('event TravelStarted(uint256 indexed tokenId, address indexed targetWallet, uint256 targetChainId, uint64 startTime, uint64 endTime)'),
+            address: config.TRAVEL_CONTRACT_ADDRESS as `0x${string}`,
+            event: parseAbiItem('event TravelStarted(uint256 indexed tokenId, address indexed targetWallet, uint256 targetChainId, uint64 startTime, uint64 endTime, bool isRandom)'),
             onLogs: async (logs: any) => {
                 for (const log of logs) {
                     await this.handleTravelStarted(log);
@@ -191,10 +213,10 @@ class EventListener {
             },
         });
 
-        // 监听 TravelCompleted
+        // 监听 TravelCompleted - 从 Travel 合约监听
         this.publicClient.watchEvent({
-            address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
-            event: parseAbiItem('event TravelCompleted(uint256 indexed tokenId, string journalHash, uint256 souvenirId, uint256 timestamp)'),
+            address: config.TRAVEL_CONTRACT_ADDRESS as `0x${string}`,
+            event: parseAbiItem('event TravelCompleted(uint256 indexed tokenId, string journalHash, uint256 souvenirId, uint256 timestamp, uint256 xpReward)'),
             onLogs: async (logs: any) => {
                 for (const log of logs) {
                     await this.handleTravelCompleted(log);
@@ -202,9 +224,9 @@ class EventListener {
             },
         });
 
-        // 监听 TravelCancelled
+        // 监听 TravelCancelled - 从 Travel 合约监听
         this.publicClient.watchEvent({
-            address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+            address: config.TRAVEL_CONTRACT_ADDRESS as `0x${string}`,
             event: parseAbiItem('event TravelCancelled(uint256 indexed tokenId, uint256 timestamp)'),
             onLogs: async (logs: any) => {
                 for (const log of logs) {
@@ -236,6 +258,17 @@ class EventListener {
         });
 
         logger.info('Watching for new events...');
+
+        // P1 Fix: 监听 CrossChainTravelStarted - 从 OmniTravel 合约监听
+        this.publicClient.watchEvent({
+            address: config.OMNI_TRAVEL_ADDRESS as `0x${string}`,
+            event: parseAbiItem('event CrossChainTravelStarted(uint256 indexed tokenId, address indexed owner, uint256 targetChainId, bytes32 messageId, uint64 startTime, uint64 maxDuration)'),
+            onLogs: async (logs: any) => {
+                for (const log of logs) {
+                    await this.handleCrossChainTravelStarted(log);
+                }
+            },
+        });
     }
 
     private async handleFrogMinted(log: any) {
@@ -243,22 +276,79 @@ class EventListener {
         logger.info(`FrogMinted: tokenId=${tokenId}, owner=${owner}, name=${name}`);
 
         try {
-            // 检查是否已存在
-            const existing = await prisma.frog.findUnique({
-                where: { tokenId: Number(tokenId) },
+            const ownerLower = (owner as string).toLowerCase();
+            const tokenIdNum = Number(tokenId);
+
+            // 先检查是否已存在该 tokenId 的 frog
+            const existingByTokenId = await prisma.frog.findUnique({
+                where: { tokenId: tokenIdNum },
             });
 
-            if (existing) {
-                logger.info(`Frog ${tokenId} already exists in database`);
+            if (existingByTokenId) {
+                // 已存在该 tokenId，只更新 owner（NFT 转移场景）
+                // 注意：如果 newOwner 已拥有另一只蛙，需要先处理旧蛙
+                const existingByOwner = await prisma.frog.findUnique({
+                    where: { ownerAddress: ownerLower },
+                });
+
+                if (existingByOwner && existingByOwner.tokenId !== tokenIdNum) {
+                    // 新 owner 已有别的蛙，这是"单钱包单蛙"冲突
+                    // 清空旧蛙的 ownerAddress（转移到临时地址）
+                    await prisma.frog.update({
+                        where: { id: existingByOwner.id },
+                        data: { ownerAddress: `orphaned_${existingByOwner.tokenId}_${Date.now()}` },
+                    });
+                    logger.warn(`Orphaned frog ${existingByOwner.tokenId} due to owner ${ownerLower} acquiring frog ${tokenIdNum}`);
+                }
+
+                await prisma.frog.update({
+                    where: { tokenId: tokenIdNum },
+                    data: { ownerAddress: ownerLower },
+                });
+                logger.info(`Frog ${tokenIdNum} owner updated to ${ownerLower}`);
                 return;
             }
 
-            // 创建青蛙记录
+            // 检查该 owner 是否已有别的 frog（单钱包单蛙规则）
+            const existingByOwner = await prisma.frog.findUnique({
+                where: { ownerAddress: ownerLower },
+            });
+
+            if (existingByOwner) {
+                // 该 owner 已有蛙，但 tokenId 不同
+                // 可能是链上重复 mint 事件，或者 NFT 被 burn 后重新 mint
+                // 更新现有记录的 tokenId 信息
+                logger.warn(`Owner ${ownerLower} already has frog ${existingByOwner.tokenId}, new tokenId=${tokenIdNum}`);
+                
+                // 清空旧蛙的 ownerAddress，为新蛙腾位置
+                await prisma.frog.update({
+                    where: { id: existingByOwner.id },
+                    data: { ownerAddress: `orphaned_${existingByOwner.tokenId}_${Date.now()}` },
+                });
+
+                // 创建新蛙
+                await prisma.frog.create({
+                    data: {
+                        tokenId: tokenIdNum,
+                        name: name as string,
+                        ownerAddress: ownerLower,
+                        birthday: new Date(Number(timestamp) * 1000),
+                        totalTravels: 0,
+                        status: FrogStatus.Idle,
+                        xp: 0,
+                        level: 1,
+                    },
+                });
+                logger.info(`Frog ${tokenIdNum} created (replaced orphaned frog)`);
+                return;
+            }
+
+            // 正常创建新蛙
             await prisma.frog.create({
                 data: {
-                    tokenId: Number(tokenId),
+                    tokenId: tokenIdNum,
                     name: name as string,
-                    ownerAddress: (owner as string).toLowerCase(),
+                    ownerAddress: ownerLower,
                     birthday: new Date(Number(timestamp) * 1000),
                     totalTravels: 0,
                     status: FrogStatus.Idle,
@@ -267,7 +357,7 @@ class EventListener {
                 },
             });
 
-            logger.info(`Frog ${tokenId} saved to database`);
+            logger.info(`Frog ${tokenIdNum} saved in database`);
 
         } catch (error) {
             logger.error(`Error handling FrogMinted event:`, error);
@@ -275,9 +365,9 @@ class EventListener {
     }
 
     private async handleTravelStarted(log: any) {
-        // 修正：正确解析包含 targetChainId 的事件
-        const { tokenId, targetWallet, targetChainId, startTime, endTime } = log.args;
-        logger.info(`TravelStarted: tokenId=${tokenId}, target=${targetWallet}, chainId=${targetChainId}`);
+        // 从Travel合约解析事件，包含 isRandom 字段
+        const { tokenId, targetWallet, targetChainId, startTime, endTime, isRandom } = log.args;
+        logger.info(`TravelStarted: tokenId=${tokenId}, target=${targetWallet}, chainId=${targetChainId}, isRandom=${isRandom}`);
 
         try {
             // 查找青蛙
@@ -292,17 +382,17 @@ class EventListener {
                 return;
             }
 
-            // 检查是否已有相同的旅行记录
+            // 检查是否已有相同的旅行记录（检查所有状态，避免重复创建）
             const existingTravel = await prisma.travel.findFirst({
                 where: {
                     frogId: frog.id,
                     startTime: new Date(Number(startTime) * 1000),
-                    status: 'Active',
+                    // 移除 status 过滤，检查所有状态
                 },
             });
 
             if (existingTravel) {
-                logger.info(`Travel already exists for frog ${tokenId}`);
+                logger.info(`Travel already exists for frog ${tokenId} (ID: ${existingTravel.id}, status: ${existingTravel.status})`);
                 return;
             }
 
@@ -311,8 +401,6 @@ class EventListener {
                 where: { id: frog.id },
                 data: { status: FrogStatus.Traveling },
             });
-
-            const isRandom = (targetWallet as string).toLowerCase() === '0x0000000000000000000000000000000000000000';
 
             // 创建旅行记录
             const travel = await prisma.travel.create({
@@ -325,7 +413,7 @@ class EventListener {
                     chainId: Number(targetChainId),
                     observedTxCount: 0,
                     observedTotalValue: "0",
-                    isRandom: isRandom, // 标记为随机探索
+                    isRandom: Boolean(isRandom), // 直接使用事件中的 isRandom
                 },
             });
 
@@ -348,6 +436,148 @@ class EventListener {
 
         } catch (error) {
             logger.error(`Error handling TravelStarted event:`, error);
+        }
+    }
+
+    /**
+     * P1 Fix: Handle CrossChainTravelStarted from OmniTravel contract
+     * Auto-creates travel record if frontend failed to do so
+     */
+    private async handleCrossChainTravelStarted(log: any) {
+        const { tokenId, owner, targetChainId, messageId, startTime, maxDuration } = log.args;
+        const txHash = log.transactionHash;
+        logger.info(`CrossChainTravelStarted: tokenId=${tokenId}, owner=${owner}, chain=${targetChainId}, msgId=${messageId}`);
+
+        try {
+            // Get transaction receipt to extract actual gas used
+            let gasUsedStr: string | null = null;
+            try {
+                const receipt = await this.publicClient.getTransactionReceipt({ hash: txHash as `0x${string}` });
+                if (receipt?.gasUsed) {
+                    // Convert gas used to ZETA (assuming gas price from receipt or estimate)
+                    const gasPrice = receipt.effectiveGasPrice || BigInt(25_000_000_000); // 25 Gwei default
+                    const gasUsedWei = receipt.gasUsed * gasPrice;
+                    const gasUsedZeta = Number(gasUsedWei) / 1e18;
+                    gasUsedStr = `${gasUsedZeta.toFixed(6)} ZETA`;
+                    logger.info(`[Gas] Transaction ${txHash} used ${receipt.gasUsed} gas = ${gasUsedStr}`);
+                }
+            } catch (gasError) {
+                logger.warn(`Failed to get gas usage for tx ${txHash}:`, gasError);
+            }
+
+            // Find frog in database
+            const frog = await prisma.frog.findUnique({
+                where: { tokenId: Number(tokenId) },
+            });
+
+            if (!frog) {
+                logger.warn(`Frog ${tokenId} not found for cross-chain travel, syncing...`);
+                await this.syncFrog(Number(tokenId));
+                return;
+            }
+
+            // Create or update CrossChainMessage record with gas data
+            const chainKeyOUT = targetChainId === 97 ? 'BSC_TESTNET' : targetChainId === 11155111 ? 'ETH_SEPOLIA' : 'ZETACHAIN_ATHENS';
+            await prisma.crossChainMessage.upsert({
+                where: { messageId: messageId as string },
+                update: {
+                    sendTxHash: txHash as string,
+                    gasUsed: gasUsedStr,
+                    status: 'CONFIRMED',
+                    confirmedAt: new Date(),
+                },
+                create: {
+                    messageId: messageId as string,
+                    tokenId: Number(tokenId),
+                    sourceChain: 'ZETACHAIN_ATHENS',
+                    targetChain: chainKeyOUT as any,
+                    direction: 'OUT',
+                    status: 'CONFIRMED',
+                    sendTxHash: txHash as string,
+                    gasUsed: gasUsedStr,
+                    payload: { owner, targetChainId: Number(targetChainId), startTime: Number(startTime), maxDuration: Number(maxDuration) },
+                    sentAt: new Date(Number(startTime) * 1000),
+                    confirmedAt: new Date(),
+                },
+            });
+
+            // Check if travel record already exists (by txHash or messageId)
+            const existingTravel = await prisma.travel.findFirst({
+                where: {
+                    OR: [
+                        { startTxHash: txHash as string },
+                        { crossChainMessageId: messageId as string },
+                        {
+                            frogId: frog.id,
+                            startTime: new Date(Number(startTime) * 1000),
+                            isCrossChain: true,
+                        }
+                    ]
+                },
+            });
+
+            if (existingTravel) {
+                logger.info(`Cross-chain travel already exists for frog ${tokenId} (ID: ${existingTravel.id})`);
+                // Update messageId and txHash if missing
+                if (!existingTravel.crossChainMessageId || !existingTravel.startTxHash) {
+                    await prisma.travel.update({
+                        where: { id: existingTravel.id },
+                        data: {
+                            crossChainMessageId: messageId as string,
+                            startTxHash: txHash as string,
+                        }
+                    });
+                }
+                return;
+            }
+
+            // Update frog status
+            await prisma.frog.update({
+                where: { id: frog.id },
+                data: { status: 'CrossChainLocked' as FrogStatus },
+            });
+
+            // Create cross-chain travel record
+            // Note: targetWallet will be populated during exploration, not at travel creation
+            const endTime = new Date((Number(startTime) + Number(maxDuration)) * 1000);
+            const travel = await prisma.travel.create({
+                data: {
+                    frogId: frog.id,
+                    // Use zero address as placeholder - actual targets are selected during exploration
+                    targetWallet: '0x0000000000000000000000000000000000000000',
+                    startTime: new Date(Number(startTime) * 1000),
+                    endTime: endTime,
+                    status: 'Active',
+                    chainId: Number(targetChainId),
+                    isCrossChain: true,
+                    crossChainMessageId: messageId as string,
+                    crossChainStatus: CrossChainStatus.CROSSING_OUT,
+                    startTxHash: txHash as string,
+                    observedTxCount: 0,
+                    observedTotalValue: "0",
+                    isRandom: true, // Cross-chain exploration uses random targets
+                },
+            });
+
+            logger.info(`[P1 Fix] Auto-created cross-chain travel ${travel.id} for frog ${tokenId} to chain ${targetChainId}`);
+
+            // Notify frontend
+            try {
+                const { notifyCrossChainTravelStarted } = await import('../websocket');
+                if (notifyCrossChainTravelStarted) {
+                    notifyCrossChainTravelStarted(frog.tokenId, {
+                        travelId: travel.id,
+                        targetChainId: Number(targetChainId),
+                        messageId: messageId as string,
+                        duration: Number(maxDuration),
+                    });
+                }
+            } catch (wsError) {
+                logger.warn('WebSocket notification failed for cross-chain travel:', wsError);
+            }
+
+        } catch (error) {
+            logger.error(`Error handling CrossChainTravelStarted event:`, error);
         }
     }
 
@@ -619,8 +849,18 @@ class EventListener {
             }
             return false;
 
-        } catch (error) {
-            logger.error(`Error syncing frog ${tokenId}:`, error);
+        } catch (error: any) {
+            // Check for NonexistentToken error (or ownerOf revert)
+            const isNonexistent = error?.message?.includes('ownerOf') || 
+                                  error?.shortMessage?.includes('ownerOf') ||
+                                  error?.details?.includes('0x7e273289') || // ERC721NonexistentToken
+                                  error?.shortMessage?.includes('0x7e273289');
+
+            if (isNonexistent) {
+                logger.warn(`Sync skipped: Frog ${tokenId} does not exist on chain.`);
+            } else {
+                logger.error(`Error syncing frog ${tokenId}:`, error);
+            }
             return false;
         }
     }
@@ -630,9 +870,9 @@ class EventListener {
      */
     async checkActiveTravelOnChain(tokenId: number) {
         try {
-            // Read active travel from contract
+            // Read active travel from Travel contract
             const result = await this.publicClient.readContract({
-                address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+                address: config.TRAVEL_CONTRACT_ADDRESS as `0x${string}`,
                 abi: ZETAFROG_ABI,
                 functionName: 'getActiveTravel',
                 args: [BigInt(tokenId)],
@@ -746,7 +986,7 @@ class EventListener {
 
             // 合约返回: [startTime, endTime, targetWallet, targetChainId, completed]
             const travelData = await this.publicClient.readContract({
-                address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+                address: config.TRAVEL_CONTRACT_ADDRESS as `0x${string}`,
                 abi: ZETAFROG_ABI,
                 functionName: 'getActiveTravel',
                 args: [BigInt(tokenId)],

@@ -14,19 +14,34 @@ const router = Router();
  * POST /api/friends/request
  * 发送好友请求
  */
+/**
+ * POST /api/friends/request
+ * 发送好友请求
+ * 注意: requesterId 和 addresseeId 现在接受 tokenId (NFT ID)
+ */
 router.post('/request', async (req, res) => {
     try {
         const { requesterId, addresseeId, walletAddress } = req.body;
 
-        if (!requesterId) {
+        // 严格检查 requesterId（支持 tokenId = 0 的情况）
+        if (requesterId === undefined || requesterId === null) {
             return res.status(400).json({ error: 'Requester ID is required' });
         }
 
-        let targetAddresseeId = addresseeId;
+        // 将 requesterId (tokenId) 转换为数据库 ID
+        const requesterFrog = await prisma.frog.findUnique({ 
+            where: { tokenId: requesterId } 
+        });
+
+        if (!requesterFrog) {
+            return res.status(404).json({ error: 'Requester frog not found' });
+        }
+
+        let targetAddresseeFrog = null;
 
         // 如果提供了钱包地址，根据地址查找青蛙
         if (walletAddress && !addresseeId) {
-            const targetFrog = await prisma.frog.findFirst({
+            targetAddresseeFrog = await prisma.frog.findFirst({
                 where: {
                     ownerAddress: {
                         equals: walletAddress.toLowerCase(),
@@ -35,78 +50,79 @@ router.post('/request', async (req, res) => {
                 }
             });
 
-            if (!targetFrog) {
+            if (!targetAddresseeFrog) {
                 return res.status(404).json({ error: 'No frog found with this wallet address' });
             }
+        } else if (addresseeId) {
+            // 将 addresseeId (tokenId) 转换为数据库 ID
+            targetAddresseeFrog = await prisma.frog.findUnique({ 
+                where: { tokenId: addresseeId } 
+            });
 
-            targetAddresseeId = targetFrog.id;
+            if (!targetAddresseeFrog) {
+                return res.status(404).json({ error: 'Addressee frog not found' });
+            }
         }
 
-        if (!targetAddresseeId) {
+        if (!targetAddresseeFrog) {
             return res.status(400).json({ error: 'Addressee ID or wallet address is required' });
         }
-    if (requesterId === targetAddresseeId) {
-      return res.status(400).json({ error: 'Cannot send friend request to yourself' });
-    }
 
-    // 检查青蛙是否存在
-    const requester = await prisma.frog.findUnique({ where: { id: requesterId } });
-    const addressee = await prisma.frog.findUnique({ where: { id: targetAddresseeId } });
+        // 使用数据库 ID 进行比较
+        if (requesterFrog.id === targetAddresseeFrog.id) {
+            return res.status(400).json({ error: 'Cannot send friend request to yourself' });
+        }
 
-    if (!requester || !addressee) {
-      return res.status(404).json({ error: 'One or both frogs not found' });
-    }
-
-    // 检查是否已存在好友关系
-    const existingFriendship = await prisma.friendship.findFirst({
-      where: {
-        OR: [
-          { requesterId, addresseeId: targetAddresseeId },
-          { requesterId: targetAddresseeId, addresseeId: requesterId }
-        ]
-      }
-    });
-
-    if (existingFriendship) {
-      if (existingFriendship.status === 'Accepted') {
-        return res.status(400).json({ error: 'Already friends' });
-      } else if (existingFriendship.status === 'Pending') {
-        return res.status(400).json({ error: 'Friend request already pending' });
-      } else {
-        // 如果是之前拒绝或拉黑的关系，更新为待处理
-        const friendship = await prisma.friendship.update({
-          where: { id: existingFriendship.id },
-          data: { status: FriendshipStatus.Pending, updatedAt: new Date() },
-          include: {
-            requester: true,
-            addressee: true
-          }
+        // 检查是否已存在好友关系
+        const existingFriendship = await prisma.friendship.findFirst({
+            where: {
+                OR: [
+                    { requesterId: requesterFrog.id, addresseeId: targetAddresseeFrog.id },
+                    { requesterId: targetAddresseeFrog.id, addresseeId: requesterFrog.id }
+                ]
+            }
         });
-        return res.json(friendship);
-      }
+
+        if (existingFriendship) {
+            if (existingFriendship.status === 'Accepted') {
+                return res.status(400).json({ error: 'Already friends' });
+            } else if (existingFriendship.status === 'Pending') {
+                return res.status(400).json({ error: 'Friend request already pending' });
+            } else {
+                // 如果是之前拒绝或拉黑的关系，更新为待处理
+                const friendship = await prisma.friendship.update({
+                    where: { id: existingFriendship.id },
+                    data: { status: FriendshipStatus.Pending, updatedAt: new Date() },
+                    include: {
+                        requester: true,
+                        addressee: true
+                    }
+                });
+                return res.json(friendship);
+            }
+        }
+
+        // 创建新的好友请求（使用数据库 ID）
+        const friendship = await prisma.friendship.create({
+            data: {
+                requesterId: requesterFrog.id,
+                addresseeId: targetAddresseeFrog.id,
+                status: FriendshipStatus.Pending
+            },
+            include: {
+                requester: true,
+                addressee: true
+            }
+        });
+
+        // 发送WebSocket通知给接收者（使用数据库 ID）
+        notifyFriendRequestReceived(targetAddresseeFrog.id, friendship);
+
+        res.status(201).json(friendship);
+    } catch (error) {
+        console.error('Error sending friend request:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-
-    // 创建新的好友请求
-    const friendship = await prisma.friendship.create({
-      data: {
-        requesterId,
-        addresseeId: targetAddresseeId,
-        status: FriendshipStatus.Pending
-      },
-      include: {
-        requester: true,
-        addressee: true
-      }
-    });
-
-    // 发送WebSocket通知给接收者
-    notifyFriendRequestReceived(targetAddresseeId, friendship);
-
-    res.status(201).json(friendship);
-  } catch (error) {
-    console.error('Error sending friend request:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
 });
 
 /**

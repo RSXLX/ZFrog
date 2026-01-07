@@ -1,12 +1,15 @@
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FrogPet } from '../components/frog/FrogPet';
+import { FrogScene } from '../components/frog/FrogScene';
 import { TravelForm } from '../components/travel/TravelForm';
+import { CrossChainTravelForm } from '../components/travel/CrossChainTravelForm';
+import { TravelModeSelector } from '../components/travel/TravelModeSelector';
 import { TravelStatus } from '../components/travel/TravelStatus';
 import { TravelJournal } from '../components/travel/TravelJournal';
 import { Loading } from '../components/common/Loading';
 import { TravelPending } from '../components/travel/TravelPending';
-import { TravelP0Form } from '../components/travel/TravelP0Form';
+import { InteractionFeed } from '../components/travel/InteractionFeed';
 import { useWebSocket, useTravelEvents } from '../hooks/useWebSocket';
 import { useEffect, useState, useRef } from 'react';
 import { apiService, type Frog } from '../services/api';
@@ -40,12 +43,14 @@ interface TravelDetail {
     } | null;
     completedAt?: string | null;
     completed: boolean;
+    isCrossChain?: boolean;
+    crossChainStatus?: 'LOCKED' | 'CROSSING_OUT' | 'ON_TARGET_CHAIN' | 'CROSSING_BACK' | 'UNLOCKED' | 'FAILED';
 }
 
 // @ts-ignore
 export function FrogDetail() {
-    const { id } = useParams<{ id: string }>();
-    const tokenId = parseInt(id || '0');
+    const { tokenId: tokenIdParam } = useParams<{ tokenId: string }>();
+    const tokenId = parseInt(tokenIdParam || '0');
 
     const [frog, setFrog] = useState<Frog | null>(null);
     const [activeTravel, setActiveTravel] = useState<TravelDetail | null>(null);
@@ -63,9 +68,22 @@ export function FrogDetail() {
     const [showInteractionModal, setShowInteractionModal] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [isFetching, setIsFetching] = useState(false); // 防止重复获取数据
-    const [activeMode, setActiveMode] = useState<'p0' | 'contract'>('p0'); // 旅行模式：p0 (随机) 或 contract (链上)
+    const [activeMode, setActiveMode] = useState<'select' | 'local' | 'crosschain'>('select'); // 旅行模式：select (选择), local (本地探索), crosschain (跨链)
+    const activeTravelRetryRef = useRef(0); // 重试计数器，限制最多3次
 
     const isOwner = frog && address && frog.ownerAddress.toLowerCase() === address.toLowerCase();
+
+    // 调试日志：帮助诊断 isOwner 判断问题
+    useEffect(() => {
+        if (frog && address) {
+            console.log('[FrogDetail] Owner check:', {
+                frogTokenId: frog.tokenId,
+                frogOwner: frog.ownerAddress.toLowerCase(),
+                walletAddress: address.toLowerCase(),
+                isOwner: frog.ownerAddress.toLowerCase() === address.toLowerCase()
+            });
+        }
+    }, [frog, address]);
 
     const fetchData = async () => {
         // 防止重复调用
@@ -74,6 +92,12 @@ export function FrogDetail() {
         try {
             setIsFetching(true);
             setIsLoading(true);
+            // 清除旧数据，防止页面切换时显示残留状态
+            setFrog(null);
+            setActiveTravel(null);
+            setTravels([]);
+            setError(null);
+            
             const frogData = await apiService.getFrogDetail(tokenId, address);
 
             // Check for status transition: Traveling -> Idle
@@ -107,9 +131,9 @@ export function FrogDetail() {
             setFrog(frogData);
             if (frogData) setCurrentFrog(frogData);
 
-            // 直接从青蛙数据中提取已完成的旅行历史
+            // 直接从青蛙数据中提取已完成的旅行历史（后端已只返回 Completed）
             if (frogData?.travels) {
-                setTravels(frogData.travels.filter((t: TravelDetail) => t.status === 'Completed'));
+                setTravels(frogData.travels);
             }
 
             // 获取活跃旅行逻辑
@@ -142,14 +166,19 @@ export function FrogDetail() {
                             if (pendingTravelRef.current) { 
                                 console.log('[FrogDetail] Keeping optimistic travel state pending backend sync...');
                             } else {
-                                // 2. 否则可能是数据延迟，重试
-                                if (!activeTravel) {
-                                    console.log('[FrogDetail] Retry fetching active travel in 2s...');
+                                // 2. 否则可能是数据延迟，限制重试次数
+                                if (!activeTravel && activeTravelRetryRef.current < 3) {
+                                    activeTravelRetryRef.current++;
+                                    console.log(`[FrogDetail] Retry fetching active travel (${activeTravelRetryRef.current}/3) in 2s...`);
                                     setTimeout(() => {
                                         if (frog?.status === 'Traveling' && !activeTravel) {
                                             fetchData();
                                         }
                                     }, 2000);
+                                } else if (activeTravelRetryRef.current >= 3) {
+                                    console.log('[FrogDetail] Max retries reached, frog may have completed travel or status is stale');
+                                    // 重置重试计数器
+                                    activeTravelRetryRef.current = 0;
                                 }
                             }
                         }
@@ -171,10 +200,12 @@ export function FrogDetail() {
                 }
             }
 
-            // 如果不是所有者且用户已登录，获取用户自己的青蛙列表以支持“加好友”
+            // 如果不是所有者且用户已登录，获取用户自己的青蛙以支持"加好友"
             if (address && frogData?.ownerAddress.toLowerCase() !== address.toLowerCase()) {
-                const myFrogs = await apiService.getFrogsByOwner(address);
-                setUserFrogs(myFrogs);
+                const myFrog = await apiService.getMyFrog(address);
+                setUserFrogs(myFrog ? [myFrog] : []);
+            } else {
+                setUserFrogs([]);
             }
         } catch (err) {
             setError(err as Error);
@@ -240,49 +271,68 @@ export function FrogDetail() {
     // Ref to track locally initiated travel that might not be synced yet
     const pendingTravelRef = useRef(false);
 
-    // [Feature] Aggressive Polling for Travel Start Sync
-    // 当处于 Processing 状态时，每 2 秒轮询一次后端，检查是否已同步
+    // [Feature] Smart Polling for Travel Start Sync
+    // 使用指数退避策略轮询，避免频繁请求
     useEffect(() => {
-        let pollTimer: NodeJS.Timeout;
+        let timeoutId: NodeJS.Timeout;
+        let delay = 1000; // 初始延迟 1s
+        let mounted = true;
+
+        const poll = async () => {
+            if (!mounted) return;
+            // 如果状态已经变了（不再是 Processing），就不再轮询
+            // 这里我们需要引用最新的 activeTravel 状态，但由于闭包问题，
+            // 最好依赖 effect 的清理和重建机制来停止
+            
+            try {
+                console.log(`[TravelSync] Polling active travel status (delay: ${Math.round(delay)}ms)...`);
+                // 使用 apiService.get 而不是直接调用 fetch
+                const response = await apiService.get(`/travels/${tokenId}/active`);
+                
+                if (mounted && response.success && response.data) {
+                    console.log('[TravelSync] Travel synced! Switching to Active state.', response.data);
+                    
+                    // 后端已同步，清除 pending 标记
+                    pendingTravelRef.current = false;
+                    
+                    // 更新为后端返回的正式数据
+                    const travelData = response.data;
+                    setActiveTravel({
+                        ...travelData,
+                        startTime: new Date(travelData.startTime).toISOString(),
+                        endTime: new Date(travelData.endTime).toISOString(),
+                        completed: travelData.status === 'Completed'
+                    });
+                    
+                    // 同时也更新一下青蛙状态
+                    if (frog && frog.status !== 'Traveling') {
+                        setFrog({ ...frog, status: 'Traveling' });
+                    }
+                    // 成功同步，不再调度下一次轮询
+                } else if (mounted) {
+                    // [DEBUG] No active travel found
+                    // 没拿到数据，继续轮询但增加延迟
+                    delay = Math.min(delay * 1.5, 10000); // 每次增加1.5倍，最大10s
+                    timeoutId = setTimeout(poll, delay);
+                }
+            } catch (e) {
+                if (mounted) {
+                    console.warn('[TravelSync] Poll failed:', e);
+                    delay = Math.min(delay * 1.5, 10000);
+                    timeoutId = setTimeout(poll, delay);
+                }
+            }
+        };
 
         if (activeTravel?.status === 'Processing') {
-            console.log('[TravelSync] Starting aggressive polling for travel sync...');
-            
-            pollTimer = setInterval(async () => {
-                try {
-                    console.log('[TravelSync] Polling active travel status...');
-                    const response = await apiService.get(`/travels/${tokenId}/active`);
-                    
-                    if (response.success && response.data) {
-                        console.log('[TravelSync] Travel synced! Switching to Active state.', response.data);
-                        
-                        // 后端已同步，清除 pending 标记
-                        pendingTravelRef.current = false;
-                        
-                        // 更新为后端返回的正式数据
-                        const travelData = response.data;
-                        setActiveTravel({
-                            ...travelData,
-                            startTime: new Date(travelData.startTime).toISOString(),
-                            endTime: new Date(travelData.endTime).toISOString(),
-                            completed: travelData.status === 'Completed'
-                        });
-                        
-                        // 同时也更新一下青蛙状态
-                        if (frog && frog.status !== 'Traveling') {
-                            setFrog({ ...frog, status: 'Traveling' });
-                        }
-                    } else {
-                        console.log('[TravelSync] Still waiting for backend sync...');
-                    }
-                } catch (e) {
-                    console.warn('[TravelSync] Poll failed:', e);
-                }
-            }, 2000);
+            console.log('[TravelSync] Starting smart polling for travel sync...');
+            // 首次轮询快速执行
+            timeoutId = setTimeout(poll, 1000);
         }
 
         return () => {
-            if (pollTimer) clearInterval(pollTimer);
+            mounted = false;
+            if (timeoutId) clearTimeout(timeoutId);
         };
     }, [activeTravel?.status, tokenId, frog]);
     
@@ -314,6 +364,8 @@ export function FrogDetail() {
                     chainId: chainId,
                     status: 'Processing', // 使用 Processing 状态触发 Pending UI
                     completed: false,
+                    isCrossChain: true,
+                    crossChainStatus: 'LOCKED',
                     journalHash: undefined,
                     journalContent: undefined,
                     journal: undefined,
@@ -406,12 +458,41 @@ export function FrogDetail() {
                         className="bg-white rounded-2xl shadow-lg p-6 mb-6"
                     >
                         <div className="flex items-center space-x-6">
-                            {frog && <FrogPet frogId={frog.tokenId} name={frog.name} />}
+                            {frog && (
+                              <FrogScene
+                                frogId={frog.id}
+                                frogName={frog.name}
+                                isOwner={isOwner}
+                                showVisitorControls={isOwner}
+                                onGroupTravel={async (companion) => {
+                                  try {
+                                    const response = await apiService.post('/travels/group', {
+                                      leaderId: frog.tokenId,
+                                      companionId: companion.tokenId,
+                                      duration: 3600
+                                    });
+                                    if (response.success) {
+                                      alert(`🐸🐸 ${frog.name} 和 ${companion.name} 一起出发啦！`);
+                                      fetchData();
+                                    }
+                                  } catch (error: any) {
+                                    alert(error?.message || '发起结伴旅行失败');
+                                  }
+                                }}
+                              />
+                            )}
                             <div className="flex-1">
-                                <div className="flex items-center justify-between">
-                                    <h1 className="text-3xl font-bold text-gray-800">{frog.name}</h1>
-                                    <div className="flex items-center gap-2">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <h1 className="text-3xl font-bold text-gray-800">{frog.name}</h1>
                                         {isOwner && (
+                                            <span className="px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full shadow-sm">
+                                                我的小青蛙 🐸
+                                            </span>
+                                        )}
+                                    </div>
+                                    {isOwner && (
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full sm:w-auto">
                                             <button
                                                 onClick={() => {
                                                     if (!isFetching) {
@@ -420,38 +501,40 @@ export function FrogDetail() {
                                                     }
                                                 }}
                                                 disabled={isSyncing}
-                                                className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 disabled:opacity-50"
+                                                className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center justify-center gap-1 disabled:opacity-50 text-sm font-medium whitespace-nowrap"
                                             >
-                                                {isSyncing ? '🔄' : '🔄'} 刷新
+                                                {isSyncing ? '🔄' : '🔄'} <span className="hidden sm:inline">刷新</span>
                                             </button>
-                                        )}
-                                        {isOwner && (
-                                            <>
-                                                <button
-                                                    onClick={() => window.location.href = `/badges/${frog.id}`}
-                                                    className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 flex items-center gap-2"
-                                                >
-                                                    🏆 徽章
-                                                </button>
-                                                <button
-                                                    onClick={() => window.location.href = `/souvenirs/${frog.tokenId}`}
-                                                    className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 flex items-center gap-2"
-                                                >
-                                                    🎁 纪念品
-                                                </button>
-                                                <button
-                                                    onClick={() => window.location.href = `/friends/${frog.tokenId}`}
-                                                    className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center gap-2"
-                                                >
-                                                    👥 好友系统
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
+                                            <button
+                                                onClick={() => window.location.href = '/garden'}
+                                                className="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center justify-center gap-1 text-sm font-medium whitespace-nowrap"
+                                            >
+                                                🏠 <span className="hidden sm:inline">家园</span>
+                                            </button>
+                                            <button
+                                                onClick={() => window.location.href = '/badges'}
+                                                className="px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 flex items-center justify-center gap-1 text-sm font-medium whitespace-nowrap"
+                                            >
+                                                🏆 <span className="hidden sm:inline">兑换</span>
+                                            </button>
+                                            <button
+                                                onClick={() => window.location.href = '/souvenirs'}
+                                                className="px-3 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 flex items-center justify-center gap-1 text-sm font-medium whitespace-nowrap"
+                                            >
+                                                🎁 <span className="hidden sm:inline">纪念品</span>
+                                            </button>
+                                            <button
+                                                onClick={() => window.location.href = '/friends'}
+                                                className="px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm font-medium whitespace-nowrap col-span-2 sm:col-span-1"
+                                            >
+                                                👥 <span className="hidden sm:inline">好友系统</span>
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
                                     <span>🎂 {new Date(frog.birthday).toLocaleDateString()}</span>
-                                    <span>✈️ {frog.totalTravels} 次旅行</span>
+                                    <span>✈️ {travels.length || frog.totalTravels} 次旅行</span>
                                     <span className={`px-2 py-1 rounded-full text-xs ${
                                         frog.status === 'Traveling' 
                                             ? 'bg-blue-100 text-blue-800' 
@@ -473,53 +556,93 @@ export function FrogDetail() {
                                     <>
                                         {console.log('显示旅行状态，activeTravel:', activeTravel)}
                                         {activeTravel.status === 'Processing' ? (
-                                            <TravelPending />
+                                            <TravelPending 
+                                                txHash={activeTravel.journalHash || ''}
+                                                onReset={() => {
+                                                    console.log('用户手动重置旅行状态');
+                                                    setIsLoading(true);
+                                                    fetchData();
+                                                }}
+                                            />
                                         ) : (
                                             <TravelStatus travel={activeTravel} frogName={frog.name} />
+                                        )}
+                                        
+                                        {/* 链上探索实时数据 */}
+                                        {activeTravel.isCrossChain && activeTravel.chainId && (
+                                            <div className="mt-6">
+                                                <InteractionFeed
+                                                    travelId={activeTravel.id}
+                                                    tokenId={tokenId}
+                                                    chainId={activeTravel.chainId}
+                                                />
+                                            </div>
                                         )}
                                     </>
                                 ) : (
                                     <>
                                         {console.log('不显示旅行状态，activeTravel:', activeTravel, 'completed:', activeTravel?.completed)}
                                         <div className="space-y-4">
-                                        {/* 模式切换选项卡 */}
-                                        <div className="flex bg-white/50 backdrop-blur p-1 rounded-xl border border-gray-200">
-                                            <button
-                                                onClick={() => setActiveMode('p0')}
-                                                className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${
-                                                    activeMode === 'p0'
-                                                        ? 'bg-white text-green-600 shadow-sm'
-                                                        : 'text-gray-500 hover:text-gray-700'
-                                                }`}
-                                            >
-                                                🎲 快速探索
-                                            </button>
-                                            <button
-                                                onClick={() => setActiveMode('contract')}
-                                                className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${
-                                                    activeMode === 'contract'
-                                                        ? 'bg-white text-blue-600 shadow-sm'
-                                                        : 'text-gray-500 hover:text-gray-700'
-                                                }`}
-                                            >
-                                                ⛓️ 高级设置
-                                            </button>
-                                        </div>
+                                        {/* 统一旅行入口 */}
+                                        {activeMode === 'select' && (
+                                            <TravelModeSelector
+                                                tokenId={tokenId}
+                                                frogId={frog.id}
+                                                frogName={frog.name}
+                                                onSelectLocalExploration={() => setActiveMode('local')}
+                                                onSelectCrossChain={() => setActiveMode('crosschain')}
+                                            />
+                                        )}
 
-                                        {activeMode === 'p0' ? (
-                                            <TravelP0Form
-                                                frogId={tokenId}
-                                                frogName={frog.name}
-                                                onSuccess={() => {
-                                                    fetchData();
-                                                }}
-                                            />
-                                        ) : (
-                                            <TravelForm
-                                                frogId={tokenId}
-                                                frogName={frog.name}
-                                                onSuccess={fetchData}
-                                            />
+                                        {/* 本地探索表单 */}
+                                        {activeMode === 'local' && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                            >
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h3 className="text-lg font-bold text-gray-800">🌿 本地探索</h3>
+                                                    <button
+                                                        onClick={() => setActiveMode('select')}
+                                                        className="text-sm text-gray-500 hover:text-gray-700"
+                                                    >
+                                                        ← 返回选择
+                                                    </button>
+                                                </div>
+                                                <TravelForm
+                                                    frogId={tokenId}
+                                                    frogName={frog.name}
+                                                    onSuccess={() => {
+                                                        fetchData();
+                                                    }}
+                                                />
+                                            </motion.div>
+                                        )}
+                                        
+                                        {/* 跨链旅行表单 */}
+                                        {activeMode === 'crosschain' && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                            >
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600">
+                                                        🌉 跨链旅行
+                                                    </h3>
+                                                    <button
+                                                        onClick={() => setActiveMode('select')}
+                                                        className="text-sm text-gray-500 hover:text-gray-700"
+                                                    >
+                                                        ← 返回选择
+                                                    </button>
+                                                </div>
+                                                <CrossChainTravelForm
+                                                    frogId={frog.id}
+                                                    tokenId={tokenId}
+                                                    frogName={frog.name}
+                                                    onSuccess={fetchData}
+                                                />
+                                            </motion.div>
                                         )}
                                         </div>
                                     </>
@@ -572,7 +695,7 @@ export function FrogDetail() {
                                                 <>
                                                     <p className="text-xs text-gray-400 text-center">你可以让你的青蛙和 {frog.name} 交朋友</p>
                                                     <button 
-                                                        onClick={() => window.location.href = `/friends/${userFrogs[0].tokenId}`}
+                                                        onClick={() => window.location.href = '/friends'}
                                                         className="w-full py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
                                                     >
                                                         🤝 发起好友请求

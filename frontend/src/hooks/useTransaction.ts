@@ -42,6 +42,7 @@ export function useTransaction(options: UseTransactionOptions = {}) {
     try {
       setState({ status: 'pending' });
       
+      // @ts-ignore
       const hash = await writeContractAsync({
         address: params.address,
         abi: params.abi,

@@ -3,7 +3,7 @@
  * 根据目的地链显示对应的背景贴图
  */
 
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { motion } from 'framer-motion';
 import { getChainBackground, CHAIN_ICONS } from '../../config/chainBackgrounds';
 
@@ -18,7 +18,7 @@ interface TravelBackgroundProps {
   className?: string;
 }
 
-export function TravelBackground({
+export const TravelBackground = memo(function TravelBackground({
   chain,
   children,
   showChainInfo = true,
@@ -105,6 +105,6 @@ export function TravelBackground({
       </div>
     </div>
   );
-}
+});
 
 export default TravelBackground;

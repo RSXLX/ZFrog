@@ -1,6 +1,7 @@
 // frontend/src/services/chat.api.ts
 
 import { api } from './api';
+import { ApiResponse } from '../types';
 import { useAccount } from 'wagmi';
 
 export interface SendMessageRequest {
@@ -77,7 +78,7 @@ export const chatApi = {
     
     console.log('Sending chat message:', { frogId, message, sessionId, ownerAddress });
     
-    const response = await api.post<SendMessageResponse>('/chat/message', {
+    const response = await api.post<ApiResponse<SendMessageResponse>>('/chat/message', {
       frogId,
       message,
       sessionId,
@@ -90,7 +91,7 @@ export const chatApi = {
    * 获取聊天历史
    */
   async getChatHistory(sessionId: number): Promise<ChatHistoryResponse> {
-    const response = await api.get<ChatHistoryResponse>(`/chat/history/${sessionId}`);
+    const response = await api.get<ApiResponse<ChatHistoryResponse>>(`/chat/history/${sessionId}`);
     return response.data;
   },
 
@@ -98,7 +99,7 @@ export const chatApi = {
    * 获取用户所有会话
    */
   async getUserSessions(): Promise<SessionsResponse> {
-    const response = await api.get<SessionsResponse>('/chat/sessions');
+    const response = await api.get<ApiResponse<SessionsResponse>>('/chat/sessions');
     return response.data;
   },
 

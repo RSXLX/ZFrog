@@ -102,4 +102,84 @@ router.get('/:frogId/unlocked', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/badges/frog/:frogId/travel
+ * 获取青蛙的旅行徽章列表
+ */
+router.get('/frog/:frogId/travel', async (req, res) => {
+  try {
+    const tokenId = parseInt(req.params.frogId);
+    
+    if (isNaN(tokenId)) {
+      return res.status(400).json({ success: false, error: 'Invalid frogId' });
+    }
+    
+    // 查找青蛙
+    const frog = await prisma.frog.findUnique({
+      where: { tokenId }
+    });
+    
+    if (!frog) {
+      return res.status(404).json({ success: false, error: 'Frog not found' });
+    }
+    
+    // 获取旅行徽章
+    const badges = await prisma.earnedTravelBadge.findMany({
+      where: { frogId: frog.id },
+      orderBy: { earnedAt: 'desc' }
+    });
+    
+    res.json({ success: true, data: badges });
+  } catch (error) {
+    console.error('Error fetching travel badges:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/badges/frog/:frogId/stats
+ * 获取青蛙的徽章统计
+ */
+router.get('/frog/:frogId/stats', async (req, res) => {
+  try {
+    const tokenId = parseInt(req.params.frogId);
+    
+    if (isNaN(tokenId)) {
+      return res.status(400).json({ success: false, error: 'Invalid frogId' });
+    }
+    
+    // 查找青蛙
+    const frog = await prisma.frog.findUnique({
+      where: { tokenId }
+    });
+    
+    if (!frog) {
+      return res.status(404).json({ success: false, error: 'Frog not found' });
+    }
+    
+    // 获取统计
+    const badges = await prisma.earnedTravelBadge.findMany({
+      where: { frogId: frog.id }
+    });
+    
+    // 总共 5 种旅行徽章
+    const total = 5;
+    const earned = badges.length;
+    const progress = Math.round((earned / total) * 100);
+    
+    res.json({
+      success: true,
+      data: {
+        total,
+        earned,
+        progress,
+        badges: badges.map(b => b.badgeType)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching badge stats:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
 export default router;

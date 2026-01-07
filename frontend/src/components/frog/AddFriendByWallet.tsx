@@ -49,7 +49,7 @@ const AddFriendByWallet: React.FC<AddFriendByWalletProps> = ({
         const frog = response.data[0];
         
         // 检查是否是自己的青蛙
-        if (frog.id === currentFrogId) {
+        if (frog.tokenId === currentFrogId) {
           setError('不能添加自己的青蛙为好友');
           return;
         }
@@ -57,9 +57,9 @@ const AddFriendByWallet: React.FC<AddFriendByWalletProps> = ({
         // 检查是否已经是好友
         try {
           const friendsResponse = await apiService.get(`/friends/list/${currentFrogId}`);
-          const friendIds = friendsResponse.success ? friendsResponse.data.map((friend: any) => friend.id) : [];
+          const friendIds = friendsResponse.success ? friendsResponse.data.map((friend: any) => friend.tokenId) : [];
           
-          if (friendIds.includes(frog.id)) {
+          if (friendIds.includes(frog.tokenId)) {
             setError('该青蛙已经是您的好友');
             return;
           }
@@ -100,12 +100,12 @@ const AddFriendByWallet: React.FC<AddFriendByWalletProps> = ({
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusClass = (status: string) => {
     switch (status) {
-      case 'Idle': return 'text-green-600';
-      case 'Traveling': return 'text-blue-600';
-      case 'Returning': return 'text-orange-600';
-      default: return 'text-gray-600';
+      case 'Idle': return 'idle';
+      case 'Traveling': return 'traveling';
+      case 'Returning': return 'returning';
+      default: return '';
     }
   };
 
@@ -119,76 +119,77 @@ const AddFriendByWallet: React.FC<AddFriendByWalletProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg sm:text-xl font-semibold">通过钱包地址添加蛙友</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-xl"
-          >
-            ✕
-          </button>
+    <div className="friend-modal-overlay active" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="friend-modal">
+        <div className="friend-modal-header">
+          <h3 className="friend-modal-title">🔗 链上地址添加</h3>
+          <button className="friend-modal-close" onClick={onClose}>×</button>
         </div>
 
         {/* 钱包地址输入 */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            输入钱包地址
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={walletAddress}
-              onChange={(e) => setWalletAddress(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && searchByWallet()}
-              placeholder="0x..."
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-            />
-            <button
-              onClick={searchByWallet}
-              disabled={loading || !walletAddress.trim()}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
-            >
-              {loading ? '搜索中...' : '搜索'}
-            </button>
-          </div>
+        <div className="friend-form-group">
+          <label className="friend-form-label">Wallet Address</label>
+          <input
+            type="text"
+            value={walletAddress}
+            onChange={(e) => setWalletAddress(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && searchByWallet()}
+            placeholder="0x..."
+            className="friend-form-input"
+            style={{ fontFamily: 'monospace' }}
+          />
           {error && (
-            <p className="mt-2 text-sm text-red-600">{error}</p>
+            <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#dc2626' }}>{error}</p>
           )}
         </div>
 
         {/* 搜索结果 */}
         {foundFrog && (
-          <div className="border rounded-lg p-4 bg-green-50">
-            <h4 className="font-semibold text-lg mb-2">找到青蛙！</h4>
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-semibold">{foundFrog.name}</h4>
-              <span className={`text-sm ${getStatusColor(foundFrog.status)}`}>
+          <div className="request-card" style={{ background: '#e8f5e9', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '1.25rem' }}>✅</span>
+              <span style={{ fontWeight: '600' }}>找到青蛙！</span>
+            </div>
+            <div className="request-header">
+              <div className="request-info">
+                <div className="request-avatar">🐸</div>
+                <div>
+                  <div className="request-name">{foundFrog.name}</div>
+                  <div className="request-meta">
+                    Lv.{foundFrog.level} • 旅行 {foundFrog.totalTravels} 次
+                  </div>
+                </div>
+              </div>
+              <span className={`friend-status ${getStatusClass(foundFrog.status)}`}>
                 {getStatusText(foundFrog.status)}
               </span>
-            </div>
-            
-            <div className="text-sm text-gray-600 mb-3">
-              等级 {foundFrog.level} • 经验值 {foundFrog.xp} • 旅行 {foundFrog.totalTravels} 次
-            </div>
-            
-            <div className="text-xs text-gray-500 mb-3 font-mono bg-gray-100 p-2 rounded">
-              钱包地址: {foundFrog.ownerAddress}
             </div>
             
             <button
               onClick={sendFriendRequest}
               disabled={loading}
-              className="w-full px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+              className="action-btn primary"
+              style={{ width: '100%', marginTop: '0.75rem' }}
             >
-              {loading ? '发送中...' : '发送好友请求'}
+              {loading ? '⏳ 发送中...' : '➕ 发送好友请求'}
             </button>
           </div>
         )}
 
-        <div className="mt-4 pt-4 border-t">
-          <p className="text-xs text-gray-500">
+        {/* 搜索按钮 */}
+        {!foundFrog && (
+          <button
+            onClick={searchByWallet}
+            disabled={loading || !walletAddress.trim()}
+            className="friend-btn friend-btn-primary"
+            style={{ width: '100%' }}
+          >
+            {loading ? '⏳ 搜索中...' : '发送请求'}
+          </button>
+        )}
+
+        <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e0e0e0' }}>
+          <p style={{ fontSize: '0.75rem', color: '#999' }}>
             💡 输入完整的以太坊钱包地址(0x开头的42位字符)来添加蛙友
           </p>
         </div>

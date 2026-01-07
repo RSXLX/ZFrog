@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { apiService } from '../../services/api';
 
 // 支持两种使用方式的 props
@@ -76,7 +76,7 @@ const rarityColors: Record<string, string> = {
     Rare: 'bg-purple-100 text-purple-800',
 };
 
-export function TravelJournal(props: JournalProps) {
+export const TravelJournal = memo(function TravelJournal(props: JournalProps) {
     const navigate = useNavigate();
     
     // 根据 props 类型提取数据
@@ -283,7 +283,7 @@ export function TravelJournal(props: JournalProps) {
             </div>
         </motion.div>
     );
-}
+});
 
 const mapRarity = (r: number | string) => {
     if (typeof r === 'string') return r;

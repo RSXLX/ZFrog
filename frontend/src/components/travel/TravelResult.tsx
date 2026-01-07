@@ -24,10 +24,10 @@ const moodEmojis: Record<DiaryMood, string> = {
   SLEEPY: '😴',
 };
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { apiService } from '../../services/api';
 
-export function TravelResult({
+export const TravelResult = memo(function TravelResult({
   travel,
   frogName,
   discoveries = [],
@@ -67,6 +67,35 @@ export function TravelResult({
         <p className="text-gray-600 mt-2">
           {travel.completedAt && formatDistanceToNow(new Date(travel.completedAt), { addSuffix: true, locale: zhCN })}
         </p>
+      </div>
+
+      {/* 旅行统计卡片 */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {/* XP 获得 */}
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 text-center border border-purple-200">
+          <div className="text-3xl font-bold text-purple-600">
+            +{(travel as any).crossChainXpEarned || (travel as any).xpEarned || 0}
+          </div>
+          <div className="text-sm text-purple-500 mt-1">经验值</div>
+        </div>
+
+        {/* 干粮退还 */}
+        {(travel as any).refundAmount && (
+          <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-4 text-center border border-green-200">
+            <div className="text-lg font-bold text-green-600">
+              +{(Number((travel as any).refundAmount) / 1e18).toFixed(4)}
+            </div>
+            <div className="text-sm text-green-500 mt-1">ZETA 退还</div>
+          </div>
+        )}
+
+        {/* 探索发现 */}
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 text-center border border-blue-200">
+          <div className="text-3xl font-bold text-blue-600">
+            {discoveries.length}
+          </div>
+          <div className="text-sm text-blue-500 mt-1">链上发现</div>
+        </div>
       </div>
 
       {/* 旅行日记 */}
@@ -149,4 +178,4 @@ export function TravelResult({
       )}
     </motion.div>
   );
-}
+});

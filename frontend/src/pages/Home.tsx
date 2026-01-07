@@ -29,11 +29,11 @@ export function Home() {
   useEffect(() => {
     if (isConnected && address) {
       setCheckLoading(true);
-      apiService.getFrogsByOwner(address)
-        .then(frogs => {
-          setHasFrogs(frogs.length > 0);
-          if (frogs.length > 0 && !currentFrog) {
-            setCurrentFrog(frogs[0]);
+      apiService.getMyFrog(address)
+        .then(frog => {
+          setHasFrogs(!!frog);
+          if (frog && !currentFrog) {
+            setCurrentFrog(frog);
           }
         })
         .catch(console.error)
@@ -154,7 +154,7 @@ export function Home() {
         >
           <FrogMint
             onSuccess={() => {
-              window.location.href = '/my-frogs';
+              window.location.href = '/my-frog';
             }}
           />
         </motion.div>
@@ -181,7 +181,7 @@ export function Home() {
                   </h3>
                   <div className="space-y-3">
                     <Link
-                      to="/my-frogs"
+                      to="/my-frog"
                       className="block w-full text-center py-4 px-4 bg-green-500 hover:bg-green-600 text-white rounded-xl font-medium transition-all transform hover:scale-105 shadow-md"
                     >
                       🐸 我的青蛙
@@ -204,13 +204,7 @@ export function Home() {
                     >
                       🎁 我的纪念品
                     </Link>
-                    <div className="pt-3 border-t border-gray-200 space-y-2">
-                      <button
-                        onClick={() => setShowMint(true)}
-                        className="block w-full py-3 px-4 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-medium transition-colors shadow-sm"
-                      >
-                        ➕ 铸造更多青蛙
-                      </button>
+                    <div className="pt-3 border-t border-gray-200">
                       <button
                         onClick={() => window.open('https://athens.explorer.zetachain.com/', '_blank')}
                         className="block w-full py-3 px-4 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-medium transition-colors shadow-sm"

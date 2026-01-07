@@ -1,0 +1,12 @@
+{
+  "contractName": "OmniTravel",
+  "network": "zetaAthens",
+  "chainId": 7001,
+  "address": "0x52B090700Ca9fb2EBBbc964fDde60A0513Df7cd7",
+  "constructorArgs": {
+    "zetaFrogNFT": "0x76e7baA23fce77DA7Edbea58D8B888128D47A1Ff",
+    "zetaConnector": "0x239e96c8f17C85c30100AC26F635Ea15f23E9c67",
+    "zetaToken": "0x0000000000000000000000000000000000000000"
+  },
+  "deployedAt": "2025-12-31T01:59:57.441Z"
+}

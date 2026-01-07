@@ -15,6 +15,9 @@
     "hardhat": "^2.19.0"
   },
   "dependencies": {
+    "@openzeppelin/contracts-upgradeable": "^5.4.0",
+    "@openzeppelin/hardhat-upgrades": "^3.9.1",
+    "@zetachain/protocol-contracts": "^14.1.0",
     "viem": "^2.43.2"
   }
 }

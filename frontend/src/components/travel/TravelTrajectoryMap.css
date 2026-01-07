@@ -1,0 +1,212 @@
+/* frontend/src/components/travel/TravelTrajectoryMap.css */
+/* 旅行轨迹地图样式 */
+
+.trajectory-map {
+  background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(30, 41, 59, 0.95));
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid rgba(99, 179, 237, 0.2);
+}
+
+.trajectory-map.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.loading-icon {
+  font-size: 2.5rem;
+  animation: pulse 2s infinite;
+}
+
+/* 头部 */
+.map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.map-header h4 {
+  margin: 0;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.point-count {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+}
+
+/* 时间轴 */
+.trajectory-timeline {
+  position: relative;
+  padding-left: 20px;
+}
+
+.empty-trajectory {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.empty-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+/* 轨迹点 */
+.trajectory-point {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.trajectory-point:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.trajectory-point.expanded {
+  background: rgba(99, 179, 237, 0.08);
+  border-radius: 8px;
+}
+
+/* 连接线 */
+.connector-line {
+  position: absolute;
+  left: 18px;
+  top: 40px;
+  bottom: -12px;
+  width: 2px;
+  border-radius: 1px;
+}
+
+/* 节点标记 */
+.point-marker {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  z-index: 1;
+  background: rgba(17, 24, 39, 0.9);
+}
+
+.trajectory-point.start .point-marker,
+.trajectory-point.end .point-marker {
+  background: currentColor;
+}
+
+/* 内容区 */
+.point-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.point-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.point-time {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+}
+
+.chain-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  color: #fff;
+}
+
+.point-address {
+  color: #fff;
+  font-size: 0.85rem;
+  font-family: monospace;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.contract-tag {
+  background: rgba(246, 224, 94, 0.2);
+  color: #f6e05e;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+}
+
+/* 展开详情 */
+.point-details {
+  margin-top: 8px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.point-message {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.85rem;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.point-full-address {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.7rem;
+  word-break: break-all;
+}
+
+/* 统计信息 */
+.trajectory-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.stat-label {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.7rem;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.1); opacity: 1; }
+}

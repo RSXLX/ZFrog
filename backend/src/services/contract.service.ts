@@ -178,7 +178,7 @@ export class ContractService {
         address: config.ZETAFROG_NFT_ADDRESS as Hex,
         abi: ZETAFROG_ABI,
         functionName: 'completeTravel',
-        args: [BigInt(frogTokenId), journalHash, BigInt(souvenirId)],
+        args: [BigInt(frogTokenId), journalHash, BigInt(souvenirId), true],  // Added success flag
         account: walletClient.account,
       });
 

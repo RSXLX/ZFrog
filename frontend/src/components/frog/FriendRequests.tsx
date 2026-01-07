@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Friendship, Frog } from '../../types';
+import { Friendship } from '../../types';
 import { useFriendWebSocket } from '../../hooks/useFriendWebSocket';
 import { apiService } from '../../services/api';
 import { FriendRequestSkeleton } from '../common/Skeleton';
@@ -85,11 +85,13 @@ const FriendRequests: React.FC<FriendRequestsProps> = ({ frogId, onRequestProces
 
   if (error) {
     return (
-      <div className="text-center py-4">
-        <div className="text-red-500 mb-2">{error}</div>
+      <div className="empty-requests">
+        <span style={{ color: '#dc2626' }}>❌</span>
+        <p style={{ fontSize: '0.9rem' }}>{error}</p>
         <button 
           onClick={fetchRequests}
-          className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+          className="action-btn primary"
+          style={{ marginTop: '0.5rem' }}
         >
           重试
         </button>
@@ -99,58 +101,47 @@ const FriendRequests: React.FC<FriendRequestsProps> = ({ frogId, onRequestProces
 
   if (requests.length === 0) {
     return (
-      <div className="text-center py-4">
-        <div className="text-gray-500 text-sm">暂无好友请求</div>
+      <div className="empty-requests">
+        <span style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#ccc' }}>✉️</span>
+        <p style={{ fontSize: '0.9rem' }}>暂无好友请求</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      <h4 className="font-semibold text-md mb-3">好友请求 ({requests.length})</h4>
-      
+    <div>
       {requests.map((request) => (
-        <div key={request.id} className="bg-white rounded-lg border p-3 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <span className="font-medium">{request.requester?.name}</span>
-              <span className="text-gray-500 text-sm ml-2">
-                想要添加你为好友
-              </span>
+        <div key={request.id} className="request-card">
+          <div className="request-header">
+            <div className="request-info">
+              <div className="request-avatar">🐸</div>
+              <div>
+                <div className="request-name">{request.requester?.name}</div>
+                <div className="request-meta">
+                  Lv.{request.requester?.level} • 旅行 {request.requester?.totalTravels} 次
+                </div>
+              </div>
             </div>
-            <span className="text-xs text-gray-400">
+            <span className="request-time">
               {formatTime(request.createdAt)}
             </span>
           </div>
           
-          {request.requester && (
-            <div className="text-sm text-gray-600 mb-3">
-              等级 {request.requester.level} • 
-              经验值 {request.requester.xp} • 
-              旅行 {request.requester.totalTravels} 次
-            </div>
-          )}
-          
-          <div className="flex flex-wrap gap-2">
+          <div className="request-actions">
             <button
               onClick={() => respondToRequest(request.id, 'Accepted', '很高兴成为朋友！🐸')}
-              className="flex-1 sm:flex-none px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600"
+              className="action-btn primary"
+              style={{ flex: 1 }}
             >
-              接受
+              ✓ 接受
             </button>
             
             <button
               onClick={() => respondToRequest(request.id, 'Declined')}
-              className="flex-1 sm:flex-none px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
+              className="action-btn danger"
+              style={{ flex: 1 }}
             >
-              拒绝
-            </button>
-            
-            <button
-              onClick={() => window.location.href = `/frog/${request.requester?.tokenId}`}
-              className="w-full sm:w-auto px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
-            >
-              查看详情
+              ✗ 拒绝
             </button>
           </div>
         </div>

@@ -5,10 +5,12 @@ import { motion } from 'framer-motion';
 import { ChatPanel } from './ChatPanel';
 import { X, Minus } from 'lucide-react';
 
+import { Personality } from '../../types';
+
 interface ChatBubbleProps {
   frogId: number;
   frogName: string;
-  personality: string;
+  personality?: Personality | string;
   onClose: () => void;
   onClickOutside: () => void;
 }

@@ -11,7 +11,7 @@ model Frog {
   id               Int                 @id @default(autoincrement())
   tokenId          Int                 @unique
   name             String
-  ownerAddress     String
+  ownerAddress     String              @unique
   birthday         DateTime
   totalTravels     Int                 @default(0)
   status           FrogStatus          @default(Idle)
@@ -28,7 +28,23 @@ model Frog {
   souvenirs        Souvenir[]
   travels          Travel[]
   badges           UserBadge[]
+  earnedTravelBadges EarnedTravelBadge[] // 已获得的旅行徽章
   chatSessions     ChatSession[]       // 新增：关联聊天会话
+  groupTravelsAsLeader    GroupTravel[] @relation("GroupTravelLeader")
+  groupTravelsAsCompanion GroupTravel[] @relation("GroupTravelCompanion")
+  visitorMessages  VisitorMessage[]    // 串门留言
+  
+  // 🆕 家园系统关联
+  decorations        UserDecoration[]    // 拥有的装饰品
+  roomLayouts        RoomLayout[]        // 布局配置
+  receivedGifts      Gift[]              // 收到的礼物
+  photos             Photo[]             // 相册照片
+  earnedAchievements EarnedAchievement[] // 已获得的成就
+  
+  // 🆕 跨链转账关联
+  transfersSent      CrossChainTransfer[] @relation("TransfersSent")
+  transfersReceived  CrossChainTransfer[] @relation("TransfersReceived")
+  footprints         TravelFootprint[]
 
   @@index([ownerAddress])
 }
@@ -80,6 +96,19 @@ model Travel {
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
   
+  // ============ 跨链旅行相关 ============
+  isCrossChain         Boolean               @default(false)    // 是否真正跨链旅行
+  crossChainStatus     CrossChainStatus?                        // 跨链状态
+  footprints           TravelFootprint[]
+  crossChainMessageId  String?                                  // 跨链消息ID
+  lockTxHash           String?                                  // 锁定交易哈希
+  unlockTxHash         String?                                  // 解锁交易哈希
+  targetChainArrivalTime DateTime?                              // 目标链到达时间
+  targetChainActions   Json?                                    // 目标链操作记录
+  returnMessageId      String?                                  // 返回消息ID
+  crossChainXpEarned   Int?                                     // 跨链获得的XP
+  refundAmount         String?                                  // 干粮返还金额 (wei)
+  
   // 兼容旧字段
   exploredBlock      BigInt?
   exploredTimestamp  DateTime?
@@ -89,12 +118,18 @@ model Travel {
   souvenirData       Json?
   addressDiscoveredAt DateTime?
   originalTargetAddress String?
+
   
   // 关联
   frog               Frog                   @relation(fields: [frogId], references: [id])
   souvenir           Souvenir?              @relation(fields: [souvenirId], references: [id])
   observations       WalletObservation[]
+  groupTravel        GroupTravel?           // 结伴旅行信息
   statusMessages     TravelStatusMessage[]  // 状态消息
+  discoveries        TravelDiscovery[]      // 旅行发现
+  interactions       TravelInteraction[]    // 跨链探索互动记录
+  visitorMessages    VisitorMessage[]       // 串门留言
+  photos             Photo[]                // 🆕 旅行照片
 
   @@index([frogId])
   @@index([status])
@@ -103,6 +138,31 @@ model Travel {
   @@index([exploredBlock])
   @@index([isRandom])
   @@index([addressDiscoveredAt])
+}
+
+// 旅行发现 - 保存探索过程中发现的区块信息
+model TravelDiscovery {
+  id          Int           @id @default(autoincrement())
+  travelId    Int
+  type        DiscoveryType
+  title       String
+  description String
+  rarity      Int           @default(1) // 1-5 稀有度
+  
+  // 区块信息
+  blockNumber BigInt?
+  chainType   ChainType     @default(ZETACHAIN_ATHENS)
+  
+  // 附加数据 (余额、交易哈希等)
+  metadata    Json?
+  
+  createdAt   DateTime      @default(now())
+  
+  travel      Travel        @relation(fields: [travelId], references: [id])
+  
+  @@index([travelId])
+  @@index([type])
+  @@index([rarity])
 }
 
 // 新增：旅行状态消息
@@ -116,6 +176,39 @@ model TravelStatusMessage {
   travel      Travel      @relation(fields: [travelId], references: [id])
   
   @@index([travelId])
+}
+
+// 新增：跨链探索互动记录 (周期性探索足迹)
+model TravelInteraction {
+  id              Int       @id @default(autoincrement())
+  travelId        Int
+  chainId         Int
+  blockNumber     BigInt
+  message         String                        // 观察/留言内容
+  exploredAddress String?                       // 探索的地址
+  isContract      Boolean   @default(false)     // 是否是合约地址
+  txHash          String?                       // 链上交易哈希 (如果上链)
+  createdAt       DateTime  @default(now())
+  
+  travel          Travel    @relation(fields: [travelId], references: [id])
+  
+  @@index([travelId])
+  @@index([chainId, blockNumber])
+}
+
+// 新增：已获得的旅行徽章 (跨链探索成就)
+model EarnedTravelBadge {
+  id          Int       @id @default(autoincrement())
+  frogId      Int
+  badgeType   String    // 'CROSS_CHAIN_PIONEER', 'EXPLORER', 'CONTRACT_HUNTER', 'WHALE_TRACKER', 'RAINBOW_TRAVELER'
+  earnedAt    DateTime  @default(now())
+  metadata    Json?     // 获得时的详细信息
+  
+  frog        Frog      @relation(fields: [frogId], references: [id])
+  
+  @@unique([frogId, badgeType])
+  @@index([frogId])
+  @@index([badgeType])
 }
 
 model Souvenir {
@@ -160,6 +253,25 @@ model WalletObservation {
   @@index([travelId])
   @@index([walletAddress])
   @@index([chainType])                                               // 新增索引
+}
+
+model TravelFootprint {
+  id             Int       @id @default(autoincrement())
+  travelId       Int
+  frogId         Int
+  chainId        Int
+  chainType      ChainType @default(ZETACHAIN_ATHENS)
+  txHash         String
+  walletAddress  String    // 被留言的钱包地址
+  message        String    // 留言内容
+  timestamp      DateTime  @default(now())
+  
+  travel         Travel    @relation(fields: [travelId], references: [id])
+  frog           Frog      @relation(fields: [frogId], references: [id])
+
+  @@index([travelId])
+  @@index([frogId])
+  @@index([walletAddress])
 }
 
 model SouvenirImage {
@@ -216,6 +328,7 @@ model FriendInteraction {
   type         InteractionType
   message      String?
   metadata     Json?
+  likesCount   Int             @default(0)  // Added for message likes
   createdAt    DateTime        @default(now())
   actor        Frog            @relation("InteractionActor", fields: [actorId], references: [id])
   friendship   Friendship      @relation(fields: [friendshipId], references: [id])
@@ -272,6 +385,7 @@ enum FrogStatus {
   Idle
   Traveling
   Returning
+  CrossChainLocked  // Added for cross-chain travel
 }
 
 enum TravelStatus {
@@ -308,6 +422,18 @@ enum Rarity {
   Legendary
 }
 
+// 发现类型
+enum DiscoveryType {
+  balance        // 余额发现
+  activity       // 活动发现
+  timing         // 时机发现
+  fun_fact       // 趣闻
+  cross_chain    // 跨链发现
+  token_holding  // 代币持有
+  tx_action      // 交易行为
+  gas_price      // Gas价格
+}
+
 // 新增：支持的链类型（与 chains.ts 保持一致）
 enum ChainType {
   BSC_TESTNET       // chainId: 97
@@ -316,6 +442,54 @@ enum ChainType {
   POLYGON_MUMBAI    // chainId: 80001 (可选扩展)
   ARBITRUM_GOERLI   // chainId: 421613 (可选扩展)
 }
+
+// ============ 跨链状态枚举 ============
+enum CrossChainStatus {
+  LOCKING          // 锁定中
+  LOCKED           // 已锁定
+  CROSSING_OUT     // 跨链出发中
+  ON_TARGET_CHAIN  // 在目标链上
+  CROSSING_BACK    // 跨链返回中
+  UNLOCKING        // 解锁中
+  COMPLETED        // 完成
+  TIMEOUT          // 超时
+  FAILED           // 失败
+}
+
+// ============ 跨链消息模型 ============
+model CrossChainMessage {
+  id              Int                @id @default(autoincrement())
+  messageId       String             @unique    // 跨链消息唯一ID (bytes32)
+  tokenId         Int                           // 青蛙 tokenId
+  sourceChain     ChainType
+  targetChain     ChainType
+  direction       MessageDirection              // OUT / BACK
+  status          CrossChainMessageStatus       // PENDING / CONFIRMED / FAILED
+  sendTxHash      String?
+  receiveTxHash   String?
+  payload         Json                          // 消息内容
+  gasUsed         String?
+  sentAt          DateTime
+  confirmedAt     DateTime?
+  createdAt       DateTime           @default(now())
+  
+  @@index([tokenId])
+  @@index([status])
+  @@index([messageId])
+}
+
+enum MessageDirection {
+  OUT   // 从主链到目标链
+  BACK  // 从目标链返回主链
+}
+
+enum CrossChainMessageStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  TIMEOUT
+}
+
 
 enum ImageGenerationStatus {
   PENDING
@@ -439,4 +613,304 @@ enum Personality {
   COMEDIAN     // 段子手：吐槽、搞笑
   POET         // 诗人：浪漫、文艺
   GOSSIP       // 八卦蛙：爱打听、爱爆料
+}
+
+// ============ 结伴旅行 ============
+
+model GroupTravel {
+  id          Int               @id @default(autoincrement())
+  leaderId    Int               // 发起者青蛙 ID
+  companionId Int               // 同伴青蛙 ID
+  travelId    Int               @unique
+  status      GroupTravelStatus @default(ACTIVE)
+  createdAt   DateTime          @default(now())
+  
+  leader      Frog              @relation("GroupTravelLeader", fields: [leaderId], references: [id])
+  companion   Frog              @relation("GroupTravelCompanion", fields: [companionId], references: [id])
+  travel      Travel            @relation(fields: [travelId], references: [id])
+  
+  @@index([leaderId])
+  @@index([companionId])
+  @@index([status])
+}
+
+enum GroupTravelStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// ============ 串门留言 (增强版) ============
+
+model VisitorMessage {
+  id          Int      @id @default(autoincrement())
+  fromFrogId  Int      // 访问者青蛙
+  toAddress   String   // 被访问地址 (用户钱包)
+  message     String   // 留言内容
+  travelId    Int?     // 关联旅行 (可选)
+  emoji       String?  // 表情符号
+  isRead      Boolean  @default(false) // 是否已读
+  createdAt   DateTime @default(now())
+  
+  // 🆕 Web3 增强
+  signature   String?  // 钱包签名 (EIP-712)
+  tipAmount   String?  // 打赏金额 (wei)
+  tipTxHash   String?  // 打赏交易哈希
+  likesCount  Int      @default(0)
+  likedBy     String[] @default([]) // 点赞者地址列表
+  
+  fromFrog    Frog     @relation(fields: [fromFrogId], references: [id])
+  travel      Travel?  @relation(fields: [travelId], references: [id])
+  
+  @@index([toAddress])
+  @@index([fromFrogId])
+  @@index([isRead])
+}
+
+// ============ 家园装饰系统 ============
+
+// 装饰品元数据 (全局定义)
+model Decoration {
+  id            String           @id @default(cuid())
+  name          String
+  type          DecorationType
+  assetUrl      String           // 图片资源 URL
+  layer         Int              @default(0) // 默认层级基准
+  isInteractive Boolean          @default(false)
+  width         Int              @default(64) // 默认宽度 (像素)
+  height        Int              @default(64) // 默认高度 (像素)
+  createdAt     DateTime         @default(now())
+  
+  userDecorations UserDecoration[]
+}
+
+enum DecorationType {
+  FURNITURE        // 家具
+  PLANT            // 植物
+  FLOORING         // 地板
+  WALLPAPER        // 壁纸
+  SOUVENIR_DISPLAY // 纪念品展示架
+}
+
+// 用户拥有的装饰品库存
+model UserDecoration {
+  id           String       @id @default(cuid())
+  frogId       Int          // 拥有者
+  decorationId String
+  amount       Int          @default(1)
+  
+  // 如果此装饰品代表特定的纪念品 NFT
+  souvenirId   Int?         @unique
+  
+  createdAt    DateTime     @default(now())
+  
+  decoration   Decoration   @relation(fields: [decorationId], references: [id])
+  frog         Frog         @relation(fields: [frogId], references: [id])
+  placements   PlacedItem[]
+  
+  @@index([frogId])
+  @@index([decorationId])
+}
+
+// 布局配置 (每个青蛙每个场景一个)
+model RoomLayout {
+  id        String       @id @default(cuid())
+  frogId    Int
+  sceneType String       // 'yard' (庭院) | 'indoor' (室内)
+  version   Int          @default(1) // 版本控制
+  updatedAt DateTime     @updatedAt
+  createdAt DateTime     @default(now())
+  
+  items     PlacedItem[]
+  snapshots RoomLayoutSnapshot[]
+  frog      Frog         @relation(fields: [frogId], references: [id])
+  
+  @@unique([frogId, sceneType])
+  @@index([frogId])
+}
+
+// 物品具体摆放位置
+model PlacedItem {
+  id               String         @id @default(cuid())
+  layoutId         String
+  userDecorationId String
+  x                Float          // 百分比 0-100
+  y                Float          // 百分比 0-100
+  scale            Float          @default(1.0)
+  rotation         Int            @default(0)
+  zIndex           Int            @default(1)
+  createdAt        DateTime       @default(now())
+  
+  layout           RoomLayout     @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  userDecoration   UserDecoration @relation(fields: [userDecorationId], references: [id])
+  
+  @@index([layoutId])
+  @@index([userDecorationId])
+}
+
+// 布局快照 (历史版本)
+model RoomLayoutSnapshot {
+  id        String     @id @default(cuid())
+  layoutId  String
+  items     Json       // 快照时的 items 状态
+  createdAt DateTime   @default(now())
+  
+  layout    RoomLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  
+  @@index([layoutId])
+}
+
+// ============ 礼物系统 ============
+
+model Gift {
+  id            String   @id @default(cuid())
+  fromAddress   String   // 发送者钱包
+  toFrogId      Int      // 接收者青蛙
+  giftType      GiftType
+  
+  // 物品详情
+  itemName      String
+  itemImageUrl  String?
+  quantity      Int      @default(1)
+  
+  // NFT 礼物 (可选)
+  nftContract   String?  // NFT 合约地址
+  nftTokenId    String?  // Token ID
+  
+  // 链上追踪
+  txHash        String?
+  
+  isOpened      Boolean  @default(false)
+  message       String?  // 附言
+  createdAt     DateTime @default(now())
+  openedAt      DateTime?
+  
+  toFrog        Frog     @relation(fields: [toFrogId], references: [id])
+  
+  @@index([toFrogId])
+  @@index([fromAddress])
+  @@index([isOpened])
+}
+
+enum GiftType {
+  ITEM        // 普通物品 (食物、玩具)
+  NFT         // NFT 收藏品
+  TOKEN       // 代币
+  DECORATION  // 装饰品
+}
+
+// ============ 相册系统 ============
+
+model Photo {
+  id            String   @id @default(cuid())
+  frogId        Int
+  travelId      Int?
+  
+  // 图片信息
+  imageUrl      String   // 本地/CDN URL
+  ipfsHash      String?  // IPFS CID
+  ipfsUrl       String?  // IPFS 网关 URL
+  
+  // NFT 铸造
+  isNft         Boolean  @default(false)
+  nftContract   String?
+  nftTokenId    String?
+  mintTxHash    String?
+  
+  // 元数据
+  caption       String?
+  location      String?  // 拍摄地点 (链名/地址简称)
+  takenAt       DateTime @default(now())
+  
+  // 互动
+  likesCount    Int      @default(0)
+  
+  frog          Frog     @relation(fields: [frogId], references: [id])
+  travel        Travel?  @relation(fields: [travelId], references: [id])
+  
+  @@index([frogId])
+  @@index([travelId])
+}
+
+// ============ 成就系统 (扩展) ============
+
+enum AchievementCategory {
+  TRAVEL      // 旅行成就
+  SOCIAL      // 社交成就 (留言、礼物)
+  COLLECTION  // 收藏成就 (纪念品、相册)
+  DECORATION  // 装饰成就
+  CROSSCHAIN  // 🆕 跨链成就
+}
+
+model Achievement {
+  id             String              @id @default(cuid())
+  code           String              @unique
+  name           String
+  description    String
+  icon           String
+  category       AchievementCategory
+  rarity         Int                 @default(1) // 1-5
+  condition      Json                // 解锁条件
+  
+  // SBT 配置
+  isSbt          Boolean             @default(false)
+  sbtContract    String?
+  sbtMetadataUri String?
+  
+  isHidden       Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+  
+  earnedBy       EarnedAchievement[]
+}
+
+model EarnedAchievement {
+  id            String      @id @default(cuid())
+  frogId        Int
+  achievementId String
+  earnedAt      DateTime    @default(now())
+  
+  // SBT 铸造记录
+  sbtTokenId    String?
+  sbtTxHash     String?
+  
+  frog          Frog        @relation(fields: [frogId], references: [id])
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  
+  @@unique([frogId, achievementId])
+  @@index([frogId])
+  @@index([achievementId])
+}
+
+// ============ 🆕 跨链转账模块 ============
+
+model CrossChainTransfer {
+  id             String    @id @default(cuid())
+  fromFrogId     Int
+  fromAddress    String
+  toAddress      String
+  toFrogId       Int?      // 如果是好友转账
+  
+  amount         String    // 转账金额
+  tokenSymbol    String    // ZETA, ETH, BNB 等
+  sourceChain    String    // 源链
+  targetChain    String    // 目标链
+  message        String?   // 转账附言
+  
+  // 交易状态
+  status         String    @default("PENDING") // PENDING, CONFIRMING, COMPLETED, FAILED
+  sourceTxHash   String?   // 源链交易哈希
+  cctxHash       String?   // ZetaChain CCTX 哈希
+  targetTxHash   String?   // 目标链交易哈希
+  
+  createdAt      DateTime  @default(now())
+  confirmedAt    DateTime?
+  
+  fromFrog       Frog      @relation("TransfersSent", fields: [fromFrogId], references: [id])
+  toFrog         Frog?     @relation("TransfersReceived", fields: [toFrogId], references: [id])
+  
+  @@index([fromFrogId])
+  @@index([toFrogId])
+  @@index([fromAddress])
+  @@index([toAddress])
+  @@index([status])
 }

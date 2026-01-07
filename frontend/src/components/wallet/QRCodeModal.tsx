@@ -62,7 +62,7 @@ export function QRCodeModal({ isOpen, onClose, uri }: QRCodeModalProps) {
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(uri);
-                  // TODO: Add toast notification
+                  alert('✅ 已复制到剪贴板！');
                 }}
                 className="text-xs text-green-600 hover:text-green-700 font-medium py-2 rounded-lg hover:bg-green-50 transition-colors"
               >

@@ -1,0 +1,202 @@
+/* frontend/src/components/travel/InteractionFeed.css */
+/* 跨链探索互动消息流样式 */
+
+.interaction-feed {
+  background: linear-gradient(135deg, rgba(26, 26, 46, 0.95), rgba(22, 33, 62, 0.95));
+  border-radius: 16px;
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid rgba(99, 179, 237, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.interaction-feed.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: 12px;
+}
+
+.loading-spinner {
+  font-size: 2rem;
+  animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.feed-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(99, 179, 237, 0.2);
+}
+
+.feed-header h4 {
+  margin: 0;
+  color: #fff;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chain-badge {
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.feed-count {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  opacity: 0.6;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+
+.empty-state p {
+  color: rgba(255, 255, 255, 0.7);
+  margin: 8px 0;
+}
+
+.empty-hint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* Interaction list */
+.interaction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.interaction-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.3s ease;
+}
+
+.interaction-item.new {
+  animation: slideIn 0.5s ease;
+  background: rgba(99, 179, 237, 0.15);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.interaction-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.interaction-item.contract {
+  border-left: 3px solid #f6e05e;
+}
+
+.interaction-item.address {
+  border-left: 3px solid #68d391;
+}
+
+.interaction-indicator {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.interaction-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.interaction-message {
+  color: #fff;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  word-wrap: break-word;
+}
+
+.interaction-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.meta-address {
+  background: rgba(99, 179, 237, 0.2);
+  color: #63b3ed;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.meta-address:hover {
+  background: rgba(99, 179, 237, 0.3);
+}
+
+.meta-block {
+  color: #a0aec0;
+}
+
+.meta-time {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Scrollbar */
+.interaction-feed::-webkit-scrollbar {
+  width: 6px;
+}
+
+.interaction-feed::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.interaction-feed::-webkit-scrollbar-thumb {
+  background: rgba(99, 179, 237, 0.4);
+  border-radius: 3px;
+}
+
+.interaction-feed::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 179, 237, 0.6);
+}

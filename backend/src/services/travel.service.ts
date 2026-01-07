@@ -2,10 +2,14 @@
 // TypeScript migration of travel.service.js
 
 import { PrismaClient, TravelStatus } from '@prisma/client';
-import { ethers, Contract, JsonRpcProvider, Wallet } from 'ethers';
+import { ethers, JsonRpcProvider, Wallet, Contract, parseEther } from 'ethers';
+import { addSafeErrorHandler } from '../utils/provider';
 import axios from 'axios';
 import { config } from '../config';
 import { logger } from '../utils/logger';
+import { badgeService } from './badge/badge.service';
+import { travelP0Service } from './travel/travel-p0.service';
+import { ChainKey } from '../config/chains';
 
 const prisma = new PrismaClient();
 
@@ -78,6 +82,7 @@ class TravelService {
     constructor() {
         const rpcUrl = config.ZETACHAIN_RPC_URL || 'https://zetachain-athens.g.allthatnode.com/archive/tendermint';
         this.provider = new ethers.JsonRpcProvider(rpcUrl);
+        addSafeErrorHandler(this.provider, 'ZetaChain');
 
         const privateKey = config.RELAYER_PRIVATE_KEY;
         if (!privateKey) {
@@ -241,6 +246,37 @@ class TravelService {
             });
 
             logger.info(`[TravelService] Travel ${travelId} completed successfully`);
+
+            // 8. Check and unlock badges (Phase 12)
+            const chainKey = this.getChainKey(travel.chainId);
+            if (chainKey) {
+                try {
+                    // First update frog stats (required for badge conditions)
+                    await travelP0Service.updateFrogStats(
+                        travelId,
+                        chainKey,
+                        [], // Local travel has no discoveries
+                        BigInt(0),
+                        new Date()
+                    );
+                    logger.info(`[TravelService] Updated frog stats for travel ${travelId}`);
+                    
+                    // Then check badges
+                    const unlockedBadges = await badgeService.checkAndUnlock(travel.frog.id, {
+                        chain: chainKey,
+                        travelId: travelId,
+                        discoveries: [] // Local travel has no discoveries
+                    });
+                    if (unlockedBadges.length > 0) {
+                        logger.info(`[TravelService] Unlocked badges: ${unlockedBadges.join(', ')}`);
+                    } else {
+                        logger.debug(`[TravelService] No new badges unlocked for travel ${travelId}`);
+                    }
+                } catch (badgeError) {
+                    logger.warn('[TravelService] Badge check failed:', badgeError);
+                }
+            }
+
             return { journalHash, souvenirId };
 
         } catch (error) {
@@ -590,6 +626,18 @@ class TravelService {
      */
     private getExplorerApiUrl(chainId: number): string {
         return EXPLORER_API_URLS[chainId] || EXPLORER_API_URLS[1];
+    }
+
+    /**
+     * Convert chain ID to ChainKey for badge service
+     */
+    private getChainKey(chainId: number): ChainKey | null {
+        const chainMap: Record<number, ChainKey> = {
+            97: 'BSC_TESTNET',
+            11155111: 'ETH_SEPOLIA',
+            7001: 'ZETACHAIN_ATHENS',
+        };
+        return chainMap[chainId] || null;
     }
 }
 

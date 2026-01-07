@@ -1,12 +1,9 @@
-// frontend/src/pages/BadgesPage.tsx
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useAccount } from 'wagmi';
+import { useMyFrog } from '../hooks/useMyFrog';
 import { Button } from '../components/common/Button';
 import { apiService } from '../services/api';
-import { useFrogStore } from '../stores/frogStore';
-
 
 interface Badge {
     id: string;
@@ -38,57 +35,33 @@ const rarityStars = {
 
 export function BadgesPage() {
     const navigate = useNavigate();
+    const { frog, loading: frogLoading, isConnected, hasFrog } = useMyFrog();
     const [badges, setBadges] = useState<Badge[]>([]);
-    const [allFrogs, setAllFrogs] = useState<any[]>([]);
-    const [selectedFrogId, setSelectedFrogId] = useState<string>('all');
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'unlocked' | 'locked'>('all');
 
-    const { frogId } = useParams<{ frogId: string }>();
-    const { currentFrog } = useFrogStore();
-    const { address } = useAccount();
-
     useEffect(() => {
         const fetchData = async () => {
-            if (!address) return;
+            if (!frog) {
+                setLoading(false);
+                return;
+            }
             
             try {
                 setLoading(true);
-                
-                // 获取用户的所有青蛙
-                const frogs = await apiService.getFrogsByOwner(address);
-                setAllFrogs(frogs);
-                
-                // 如果URL中有frogId参数，优先使用它
-                if (frogId) {
-                    setSelectedFrogId(frogId);
-                    const badges = await apiService.getBadges(parseInt(frogId));
-                    setBadges(badges || []);
-                } else if (selectedFrogId !== 'all' && selectedFrogId !== '') {
-                    // 获取选中青蛙的徽章
-                    const badges = await apiService.getBadges(parseInt(selectedFrogId));
-                    setBadges(badges || []);
-                } else {
-                    // 获取所有青蛙的徽章
-                    const allBadgesData = await apiService.getBadges(undefined, address);
-                    // 合并所有青蛙的徽章
-                    const mergedBadges: Badge[] = [];
-                    allBadgesData.forEach((frogData: any) => {
-                        if (frogData.badges) {
-                            mergedBadges.push(...frogData.badges);
-                        }
-                    });
-                    setBadges(mergedBadges);
-                }
+                const badgesData = await apiService.getBadges(frog.tokenId);
+                setBadges(badgesData || []);
             } catch (error) {
-                console.error('Failed to fetch data:', error);
+                console.error('Failed to fetch badges:', error);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchData();
-    }, [address, frogId, selectedFrogId]);
+        if (!frogLoading) {
+            fetchData();
+        }
+    }, [frog, frogLoading]);
 
     const filteredBadges = badges.filter(badge => {
         if (filter === 'all') return true;
@@ -100,19 +73,32 @@ export function BadgesPage() {
     const unlockedCount = badges.filter(b => b.unlocked).length;
     const totalCount = badges.length;
 
-    if (!currentFrog && !frogId) {
+    // 未连接钱包
+    if (!isConnected) {
         return (
             <div className="min-h-screen bg-gradient-to-b from-sky-200 to-green-200 flex flex-col items-center justify-center p-4">
-                <div className="text-6xl mb-4">🐸</div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">请先选择一只青蛙</h2>
-                <Button onClick={() => navigate('/my-frogs')} variant="primary">
-                    去我的青蛙
-                </Button>
+                <div className="text-6xl mb-4">🔗</div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">请先连接钱包</h2>
+                <p className="text-gray-600">连接钱包后查看你的徽章收藏</p>
             </div>
         );
     }
 
-    if (loading) {
+    // 没有青蛙
+    if (!frogLoading && !hasFrog) {
+        return (
+            <div className="min-h-screen bg-gradient-to-b from-sky-200 to-green-200 flex flex-col items-center justify-center p-4">
+                <div className="text-6xl mb-4">🐸</div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">还没有青蛙</h2>
+                <p className="text-gray-600 mb-4">先铸造一只青蛙开始收集徽章吧！</p>
+                <Link to="/?mint=true">
+                    <Button variant="primary">🎉 立即铸造</Button>
+                </Link>
+            </div>
+        );
+    }
+
+    if (frogLoading || loading) {
         return (
             <div className="min-h-screen bg-gradient-to-b from-sky-200 to-green-200 flex items-center justify-center">
                 <motion.div
@@ -152,29 +138,12 @@ export function BadgesPage() {
                     className="text-center mb-8"
                 >
                     <h1 className="text-4xl font-bold text-green-600 mb-2">
-                        🏆 我的徽章
+                        🏆 {frog?.name} 的徽章
                     </h1>
                     <p className="text-gray-700 mb-4">
                         收集旅行徽章，记录你的探险成就！
                     </p>
                     
-                    {/* 青蛙选择器 */}
-                    {allFrogs.length > 0 && (
-                        <div className="flex justify-center mb-4">
-                            <select
-                                value={selectedFrogId}
-                                onChange={(e) => setSelectedFrogId(e.target.value)}
-                                className="px-4 py-2 rounded-lg border border-white/50 bg-white/70 backdrop-blur text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                            >
-                                <option value="all">🐸 所有青蛙</option>
-                                {allFrogs.map((frog) => (
-                                    <option key={frog.id} value={frog.id}>
-                                        🐸 {frog.name} (#{frog.tokenId})
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
                     <div className="inline-flex items-center space-x-4 bg-white/50 backdrop-blur rounded-full px-6 py-3">
                         <span className="text-2xl">🎯</span>
                         <span className="font-medium text-gray-700">
@@ -184,7 +153,7 @@ export function BadgesPage() {
                             <motion.div
                                 className="h-full bg-gradient-to-r from-green-400 to-blue-500"
                                 initial={{ width: 0 }}
-                                animate={{ width: `${(unlockedCount / totalCount) * 100}%` }}
+                                animate={{ width: totalCount > 0 ? `${(unlockedCount / totalCount) * 100}%` : '0%' }}
                                 transition={{ duration: 0.5 }}
                             />
                         </div>
@@ -239,33 +208,28 @@ export function BadgesPage() {
                                     : 'border-gray-200 bg-gray-50 opacity-60'
                             }`}
                         >
-                            {/* 锁定状态 */}
                             {!badge.unlocked && (
                                 <div className="absolute inset-0 flex items-center justify-center bg-gray-900/20 rounded-2xl">
                                     <span className="text-4xl">🔒</span>
                                 </div>
                             )}
 
-                            {/* 徽章图标 */}
                             <div className="text-5xl mb-3">
                                 {badge.unlocked ? badge.icon : '❓'}
                             </div>
 
-                            {/* 徽章名称 */}
                             <h3 className={`font-bold mb-2 ${
                                 badge.unlocked ? 'text-gray-800' : 'text-gray-500'
                             }`}>
                                 {badge.unlocked ? badge.name : '???'}
                             </h3>
 
-                            {/* 徽章描述 */}
                             <p className={`text-sm mb-3 ${
                                 badge.unlocked ? 'text-gray-600' : 'text-gray-400'
                             }`}>
                                 {badge.unlocked ? badge.description : '完成特定条件解锁'}
                             </p>
 
-                            {/* 稀有度星级 */}
                             {badge.unlocked && (
                                 <div className="flex justify-center mb-2">
                                     <span className="text-sm">
@@ -274,7 +238,6 @@ export function BadgesPage() {
                                 </div>
                             )}
 
-                            {/* 解锁时间 */}
                             {badge.unlocked && badge.unlockedAt && (
                                 <p className="text-xs text-gray-500">
                                     解锁于 {new Date(badge.unlockedAt).toLocaleDateString()}
@@ -299,8 +262,9 @@ export function BadgesPage() {
                         </p>
                         {filter !== 'locked' && (
                             <Button onClick={() => navigate('/')} variant="primary">
-                                                        开始旅行
-                                                    </Button>                        )}
+                                开始旅行
+                            </Button>
+                        )}
                     </motion.div>
                 )}
 
