@@ -10,6 +10,7 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ['sandlike-mila-uncreditably.ngrok-free.dev'],
     port: 5173,
     proxy: {
       '/api': {
