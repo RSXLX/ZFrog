@@ -91,72 +91,132 @@ export function ChatPanel({ frogId, frogName, personality }: ChatPanelProps) {
     }
   }, [writeError]);
 
-  // 发送消息
+  // 发送消息（支持流式响应）
   const handleSend = async (text: string) => {
     // 添加用户消息
     setMessages(prev => [...prev, { role: 'user', content: text }]);
     setShowQuickReplies(false);
     setIsLoading(true);
 
-    try {
-      const response = await chatApi.sendMessage(frogId, text);
-      
-      // 添加青蛙回复
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: response.reply.content,
-        intent: response.reply.intent,
-        data: response.reply.data,
-      }]);
+    // 添加一个空的助手消息用于流式填充
+    const assistantMsgIndex = messages.length + 1; // 新消息的索引
+    setMessages(prev => [...prev, { role: 'assistant', content: '', intent: undefined, data: undefined }]);
 
-      // 处理 START_TRAVEL 行动
-      if (response.reply.intent === 'start_travel' && response.reply.data?.action === 'START_TRAVEL') {
-        const params = response.reply.data.travelParams;
-        
-        if (params && ZETAFROG_ADDRESS) {
-          setTravelParams(params);
+    let streamedContent = '';
+    let intentData: any = null;
+    let detectedIntent = '';
+
+    try {
+      // 使用流式API
+      chatApi.sendMessageStream(
+        frogId,
+        text,
+        undefined, // sessionId
+        // onChunk - 逐字更新
+        (chunk: string) => {
+          streamedContent += chunk;
+          setMessages(prev => {
+            const newMessages = [...prev];
+            const lastMsg = newMessages[newMessages.length - 1];
+            if (lastMsg?.role === 'assistant') {
+              lastMsg.content = streamedContent;
+            }
+            return newMessages;
+          });
+        },
+        // onComplete
+        (data) => {
+          setIsLoading(false);
+          detectedIntent = data.intent;
           
-          // 触发合约调用
-          try {
-            // @ts-ignore
-            writeContract({
-              address: ZETAFROG_ADDRESS,
-              abi: ZETAFROG_ABI,
-              functionName: 'startTravel',
-              args: [
-                BigInt(params.tokenId), 
-                params.targetWallet as `0x${string}`, 
-                BigInt(params.duration), 
-                BigInt(params.chainId)
-              ],
-            });
+          // 更新最后一条消息的 intent
+          setMessages(prev => {
+            const newMessages = [...prev];
+            const lastMsg = newMessages[newMessages.length - 1];
+            if (lastMsg?.role === 'assistant') {
+              lastMsg.intent = data.intent;
+            }
+            return newMessages;
+          });
+        },
+        // onError
+        (errorMsg: string) => {
+          setIsLoading(false);
+          setMessages(prev => {
+            const newMessages = [...prev];
+            const lastMsg = newMessages[newMessages.length - 1];
+            if (lastMsg?.role === 'assistant') {
+              lastMsg.content = '呱...出了点问题，等会再试试？';
+            }
+            return newMessages;
+          });
+        }
+      );
+    } catch (error) {
+      // 降级到非流式API
+      try {
+        const response = await chatApi.sendMessage(frogId, text);
+        
+        setMessages(prev => {
+          const newMessages = [...prev];
+          const lastMsg = newMessages[newMessages.length - 1];
+          if (lastMsg?.role === 'assistant') {
+            lastMsg.content = response.reply.content;
+            lastMsg.intent = response.reply.intent;
+            lastMsg.data = response.reply.data;
+          }
+          return newMessages;
+        });
+        
+        // 处理 START_TRAVEL 行动
+        if (response.reply.intent === 'start_travel' && response.reply.data?.action === 'START_TRAVEL') {
+          const params = response.reply.data.travelParams;
+          
+          if (params && ZETAFROG_ADDRESS) {
+            setTravelParams(params);
             
-            // 添加提示消息
+            try {
+              // @ts-ignore
+              writeContract({
+                address: ZETAFROG_ADDRESS,
+                abi: ZETAFROG_ABI,
+                functionName: 'startTravel',
+                args: [
+                  BigInt(params.tokenId), 
+                  params.targetWallet as `0x${string}`, 
+                  BigInt(params.duration), 
+                  BigInt(params.chainId)
+                ],
+              });
+              
+              setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: '🎒 正在打开钱包准备旅行...',
+              }]);
+            } catch (error) {
+              console.error('Contract write failed:', error);
+              setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: '呱...钱包好像打不开了，等会再试试？',
+              }]);
+            }
+          } else if (!ZETAFROG_ADDRESS) {
             setMessages(prev => [...prev, {
               role: 'assistant',
-              content: '🎒 正在打开钱包准备旅行...',
-            }]);
-          } catch (error) {
-            console.error('Contract write failed:', error);
-            setMessages(prev => [...prev, {
-              role: 'assistant',
-              content: '呱...钱包好像打不开了，等会再试试？',
+              content: '呱...合约地址没配置好，找管理员看看吧！',
             }]);
           }
-        } else if (!ZETAFROG_ADDRESS) {
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: '呱...合约地址没配置好，找管理员看看吧！',
-          }]);
         }
+      } catch {
+        setMessages(prev => {
+          const newMessages = [...prev];
+          const lastMsg = newMessages[newMessages.length - 1];
+          if (lastMsg?.role === 'assistant') {
+            lastMsg.content = '呱...出了点问题，等会再试试？';
+          }
+          return newMessages;
+        });
       }
-    } catch (error) {
-      // 错误处理
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: '呱...出了点问题，等会再试试？',
-      }]);
-    } finally {
       setIsLoading(false);
     }
   };

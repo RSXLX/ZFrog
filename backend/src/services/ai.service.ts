@@ -143,7 +143,7 @@ class AIService {
                             return {
                                 title: result.title,
                                 content: result.content,
-                                mood: result.mood || 'happy',
+                                mood: this.normalizeMood(result.mood || 'happy') as any,
                                 highlights: result.highlights || [],
                             };
                         }
@@ -154,7 +154,7 @@ class AIService {
                             return {
                                 title: `${frogName}的区块链冒险`,
                                 content: cleanContent,
-                                mood: 'happy',
+                                mood: this.normalizeMood('happy') as any,
                                 highlights: ['探索了区块链世界'],
                             };
                         }
@@ -182,6 +182,176 @@ class AIService {
             logger.error('AI generation failed:', error);
             return this.generateFallbackJournal(frogName, observation);
         }
+    }
+    
+    /**
+     * P0 探索旅行日记生成 - 基于 ExplorationResult 数据
+     * 统一 TravelP0Service 的 AI 调用入口
+     */
+    async generateJournalFromExploration(params: {
+        frogName: string;
+        chain: string;
+        chainId: number;
+        blockNumber: bigint;
+        snapshot: {
+            address: string;
+            nativeBalance: string;
+            nativeSymbol: string;
+            txCount: number;
+            walletAge: string;
+            isContract: boolean;
+            tokens: { symbol: string; balance: string }[];
+        };
+        discoveries: { type: string; title: string; description: string; rarity: number }[];
+        transactionContext?: { hash: string; method: string; value: string };
+        networkStatus?: { gasPrice: string };
+        souvenir: { name: string; emoji: string; description: string };
+    }): Promise<GeneratedJournal> {
+        const { frogName, chain, chainId, blockNumber, snapshot, discoveries, transactionContext, networkStatus, souvenir } = params;
+        const chainChar = this.getChainCharacter(chainId);
+        
+        logger.info(`[AI] Generating P0 exploration journal for ${frogName} on ${chain}`);
+        
+        // 构建探索专用 prompt
+        const prompt = `
+为小青蛙「${frogName}」写一篇旅行日记，它刚从 ${chain}${chainChar.emoji} 的探险归来。
+
+【探索目的地】
+- 链: ${chain} (区块 #${blockNumber})
+- 钱包: ${snapshot.address.slice(0, 10)}...
+- 链的氛围: ${chainChar.vibe}
+
+【观察到的情况】
+- 余额: ${snapshot.nativeBalance} ${snapshot.nativeSymbol}
+- 交易历史: ${snapshot.txCount} 笔
+- 钱包状态: ${snapshot.walletAge}
+${snapshot.isContract ? '- ⚠️ 这是一个智能合约地址！' : ''}
+${snapshot.tokens.length > 0 ? `- 持有代币: ${snapshot.tokens.map(t => `${t.balance} ${t.symbol}`).join(', ')}` : ''}
+${transactionContext ? `
+- 观察到的交易: ${transactionContext.method}
+- 交易值: ${transactionContext.value} ${snapshot.nativeSymbol}` : ''}
+${networkStatus ? `- 网络 Gas: ${networkStatus.gasPrice} Gwei` : ''}
+
+【旅途中的发现】
+${discoveries.map(d => `- [${d.type}] ${d.title}: ${d.description}`).join('\n')}
+
+【带回的纪念品】
+${souvenir.emoji} ${souvenir.name}: ${souvenir.description}
+
+请以第一人称写一篇 150-250 字的旅行日记，要求：
+1. 🐸 用可爱、天真的青蛙口吻
+2. 🌈 把区块链概念转化为生动比喻
+3. 🎁 提到带回的纪念品
+4. 😴 可以有点小情绪（开心/困/好奇等）
+
+请以 JSON 格式输出：
+{
+  "title": "日记标题（5-10个字）",
+  "content": "日记正文",
+  "mood": "HAPPY/CURIOUS/SURPRISED/PEACEFUL/EXCITED/SLEEPY",
+  "highlights": ["2-3个旅行亮点"]
+}`;
+
+        try {
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    const completion = await this.client.chat.completions.create({
+                        model: 'qwen-turbo',
+                        messages: [
+                            {
+                                role: 'system',
+                                content: `你是一个创意写手，为可爱的小青蛙"${frogName}"写旅行日记。
+用第一人称视角，语气俏皮温馨，偶尔带点区块链梗。
+把链上数据转化为青蛙能理解的有趣比喻。
+保持积极、天真的视角。必须返回有效的 JSON 格式。`
+                            },
+                            {
+                                role: 'user',
+                                content: prompt
+                            }
+                        ],
+                        temperature: 0.85,
+                        max_tokens: 1000,
+                    });
+                    
+                    const content = completion.choices[0]?.message?.content || '';
+                    const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
+                    
+                    try {
+                        const result = JSON.parse(cleanContent);
+                        if (result.title && result.content) {
+                            logger.info(`[AI] P0 exploration journal generated successfully`);
+                            return {
+                                title: result.title,
+                                content: result.content,
+                                mood: this.normalizeMood(result.mood || 'happy') as any,
+                                highlights: result.highlights || discoveries.slice(0, 3).map(d => d.title),
+                            };
+                        }
+                    } catch (parseError) {
+                        if (cleanContent && cleanContent.length > 50) {
+                            return {
+                                title: `${frogName}的${chain}探险`,
+                                content: cleanContent,
+                                mood: this.normalizeMood('happy') as any,
+                                highlights: discoveries.slice(0, 3).map(d => d.title),
+                            };
+                        }
+                    }
+                } catch (apiError) {
+                    logger.warn(`[AI] P0 exploration attempt ${attempt} failed:`, apiError);
+                    if (attempt < 3) {
+                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                    }
+                }
+            }
+            
+            // Fallback
+            return this.generateExplorationFallback(frogName, chainId, snapshot, discoveries, souvenir);
+        } catch (error) {
+            logger.error('[AI] P0 exploration journal generation failed:', error);
+            return this.generateExplorationFallback(frogName, chainId, snapshot, discoveries, souvenir);
+        }
+    }
+    
+    /**
+     * 探索日记降级方案
+     */
+    private generateExplorationFallback(
+        frogName: string,
+        chainId: number,
+        snapshot: { nativeBalance: string; txCount: number; isContract: boolean },
+        discoveries: { title: string }[],
+        souvenir: { name: string; emoji: string }
+    ): GeneratedJournal {
+        const chain = this.getChainCharacter(chainId);
+        const txLevel = snapshot.txCount === 0 ? 'silent' : snapshot.txCount < 5 ? 'low' : 'medium';
+        
+        const templates: Record<string, { title: string; content: string; mood: string }> = {
+            silent: {
+                title: `${frogName}的${chain.name}静思`,
+                content: `呱！亲爱的日记：\n\n今天我在${chain.name}${chain.emoji}进行了一次安静的探索。这里${chain.vibe}，虽然没有太多活动，但我感受到了区块链世界的脉搏。\n\n带回了${souvenir.emoji} ${souvenir.name}，好开心！\n\n🐸 ${frogName}`,
+                mood: 'PEACEFUL',
+            },
+            low: {
+                title: `${frogName}的小探险`,
+                content: `呱！亲爱的日记：\n\n在${chain.name}${chain.emoji}发现了一些有趣的东西！看到了 ${snapshot.txCount} 笔交易，${snapshot.isContract ? '还发现这是个智能合约地址！' : '感觉这个钱包挺活跃的。'}\n\n带回了${souvenir.emoji} ${souvenir.name}，今天真棒！\n\n🐸 ${frogName}`,
+                mood: 'HAPPY',
+            },
+            medium: {
+                title: `${chain.name}冒险记`,
+                content: `呱呱！今天的${chain.name}${chain.emoji}之旅太精彩了！\n\n看到了 ${snapshot.txCount} 笔交易，这里${chain.vibe}的氛围让我兴奋不已！${discoveries.length > 0 ? `我发现了${discoveries[0].title}！` : ''}\n\n带回了${souvenir.emoji} ${souvenir.name}，迫不及待想炫耀！\n\n🐸 ${frogName}`,
+                mood: 'EXCITED',
+            },
+        };
+        
+        const template = templates[txLevel];
+        return {
+            title: template.title,
+            content: template.content,
+            mood: this.normalizeMood(template.mood) as any,
+            highlights: discoveries.slice(0, 3).map(d => d.title),
+        };
     }
     
     /**
@@ -221,7 +391,7 @@ class AIService {
                             return {
                                 title: result.title,
                                 content: result.content,
-                                mood: result.mood || 'adventurous',
+                                mood: this.normalizeMood(result.mood || 'adventurous') as any,
                                 highlights: result.highlights || [],
                             };
                         }
@@ -230,7 +400,7 @@ class AIService {
                             return {
                                 title: `${context.frog.name}的${context.chain.name}奇遇`,
                                 content: cleanContent,
-                                mood: 'adventurous',
+                                mood: this.normalizeMood('adventurous') as any,
                                 highlights: ['探索了区块链世界'],
                             };
                         }
@@ -375,7 +545,7 @@ ${context.footprints.map(fp => `- 在 ${fp.location.slice(0,8)}... 留言: "${fp
         
         content += `\n\n这次冒险真是太棒了！\n\n🐸 ${frog.name}`;
         
-        return { title, content, mood, highlights };
+        return { title, content, mood: this.normalizeMood(mood) as any, highlights };
     }
     
     private buildPrompt(
@@ -448,119 +618,236 @@ ${isRandom ? '重点强调：这种“意外发现”带来的惊喜感和奇妙
 `;
     }
     
+    /**
+     * Mood 映射 - 将 AI 返回的各种 mood 统一转换为标准 DiaryMood
+     */
+    private normalizeMood(aiMood: string): 'HAPPY' | 'CURIOUS' | 'SURPRISED' | 'PEACEFUL' | 'EXCITED' | 'SLEEPY' {
+        const moodMap: Record<string, 'HAPPY' | 'CURIOUS' | 'SURPRISED' | 'PEACEFUL' | 'EXCITED' | 'SLEEPY'> = {
+            // 小写形式
+            'happy': 'HAPPY',
+            'excited': 'EXCITED',
+            'thoughtful': 'CURIOUS',
+            'adventurous': 'EXCITED',
+            'tired': 'SLEEPY',
+            // 大写形式
+            'HAPPY': 'HAPPY',
+            'EXCITED': 'EXCITED',
+            'CURIOUS': 'CURIOUS',
+            'SURPRISED': 'SURPRISED',
+            'PEACEFUL': 'PEACEFUL',
+            'SLEEPY': 'SLEEPY',
+            'TIRED': 'SLEEPY',
+            'MELANCHOLIC': 'PEACEFUL',
+        };
+        return moodMap[aiMood] || 'HAPPY';
+    }
+
+    /**
+     * 链特性定义
+     */
+    private getChainCharacter(chainId: number): { name: string; emoji: string; vibe: string } {
+        const chains: Record<number, { name: string; emoji: string; vibe: string }> = {
+            1: { name: '以太坊', emoji: '💎', vibe: '古老而庄严' },
+            56: { name: 'BNB Chain', emoji: '🌅', vibe: '热闹繁华' },
+            97: { name: 'BSC测试网', emoji: '🏖️', vibe: '轻松自在' },
+            137: { name: 'Polygon', emoji: '🟣', vibe: '快速高效' },
+            80002: { name: 'Polygon Amoy', emoji: '🌊', vibe: '清新活力' },
+            11155111: { name: 'Sepolia', emoji: '🧪', vibe: '充满实验感' },
+            7001: { name: 'ZetaChain', emoji: '⚡', vibe: '跨链闪电' },
+        };
+        return chains[chainId] || { name: `Chain ${chainId}`, emoji: '🌐', vibe: '神秘未知' };
+    }
+
     private generateFallbackJournal(
         frogName: string,
         observation: ObservationResult
     ): GeneratedJournal {
         const txCount = observation.totalTxCount;
+        const chain = this.getChainCharacter(observation.chainId || 1);
         
-        // 获取链名称
-        const getChainName = (chainId: number): string => {
-          const chainNames: Record<number, string> = {
-            1: '以太坊',
-            56: 'BNB Chain',
-            97: 'BSC测试网',
-            137: 'Polygon',
-            80002: 'Polygon Amoy测试网',
-            11155111: 'Sepolia测试网',
-            7001: 'ZetaChain',
-          };
-          return chainNames[chainId] || `链${chainId}`;
+        // 多变体模板 - 每种活跃度 3 个模板随机选择
+        const templates: Record<string, Array<{ title: string; content: string; mood: string; highlights: string[] }>> = {
+            silent: [
+                {
+                    title: `${frogName}的${chain.name}静思之旅`,
+                    content: `呱！亲爱的日记：\n\n今天我在${chain.name}${chain.emoji}的区块链世界里度过了一段宁静的时光。就像坐在一片平静的荷叶上，我静静观察着数字世界的流动。虽然没有看到太多交易，但这种宁静让我能更好地感受区块链的本质。\n\n${chain.name}给我的感觉是${chain.vibe}的。\n\n🐸 ${frogName}`,
+                    mood: 'PEACEFUL',
+                    highlights: [`体验了${chain.name}的宁静`, '感受区块链脉搏', '享受慢时光'],
+                },
+                {
+                    title: `${chain.name}的宁静午后`,
+                    content: `呱～今天在${chain.name}${chain.emoji}晃悠了好久好久...\n\n这里安静得可以听到自己的心跳呢！链上的交易寥寥无几，就像一潭静水。我趴在一个区块上打了个盹，梦见自己变成了一个小小的交易数据，在链上自由流动～\n\n睡醒发现太阳都要下山了，该回家啦！\n\n🐸 ${frogName}`,
+                    mood: 'SLEEPY',
+                    highlights: ['享受宁静时光', '区块上打盹', '感受链的心跳'],
+                },
+                {
+                    title: `${frogName}冥想之旅`,
+                    content: `呱...（轻声）\n\n今天我决定在${chain.name}${chain.emoji}进行一次冥想之旅。闭上眼睛，感受区块一个接一个地生成，虽然几乎没有交易，但这种${chain.vibe}的氛围让我内心平静。\n\n或许这就是区块链的另一种美好吧～\n\n🐸 ${frogName}`,
+                    mood: 'PEACEFUL',
+                    highlights: ['冥想体验', `感受${chain.name}氛围`, '内心平静'],
+                },
+            ],
+            low: [
+                {
+                    title: `${frogName}的${chain.name}初探`,
+                    content: `呱！亲爱的日记：\n\n今天我在${chain.name}${chain.emoji}上看到了 ${txCount} 笔交易，就像发现了 ${txCount} 颗闪闪发光的露珠！每一笔交易都像一个小故事，让我着迷地观察着。\n\n这里${chain.vibe}的感觉让我很舒服～\n\n🐸 ${frogName}`,
+                    mood: 'HAPPY',
+                    highlights: [`发现${txCount}笔交易`, `初识${chain.name}`, '收获满满'],
+                },
+                {
+                    title: `${chain.name}的小发现`,
+                    content: `呱呱！今天运气不错～\n\n在${chain.name}${chain.emoji}逛了一圈，虽然只看到 ${txCount} 笔交易，但每一笔都很有意思！有人在转账，有人在和合约互动...\n\n虽然不多，但质量很高呢！感觉自己像个链上侦探～\n\n🐸 ${frogName}`,
+                    mood: 'CURIOUS',
+                    highlights: ['链上侦探体验', `观察${txCount}笔交易`, '质量优先'],
+                },
+                {
+                    title: `悠闲的${chain.name}漫步`,
+                    content: `呱～今天的${chain.name}${chain.emoji}不太忙呢！\n\n我慢悠悠地从一个区块跳到另一个区块，数着看到的交易：一笔、两笔...\n总共 ${txCount} 笔！虽然不多，但每一笔我都认真看过了。这种${chain.vibe}的氛围真让蛙放松～\n\n🐸 ${frogName}`,
+                    mood: 'PEACEFUL',
+                    highlights: ['悠闲漫步', '认真观察每笔交易', '放松心情'],
+                },
+            ],
+            medium: [
+                {
+                    title: `${frogName}的${chain.name}冒险`,
+                    content: `呱！亲爱的日记：\n\n哇！${chain.name}${chain.emoji}今天真热闹！我看到了整整 ${txCount} 笔交易，就像参加了一场盛大的荷叶派对！\n\n交易来来往往，每一笔都充满了活力。这里${chain.vibe}的感觉太棒了！我努力记录下每一个精彩瞬间～\n\n🐸 ${frogName}`,
+                    mood: 'EXCITED',
+                    highlights: [`见证${txCount}笔交易`, `${chain.name}派对`, '探险家体验'],
+                },
+                {
+                    title: `${chain.name}嘉年华！`,
+                    content: `呱呱呱！今天太刺激了！\n\n${chain.name}${chain.emoji}简直像在办嘉年华！${txCount} 笔交易此起彼伏，我左看看右看看，眼睛都不够用了！\n\n有大额转账、有 NFT 交易、还有 DeFi 操作...这种${chain.vibe}的氛围让我兴奋不已！\n\n🐸 ${frogName}`,
+                    mood: 'EXCITED',
+                    highlights: ['嘉年华体验', '多样化交易', '兴奋不已'],
+                },
+                {
+                    title: `繁忙的${chain.name}日记`,
+                    content: `呱！好忙好忙的一天！\n\n在${chain.name}${chain.emoji}跳来跳去，累得我小腿都酸了！但是值得，因为我看到了 ${txCount} 笔精彩的交易！\n\n每个区块都塞得满满的，${chain.vibe}的感觉真是名不虚传呢～\n\n🐸 ${frogName}`,
+                    mood: 'HAPPY',
+                    highlights: [`观察${txCount}笔交易`, '繁忙但值得', '满载而归'],
+                },
+            ],
+            high: [
+                {
+                    title: `${frogName}的${chain.name}奇遇`,
+                    content: `呱！亲爱的日记：\n\n天哪！${chain.name}${chain.emoji}简直太疯狂了！整整 ${txCount} 笔交易！就像整个区块链世界都在开派对！\n\n我被这股${chain.vibe}的热潮深深吸引，虽然有点眼花缭乱，但这种激动人心的体验让我终生难忘！\n\n🐸 ${frogName}`,
+                    mood: 'EXCITED',
+                    highlights: [`震撼的${txCount}笔交易`, `${chain.name}狂欢`, '终生难忘'],
+                },
+                {
+                    title: `${chain.name}大爆发！`,
+                    content: `呱呱呱呱呱！！！\n\n我的天啊！${chain.name}${chain.emoji}今天是要上天吗？？${txCount} 笔交易！我都数不过来了！\n\n到处都是闪闪发光的交易记录，感觉自己像掉进了数字银河系！${chain.vibe}的能量快要把我冲飞了！\n\n太！刺！激！了！\n\n🐸 一个被吓到的${frogName}`,
+                    mood: 'SURPRISED',
+                    highlights: ['交易大爆发', '数字银河体验', '震惊小蛙'],
+                },
+                {
+                    title: `疯狂的链上之夜`,
+                    content: `呱...我现在还没缓过来...\n\n${chain.name}${chain.emoji}今天的活跃度简直破纪录！${txCount} 笔交易接连不断，我看得眼睛都花了！\n\n这种${chain.vibe}的疯狂让我既兴奋又有点累...但是！这就是区块链的魅力啊！下次我还来！\n\n🐸 累并快乐的${frogName}`,
+                    mood: 'EXCITED',
+                    highlights: ['破纪录活跃度', '累并快乐', '难忘体验'],
+                },
+            ],
         };
         
-        const chainName = getChainName(observation.chainId || 1);
+        // 根据交易数量选择模板组
+        let templateGroup: Array<{ title: string; content: string; mood: string; highlights: string[] }>;
+        if (txCount === 0) {
+            templateGroup = templates.silent;
+        } else if (txCount < 5) {
+            templateGroup = templates.low;
+        } else if (txCount < 20) {
+            templateGroup = templates.medium;
+        } else {
+            templateGroup = templates.high;
+        }
         
-        // 动态生成内容，减少硬编码
+        // 随机选择一个模板
+        const selected = templateGroup[Math.floor(Math.random() * templateGroup.length)];
+        return {
+            title: selected.title,
+            content: selected.content,
+            mood: this.normalizeMood(selected.mood) as any,
+            highlights: selected.highlights,
+        };
+    }
+    
+    /**
+     * 生成聊天回复（供 ChatService 调用）
+     * 统一使用此方法进行聊天 AI 调用，避免重复创建客户端
+     */
+    async generateChatResponse(
+        systemPrompt: string,
+        userPrompt: string,
+        options?: {
+            temperature?: number;
+            maxTokens?: number;
+        }
+    ): Promise<string> {
+        const temperature = options?.temperature ?? 0.8;
+        const maxTokens = options?.maxTokens ?? 500;
         
-                const generateDynamicContent = (txCount: number, chainName: string): { title: string; content: string; mood: string; highlights: string[] } => {
+        try {
+            const completion = await this.client.chat.completions.create({
+                model: 'qwen-turbo',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                temperature,
+                max_tokens: maxTokens,
+            });
+            
+            const content = completion.choices[0]?.message?.content || '';
+            
+            if (!content || content.length < 10) {
+                logger.warn('[AI] Chat response too short, returning empty');
+                return '';
+            }
+            
+            return content;
+        } catch (error) {
+            logger.error('[AI] Chat response generation failed:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * 流式生成聊天回复（SSE 支持）
+     */
+    async *generateChatResponseStream(
+        systemPrompt: string,
+        userPrompt: string,
+        options?: {
+            temperature?: number;
+            maxTokens?: number;
+        }
+    ): AsyncGenerator<string, void, unknown> {
+        const temperature = options?.temperature ?? 0.8;
+        const maxTokens = options?.maxTokens ?? 500;
         
-                    const templates = {
-        
-                        0: {
-        
-                            title: `${frogName}的${chainName}静思之旅`,
-        
-                            content: `呱！亲爱的日记：\n\n今天我在${chainName}的区块链世界里度过了一段宁静的时光。就像坐在一片平静的荷叶上，我静静观察着数字世界的流动。虽然没有看到太多交易，但这种宁静让我能更好地感受区块链的本质。每一秒的等待都像是在聆听区块链的心跳。我很高兴体验了这份独特的宁静！\n\n🐸 ${frogName}`,
-        
-                            mood: 'thoughtful',
-        
-                            highlights: [`体验了${chainName}的宁静`, '感受区块链本质', '静心观察时光'],
-        
-                        },
-        
-                        low: {
-        
-                            title: `${frogName}的${chainName}初探`,
-        
-                            content: `呱！亲爱的日记：\n\n今天我在${chainName}上看到了 ${txCount} 笔交易，就像发现了 ${txCount} 颗闪闪发光的露珠！每一笔交易都像一个小故事，让我着迷地观察着。虽然不算太热闹，但这种恰到好处的活动让我感觉很舒服。我学到了很多关于${chainName}的知识！\n\n🐸 ${frogName}`,
-        
-                            mood: 'happy',
-        
-                            highlights: [`发现了${txCount}笔交易`, `初识${chainName}`, '收获满满'],
-        
-                        },
-        
-                        medium: {
-        
-                            title: `${frogName}的${chainName}冒险`,
-        
-                            content: `呱！亲爱的日记：\n\n哇！${chainName}今天真热闹！我看到了整整 ${txCount} 笔交易，就像参加了一场盛大的荷叶派对！交易来来往往，每一笔都充满了活力。我努力记录下每一个精彩瞬间，感觉自己像个真正的区块链探险家。这次冒险太精彩了！\n\n🐸 ${frogName}`,
-        
-                            mood: 'excited',
-        
-                            highlights: [`见证了${txCount}笔交易`, `${chainName}热闹非凡`, '探险家体验'],
-        
-                        },
-        
-                        high: {
-        
-                            title: `${frogName}的${chainName}奇遇`,
-        
-                            content: `呱！亲爱的日记：\n\n天哪！${chainName}简直太疯狂了！整整 ${txCount} 笔交易！就像整个区块链世界都在开派对！我被这股热潮深深吸引，感觉自己像个超级明星一样受欢迎。虽然有点眼花缭乱，但这种激动人心的体验让我终生难忘！\n\n🐸 ${frogName}`,
-        
-                            mood: 'adventurous',
-        
-                            highlights: [`震撼的${txCount}笔交易`, `${chainName}狂欢体验`, '终生难忘的冒险'],
-        
-                        }
-        
-                    };
-        
-        
-        
-                    let template;
-        
-                    if (txCount === 0) template = templates[0];
-        
-                    else if (txCount < 5) template = templates.low;
-        
-                    else if (txCount < 20) template = templates.medium;
-        
-                    else template = templates.high;
-        
-        
-        
-                    return template;
-        
-                };
-        
-        
-        
-                const dynamicContent = generateDynamicContent(txCount, chainName);
-        
-                
-        
-                return {
-        
-                    title: dynamicContent.title,
-        
-                    content: dynamicContent.content,
-        
-                    mood: dynamicContent.mood as any,
-        
-                    highlights: dynamicContent.highlights,
-        
-                };    }
+        try {
+            const stream = await this.client.chat.completions.create({
+                model: 'qwen-turbo',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                temperature,
+                max_tokens: maxTokens,
+                stream: true,
+            });
+            
+            for await (const chunk of stream) {
+                const content = chunk.choices[0]?.delta?.content;
+                if (content) {
+                    yield content;
+                }
+            }
+        } catch (error) {
+            logger.error('[AI] Chat stream generation failed:', error);
+            throw error;
+        }
+    }
 }
 
 export const aiService = new AIService();

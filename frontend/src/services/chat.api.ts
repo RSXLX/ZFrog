@@ -109,5 +109,89 @@ export const chatApi = {
   async createSession(frogId: number): Promise<{ sessionId: number; frogId: number; createdAt: string }> {
     const response = await api.post('/chat/session', { frogId });
     return response.data;
+  },
+
+  /**
+   * 流式发送消息给青蛙（SSE）
+   */
+  sendMessageStream(
+    frogId: number,
+    message: string,
+    sessionId?: number,
+    onChunk?: (chunk: string) => void,
+    onComplete?: (data: { sessionId: number; intent: string; frogMood: string }) => void,
+    onError?: (error: string) => void
+  ): AbortController {
+    const controller = new AbortController();
+    
+    // 获取钱包地址
+    let ownerAddress = '0x0000000000000000000000000000000000000000';
+    try {
+      if (typeof window !== 'undefined' && (window as any).ethereum) {
+        (window as any).ethereum.request({ method: 'eth_accounts' }).then((accounts: string[]) => {
+          if (accounts?.length > 0) ownerAddress = accounts[0];
+        }).catch(() => {});
+      }
+    } catch {}
+    
+    // 使用 fetch 发起流式请求
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    
+    fetch(`${baseUrl}/chat/message/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ frogId, message, sessionId, ownerAddress }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error('Stream request failed');
+        }
+        
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        
+        if (!reader) {
+          throw new Error('No reader available');
+        }
+        
+        let buffer = '';
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          
+          // 解析 SSE 数据
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || '';
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const event = JSON.parse(line.slice(6));
+                
+                if (event.type === 'chunk' && onChunk) {
+                  onChunk(event.data.content);
+                } else if (event.type === 'done' && onComplete) {
+                  onComplete(event.data);
+                } else if (event.type === 'error' && onError) {
+                  onError(event.data.message);
+                }
+              } catch (e) {
+                console.warn('Failed to parse SSE event:', line);
+              }
+            }
+          }
+        }
+      })
+      .catch((error) => {
+        if (error.name !== 'AbortError' && onError) {
+          onError(error.message);
+        }
+      });
+    
+    return controller;
   }
 };

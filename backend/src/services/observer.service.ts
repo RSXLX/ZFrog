@@ -95,12 +95,20 @@ class ObserverService {
     let totalValueWei = BigInt(0);
     
     try {
-      // 1. 获取时间范围内的区块
-      const fromBlock = await this.getBlockNumberByTimestamp(client, fromTime);
-      const toBlock = await this.getBlockNumberByTimestamp(client, toTime);
+      // 1. 获取原生代币余额
+      let nativeBalance: string | undefined;
+      try {
+        const balance = await client.getBalance({ address });
+        nativeBalance = formatEther(balance);
+      } catch (balanceError) {
+        logger.warn(`Failed to get native balance: ${balanceError}`);
+      }
       
-      // 2. 查询转账事件 (ERC-20 Transfer)
-      // 注意: 不同链转账事件可能不同，但 ERC20 是标准的
+      // 2. 获取时间范围内的区块
+      const fromBlock = await this.getBlockNumberByTimestamp(client, fromTime, chainId);
+      const toBlock = await this.getBlockNumberByTimestamp(client, toTime, chainId);
+      
+      // 3. 查询转账事件 (ERC-20 Transfer)
       const transferLogs = await client.getLogs({
         event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 value)'),
         args: {
@@ -110,7 +118,7 @@ class ObserverService {
         toBlock: BigInt(toBlock),
       });
       
-      // 3. 处理发送交易 (逻辑简化，仅处理 ERC20 logs)
+      // 4. 处理发送交易
       for (const log of transferLogs.slice(0, 20)) {
         const value = (log as any).args.value || BigInt(0);
         totalValueWei += value;
@@ -123,7 +131,7 @@ class ObserverService {
           to: (log as any).args.to,
         });
         
-        // 检查大额转账 (Threshold varies by chain, simple default > 100 tokens)
+        // 检查大额转账 (> 100 tokens)
         if (value > BigInt(100) * BigInt(10 ** 18)) { 
           notableEvents.push({
             type: 'large_transfer',
@@ -134,7 +142,7 @@ class ObserverService {
         }
       }
       
-      logger.info(`Observation complete: ${transactions.length} transactions found`);
+      logger.info(`Observation complete: ${transactions.length} transactions found, balance: ${nativeBalance || 'unknown'}`);
       
       return {
         walletAddress,
@@ -145,6 +153,7 @@ class ObserverService {
         notableEvents,
         observedFrom: fromTime,
         observedTo: toTime,
+        nativeBalance,  // 新增：填充原生代币余额
       };
       
     } catch (error) {
@@ -163,14 +172,28 @@ class ObserverService {
     }
   }
   
-  private async getBlockNumberByTimestamp(client: any, timestamp: Date): Promise<number> {
+  /**
+   * 根据时间戳估算区块号
+   * 使用链特定的出块时间进行更精确的计算
+   */
+  private async getBlockNumberByTimestamp(client: any, timestamp: Date, chainId: number): Promise<number> {
     const currentBlock = await client.getBlockNumber();
     const currentTime = Date.now() / 1000;
     const targetTime = timestamp.getTime() / 1000;
     
-    // Avg block times: Eth ~12s, Poly ~2s, BSC ~3s
-    // Use conservative 12s for all for MVP safety
-    const blockDiff = Math.floor((currentTime - targetTime) / 5); 
+    // 链特定的平均出块时间 (秒)
+    const blockTimes: Record<number, number> = {
+      1: 12,       // Ethereum Mainnet
+      56: 3,       // BNB Chain
+      97: 3,       // BSC Testnet
+      137: 2,      // Polygon
+      80002: 2,    // Polygon Amoy
+      11155111: 12, // Sepolia
+      7001: 1,     // ZetaChain
+    };
+    const avgBlockTime = blockTimes[chainId] || 12;
+    
+    const blockDiff = Math.floor((currentTime - targetTime) / avgBlockTime); 
     
     return Math.max(0, Number(currentBlock) - blockDiff);
   }

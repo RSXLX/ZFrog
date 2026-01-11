@@ -62,6 +62,50 @@ router.post('/message', async (req, res) => {
 });
 
 /**
+ * POST /api/chat/message/stream
+ * 流式发送消息给青蛙（SSE）
+ */
+router.post('/message/stream', async (req, res) => {
+  try {
+    const { frogId, message, sessionId, ownerAddress } = req.body;
+    
+    if (!frogId || !message) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameters: frogId, message'
+      });
+    }
+    
+    const userAddress = ownerAddress || '0x0000000000000000000000000000000000000000';
+    
+    // 设置 SSE 响应头
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // 禁用 nginx 缓冲
+    
+    // 流式处理
+    const stream = chatService.processMessageStream(
+      frogId,
+      userAddress,
+      message,
+      sessionId
+    );
+    
+    for await (const event of stream) {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    }
+    
+    res.end();
+    
+  } catch (error) {
+    console.error('Error in chat stream:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', data: { message: 'Stream error' } })}\n\n`);
+    res.end();
+  }
+});
+
+/**
  * GET /api/chat/history/:sessionId
  * 获取聊天历史
  */

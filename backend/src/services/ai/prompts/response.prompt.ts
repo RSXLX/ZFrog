@@ -1,6 +1,7 @@
 // backend/src/services/ai/prompts/response.prompt.ts
 
 import { ChatIntent } from '@prisma/client';
+import { ChatContext } from '../context.service';
 
 /**
  * 构建回复生成提示词
@@ -8,7 +9,8 @@ import { ChatIntent } from '@prisma/client';
 export function buildResponsePrompt(
   userMessage: string,
   intent: ChatIntent,
-  data: any
+  data: any,
+  context?: ChatContext
 ): string {
   
   let dataContext = '';
@@ -84,16 +86,92 @@ ${tokens.slice(0, 5).map((t: any) =>
 - 查价格：问"ETH多少钱"
 - 查资产：问"我有什么"
 - 青蛙状态：问"青蛙在干嘛"
-- 旅行信息：问"去了哪里"`;
+- 旅行信息：问"去了哪里"
+- 好友列表：问"我的好友"
+- 纪念品：问"我的纪念品"
+- 徽章：问"我的徽章"
+- 家园：问"去家园"`;
+      break;
+      
+    case 'travel_stats':
+      if (data) {
+        dataContext = `
+## 旅行统计
+- 总旅行次数：${data.totalTravels || 0}
+- 总行走距离：${data.totalDistance || 0}
+- 总获得经验：${data.totalXp || 0}`;
+      } else {
+        dataContext = '## 旅行统计\n暂无旅行记录';
+      }
+      break;
+      
+    case 'friend_list':
+      if (data?.friends?.length > 0) {
+        dataContext = `
+## 好友列表（共 ${data.count} 位）
+${data.friends.slice(0, 5).map((f: any) => `- 好友ID: ${f.requesterId || f.addresseeId}`).join('\n')}`;
+      } else {
+        dataContext = '## 好友列表\n还没有好友，快去交朋友吧！';
+      }
+      break;
+      
+    case 'friend_add':
+    case 'friend_visit':
+      dataContext = data?.message || '好的，帮你处理~';
+      break;
+      
+    case 'souvenirs_query':
+      if (data?.souvenirs?.length > 0) {
+        dataContext = `
+## 纪念品（共 ${data.count} 件）
+${data.souvenirs.slice(0, 3).map((s: any) => `- ${s.type}: ${s.name || '未命名'}`).join('\n')}`;
+      } else {
+        dataContext = '## 纪念品\n还没有纪念品，去旅行收集更多吧！';
+      }
+      break;
+      
+    case 'badges_query':
+      if (data?.badges?.length > 0) {
+        dataContext = `
+## 徽章成就（共 ${data.count} 枚）
+${data.badges.slice(0, 3).map((b: any) => `- ${b.badge?.name || '未知徽章'}`).join('\n')}`;
+      } else {
+        dataContext = '## 徽章\n还没有获得徽章，继续探索吧！';
+      }
+      break;
+      
+    case 'garden_query':
+    case 'messages_query':
+    case 'navigate':
+      if (data?.action === 'NAVIGATE') {
+        dataContext = `【导航提示】${data.message || '准备带你去~'}`;
+      } else if (data?.messages?.length > 0) {
+        dataContext = `## 最近留言（${data.count} 条）\n有新留言等你查看！`;
+      } else {
+        dataContext = data?.message || '好的~';
+      }
       break;
       
     default:
       dataContext = '（无特定数据，自由发挥即可）';
   }
   
-  return `用户说：「${userMessage}」
+  // 构建历史对话部分（新增）
+  let historySection = '';
+  if (context && context.recentMessages.length > 0) {
+    const historyLines = context.recentMessages.slice(-5).map(msg => {
+      const prefix = msg.role === 'user' ? '用户' : '青蛙';
+      return `${prefix}: ${msg.content.slice(0, 100)}`;
+    });
+    historySection = `
+## 对话历史（最近几轮）
+${historyLines.join('\n')}
+`;
+  }
+  
+  return `${historySection}用户说：「${userMessage}」
 
 ${dataContext}
 
-请根据你的性格，用简洁有趣的方式回复用户。记住以「呱」开头！`;
+请根据你的性格，用简洁有趣的方式回复用户。记住以「呱」开头！${context?.recentMessages.length ? '\n注意保持对话连贯性。' : ''}`;
 }

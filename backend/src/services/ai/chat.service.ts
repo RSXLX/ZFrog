@@ -2,6 +2,7 @@
 
 import { PrismaClient, ChatIntent, Personality, FrogStatus } from '@prisma/client';
 import { IntentService } from './intent.service';
+import { contextService, ChatContext } from './context.service';
 import { PriceService } from '../defi/price.service';
 import { AssetService } from '../defi/asset.service';
 import { aiService } from '../ai.service';
@@ -71,18 +72,35 @@ export class ChatService {
     // 3. 保存用户消息
     await this.saveMessage(session.id, 'user', userMessage);
     
-    // 4. 识别意图
-    const intentResult = await this.intentService.classifyIntent(userMessage);
+    // 4. 获取上下文（新增）
+    const context = await contextService.getContext(session.id);
     
-    // 5. 根据意图获取数据
+    // 5. 识别意图（结合上下文推断）
+    let intentResult = await this.intentService.classifyIntent(userMessage);
+    
+    // 如果意图不明确但需要上下文引用，尝试从上下文推断
+    if (intentResult.intent === 'chitchat' && contextService.needsContextReference(userMessage)) {
+      const inferred = contextService.inferFromContext(context, userMessage);
+      if (inferred.inferredIntent) {
+        intentResult = {
+          intent: inferred.inferredIntent,
+          confidence: 0.7,
+          params: { ...intentResult.params, ...inferred.inferredParams }
+        };
+        logger.info(`[Chat] Inferred intent from context: ${inferred.inferredIntent}`);
+      }
+    }
+    
+    // 6. 根据意图获取数据
     const intentData = await this.fetchIntentData(intentResult, ownerAddress, frogId);
     
-    // 6. 生成青蛙回复
+    // 7. 生成青蛙回复（传入上下文）
     const reply = await this.generateReply(
       frog,
       userMessage,
       intentResult,
-      intentData
+      intentData,
+      context  // 新增参数
     );
     
     // 7. 保存青蛙回复
@@ -103,6 +121,118 @@ export class ChatService {
         data: intentData
       },
       frogMood: this.determineMood(intentResult.intent)
+    };
+  }
+  
+  /**
+   * 流式处理用户消息（SSE 支持）
+   */
+  async *processMessageStream(
+    frogIdOrTokenId: number,
+    ownerAddress: string,
+    userMessage: string,
+    sessionId?: number
+  ): AsyncGenerator<{ type: string; data: any }, void, unknown> {
+    
+    // 1. 查找青蛙
+    let frog = await this.prisma.frog.findUnique({
+      where: { tokenId: frogIdOrTokenId }
+    });
+    
+    if (!frog) {
+      frog = await this.prisma.frog.findUnique({
+        where: { id: frogIdOrTokenId }
+      });
+    }
+    
+    if (!frog) {
+      yield { type: 'error', data: { message: `Frog not found` } };
+      return;
+    }
+    
+    if (frog.ownerAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
+      yield { type: 'error', data: { message: `Not authorized` } };
+      return;
+    }
+    
+    const frogId = frog.id;
+    
+    // 2. 获取或创建会话
+    const session = await this.getOrCreateSession(frogId, ownerAddress, sessionId);
+    yield { type: 'session', data: { sessionId: session.id } };
+    
+    // 3. 保存用户消息
+    await this.saveMessage(session.id, 'user', userMessage);
+    
+    // 4. 获取上下文
+    const context = await contextService.getContext(session.id);
+    
+    // 5. 识别意图
+    let intentResult = await this.intentService.classifyIntent(userMessage);
+    
+    if (intentResult.intent === 'chitchat' && contextService.needsContextReference(userMessage)) {
+      const inferred = contextService.inferFromContext(context, userMessage);
+      if (inferred.inferredIntent) {
+        intentResult = {
+          intent: inferred.inferredIntent,
+          confidence: 0.7,
+          params: { ...intentResult.params, ...inferred.inferredParams }
+        };
+      }
+    }
+    
+    yield { type: 'intent', data: { intent: intentResult.intent } };
+    
+    // 6. 获取意图数据
+    const intentData = await this.fetchIntentData(intentResult, ownerAddress, frogId);
+    
+    if (intentData) {
+      yield { type: 'data', data: intentData };
+    }
+    
+    // 7. 构建提示词
+    const systemPrompt = buildSystemPrompt(frog.name, frog.personality);
+    const responsePrompt = buildResponsePrompt(
+      userMessage,
+      intentResult.intent,
+      intentData,
+      context
+    );
+    
+    // 8. 流式生成回复
+    let fullContent = '';
+    try {
+      for await (const chunk of aiService.generateChatResponseStream(
+        systemPrompt,
+        responsePrompt,
+        { temperature: 0.8, maxTokens: 500 }
+      )) {
+        fullContent += chunk;
+        yield { type: 'chunk', data: { content: chunk } };
+      }
+    } catch (error) {
+      // fallback
+      fullContent = this.getFallbackResponse(intentResult.intent, frog.personality);
+      yield { type: 'chunk', data: { content: fullContent } };
+    }
+    
+    // 9. 保存回复
+    await this.saveMessage(
+      session.id,
+      'assistant',
+      fullContent,
+      intentResult.intent,
+      intentResult.params
+    );
+    
+    // 10. 发送完成信号
+    yield { 
+      type: 'done', 
+      data: { 
+        sessionId: session.id,
+        intent: intentResult.intent,
+        frogMood: this.determineMood(intentResult.intent)
+      } 
     };
   }
   
@@ -284,6 +414,118 @@ export class ChatService {
           }
           return { error: '缺少青蛙ID' };
           
+        // =========== 新增意图处理 ===========
+        
+        case 'travel_stats':
+          if (frogId) {
+            const stats = await this.prisma.frogTravelStats.findUnique({
+              where: { frogId }
+            });
+            return stats || { message: '暂无旅行统计数据' };
+          }
+          return null;
+          
+        case 'friend_list':
+          if (frogId) {
+            const frog = await this.prisma.frog.findUnique({
+              where: { id: frogId }
+            });
+            if (frog) {
+              const friendships = await this.prisma.friendship.findMany({
+                where: {
+                  OR: [
+                    { requesterId: frog.tokenId, status: 'Accepted' },
+                    { addresseeId: frog.tokenId, status: 'Accepted' }
+                  ]
+                },
+                take: 10
+              });
+              return { friends: friendships, count: friendships.length };
+            }
+          }
+          return { friends: [], count: 0 };
+          
+        case 'friend_add':
+          // 返回前端处理提示
+          return { 
+            action: 'NAVIGATE',
+            target: '/friends',
+            message: '可以在好友页面搜索并添加好友哦！'
+          };
+          
+        case 'friend_visit':
+          const targetName = intentResult.params?.targetName;
+          if (targetName) {
+            // 尝试搜索好友
+            const targetFrog = await this.prisma.frog.findFirst({
+              where: { 
+                name: { contains: targetName, mode: 'insensitive' }
+              }
+            });
+            if (targetFrog) {
+              return {
+                action: 'NAVIGATE',
+                target: `/visit/${targetFrog.ownerAddress}`,
+                message: `找到了 ${targetFrog.name}！点击可以去拜访~`
+              };
+            }
+          }
+          return { message: '没找到这位朋友，试试在好友页面查找？' };
+          
+        case 'souvenirs_query':
+          if (frogId) {
+            const souvenirs = await this.prisma.souvenir.findMany({
+              where: { frogId },
+              take: 5,
+              orderBy: { createdAt: 'desc' }
+            });
+            return { souvenirs, count: souvenirs.length };
+          }
+          return { souvenirs: [], count: 0 };
+          
+        case 'badges_query':
+          if (frogId) {
+            const frog = await this.prisma.frog.findUnique({ where: { id: frogId } });
+            if (frog) {
+              const badges = await this.prisma.userBadge.findMany({
+                where: { frogId: frog.tokenId },
+                include: { badge: true },
+                take: 10
+              });
+              return { badges, count: badges.length };
+            }
+          }
+          return { badges: [], count: 0 };
+          
+        case 'garden_query':
+          return {
+            action: 'NAVIGATE',
+            target: '/garden',
+            message: '去家园看看吧！'
+          };
+          
+        case 'messages_query':
+          if (frogId) {
+            const frog = await this.prisma.frog.findUnique({ where: { id: frogId } });
+            if (frog) {
+              const messages = await this.prisma.visitorMessage.findMany({
+                where: { toAddress: frog.ownerAddress },
+                take: 5,
+                orderBy: { createdAt: 'desc' }
+              });
+              return { messages, count: messages.length };
+            }
+          }
+          return { messages: [], count: 0 };
+          
+        case 'navigate':
+          const target = intentResult.params?.target || '/';
+          return {
+            action: 'NAVIGATE',
+            target,
+            message: `好的，带你去那里！`
+          };
+          
         default:
           return null;
       }
@@ -300,7 +542,8 @@ export class ChatService {
     frog: any,
     userMessage: string,
     intent: any,
-    data: any
+    data: any,
+    context?: ChatContext
   ): Promise<{ content: string }> {
     
     try {
@@ -309,7 +552,8 @@ export class ChatService {
       const responsePrompt = buildResponsePrompt(
         userMessage,
         intent.intent,
-        data
+        data,
+        context  // 传入上下文
       );
       
       // 使用真实的AI服务生成回复
@@ -331,7 +575,7 @@ export class ChatService {
   }
   
   /**
-   * 使用Qwen模型生成真实的AI回复
+   * 使用统一的 AIService 生成回复
    */
   private async generateAIResponse(
     systemPrompt: string,
@@ -339,41 +583,11 @@ export class ChatService {
     personality: Personality
   ): Promise<string> {
     try {
-      // 导入AI服务
-      const { aiService } = await import('../ai.service');
-      
-      // 创建一个临时的生成方法，复用现有的AI服务
-      const generateWithQwen = async (prompt: string): Promise<string> => {
-        // 使用aiService的client属性（如果暴露了的话）或者重新创建
-        const OpenAI = require('openai');
-        const { config } = await import('../../config');
-        
-        const client = new OpenAI({
-          apiKey: config.QWEN_API_KEY,
-          baseURL: config.QWEN_BASE_URL,
-        });
-        
-        const completion = await client.chat.completions.create({
-          model: 'qwen-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt
-            },
-            {
-              role: 'user',
-              content: responsePrompt
-            }
-          ],
-          temperature: 0.8,
-          max_tokens: 500,
-        });
-        
-        return completion.choices[0]?.message?.content || '';
-      };
-      
-      // 尝试使用Qwen生成回复
-      const content = await generateWithQwen(responsePrompt);
+      const content = await aiService.generateChatResponse(
+        systemPrompt,
+        responsePrompt,
+        { temperature: 0.8, maxTokens: 500 }
+      );
       
       // 如果生成的内容太短或为空，使用fallback
       if (!content || content.length < 10) {
@@ -384,7 +598,6 @@ export class ChatService {
       
     } catch (error) {
       logger.error('AI generation failed, using fallback:', error);
-      // 如果AI生成失败，使用预设回复作为fallback
       return this.getFallbackResponse('chitchat', personality);
     }
   }
@@ -438,16 +651,25 @@ export class ChatService {
   /**
    * 获取兜底回复
    */
-  private getFallbackResponse(intent: ChatIntent, personality: Personality): string {
-    const responses = {
-      price_query: '呱...价格数据暂时获取不到，请稍后再试。',
-      asset_query: '呱...暂时看不到你的资产，是不是钱包没连好？',
-      frog_status: '呱...我很好，谢谢关心！',
-      travel_info: '呱...旅行记录暂时找不到，让我想想...',
-      start_travel: '呱！旅行准备中...马上就出发！',
-      chitchat: '呱！今天天气真好，适合聊天！',
-      help: '呱！有什么需要帮助的吗？',
-      unknown: '呱...这个我不太清楚呢。'
+  private getFallbackResponse(intent: ChatIntent | string, personality: Personality): string {
+    const responses: Record<string, string> = {
+      price_query: '呵...价格数据暂时获取不到，请稍后再试。',
+      asset_query: '呵...暂时看不到你的资产，是不是钱包没连好？',
+      frog_status: '呵...我很好，谢谢关心！',
+      travel_info: '呵...旅行记录暂时找不到，让我想想...',
+      travel_stats: '呵...旅行统计正在计算中...',
+      start_travel: '呵！旅行准备中...马上就出发！',
+      friend_list: '呵...好友列表加载中...',
+      friend_add: '呵！想添加好友吗？去好友页面看看~',
+      friend_visit: '呵！我帮你找找这位朋友...',
+      souvenirs_query: '呵！我的纪念品都很珍贵呢~',
+      badges_query: '呵！荣誉徽章正在加载...',
+      garden_query: '呵！家园很舒适的~',
+      messages_query: '呵...正在查看留言板...',
+      navigate: '呵！我带你去~',
+      chitchat: '呵！今天天气真好，适合聊天！',
+      help: '呵！有什么需要帮助的吗？',
+      unknown: '呵...这个我不太清楚呢。'
     };
     
     return responses[intent] || responses.unknown;
@@ -456,16 +678,25 @@ export class ChatService {
   /**
    * 根据意图确定青蛙心情（用于前端动画）
    */
-  private determineMood(intent: ChatIntent): string {
-    const moodMap: Record<ChatIntent, string> = {
-      price_query: 'thinking',      // 思考
-      asset_query: 'counting',      // 数钱
-      frog_status: 'happy',         // 开心
-      travel_info: 'adventurous',   // 冒险
-      start_travel: 'excited',      // 兴奋
-      chitchat: 'relaxed',          // 放松
-      help: 'helpful',              // 乐于助人
-      unknown: 'confused'           // 困惑
+  private determineMood(intent: ChatIntent | string): string {
+    const moodMap: Record<string, string> = {
+      price_query: 'thinking',
+      asset_query: 'counting',
+      frog_status: 'happy',
+      travel_info: 'adventurous',
+      travel_stats: 'proud',
+      start_travel: 'excited',
+      friend_list: 'social',
+      friend_add: 'friendly',
+      friend_visit: 'adventurous',
+      souvenirs_query: 'nostalgic',
+      badges_query: 'proud',
+      garden_query: 'relaxed',
+      messages_query: 'curious',
+      navigate: 'helpful',
+      chitchat: 'relaxed',
+      help: 'helpful',
+      unknown: 'confused'
     };
     return moodMap[intent] || 'neutral';
   }
