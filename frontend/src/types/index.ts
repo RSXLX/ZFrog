@@ -82,7 +82,9 @@ export interface Travel {
   exploredBlock?: bigint;
   exploredTimestamp?: Date;
   exploredSnapshot?: any;
+  /** @deprecated 使用 journal.content 替代 */
   diary?: string;
+  /** @deprecated 使用 journal.mood 替代 */
   diaryMood?: DiaryMood;
   souvenirData?: SouvenirP0;
   
@@ -113,7 +115,7 @@ export interface Souvenir {
 export interface Journal {
   title: string;
   content: string;
-  mood: 'happy' | 'excited' | 'thoughtful' | 'adventurous' | 'tired' | 'HAPPY' | 'CURIOUS' | 'SURPRISED' | 'PEACEFUL' | 'EXCITED' | 'SLEEPY' | string;
+  mood: DiaryMood | string;  // 统一使用 DiaryMood 枚举
   highlights: string[];
 }
 

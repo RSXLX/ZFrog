@@ -531,6 +531,8 @@ enum BadgeUnlockType {
   MULTI_CHAIN
   RARE_FIND
   SPECIAL
+  SOCIAL      // 社交互动类徽章
+  COLLECTION  // 收藏成就类徽章
 }
 
 // ============ 新增：聊天相关 ============
@@ -598,13 +600,33 @@ enum MessageRole {
 }
 
 enum ChatIntent {
+  // 基础查询
   price_query      // 价格查询
   asset_query      // 资产查询
   frog_status      // 青蛙状态
-  travel_info      // 旅行信息
+  
+  // 旅行系统
+  travel_info      // 旅行信息/历史
   start_travel     // 开始旅行
+  travel_stats     // 旅行统计
+  
+  // 好友系统
+  friend_list      // 查看好友列表
+  friend_add       // 添加好友
+  friend_visit     // 拜访好友家园
+  
+  // 收藏系统
+  souvenirs_query  // 查看纪念品
+  badges_query     // 查看徽章
+  
+  // 家园系统
+  garden_query     // 查看家园
+  messages_query   // 查看留言
+  
+  // 通用
   chitchat         // 闲聊
   help             // 帮助
+  navigate         // 导航到页面
   unknown          // 未识别
 }
 
@@ -914,3 +936,66 @@ model CrossChainTransfer {
   @@index([toAddress])
   @@index([status])
 }
+
+// ============ 🆕 社区系统 ============
+
+// 社区凭证类型
+enum CommunityCredentialType {
+  PUBLIC       // 公开社区，无需凭证
+  NFT          // 需持有特定 NFT
+  INVITE_CODE  // 需要邀请码
+  SIGNATURE    // 需要签名验证
+}
+
+// 社区定义
+model Community {
+  id               String                   @id @default(cuid())
+  name             String
+  icon             String                   @default("🏠")
+  themeColor       String                   @default("#4CAF50")
+  description      String?
+  
+  // 凭证配置
+  credentialType   CommunityCredentialType  @default(PUBLIC)
+  credentialData   Json?                    // NFT 合约地址、邀请码列表等
+  
+  // 统计
+  memberCount      Int                      @default(0)
+  
+  // 管理
+  creatorAddress   String?
+  isOfficial       Boolean                  @default(false)
+  isActive         Boolean                  @default(true)
+  
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  
+  members          UserCommunity[]
+  
+  @@index([name])
+  @@index([creatorAddress])
+  @@index([isActive])
+}
+
+// 用户加入的社区
+model UserCommunity {
+  id           Int       @id @default(autoincrement())
+  userAddress  String    // 用户钱包地址
+  communityId  String
+  
+  // 加入凭证
+  credential   String?   // 使用的凭证（邀请码、NFT token ID 等）
+  
+  // 状态
+  isActive     Boolean   @default(false)  // 是否为当前激活社区
+  
+  joinedAt     DateTime  @default(now())
+  
+  community    Community @relation(fields: [communityId], references: [id])
+  
+  @@unique([userAddress, communityId])
+  @@index([userAddress])
+  @@index([communityId])
+  @@index([isActive])
+}
+

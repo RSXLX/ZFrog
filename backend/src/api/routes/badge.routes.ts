@@ -105,6 +105,7 @@ router.get('/:frogId/unlocked', async (req, res) => {
 /**
  * GET /api/badges/frog/:frogId/travel
  * 获取青蛙的旅行徽章列表
+ * 已迁移至使用 UserBadge + TravelBadge
  */
 router.get('/frog/:frogId/travel', async (req, res) => {
   try {
@@ -123,11 +124,25 @@ router.get('/frog/:frogId/travel', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Frog not found' });
     }
     
-    // 获取旅行徽章
-    const badges = await prisma.earnedTravelBadge.findMany({
+    // 使用 UserBadge 获取已解锁徽章，包含完整徽章信息
+    const userBadges = await prisma.userBadge.findMany({
       where: { frogId: frog.id },
-      orderBy: { earnedAt: 'desc' }
+      include: { badge: true },
+      orderBy: { unlockedAt: 'desc' }
     });
+    
+    // 转换为前端期望的格式
+    const badges = userBadges.map(ub => ({
+      id: ub.id,
+      badgeType: ub.badge.code,
+      earnedAt: ub.unlockedAt.toISOString(),
+      metadata: {
+        name: ub.badge.name,
+        icon: ub.badge.icon,
+        description: ub.badge.description,
+        rarity: ub.badge.rarity,
+      }
+    }));
     
     res.json({ success: true, data: badges });
   } catch (error) {
@@ -139,6 +154,7 @@ router.get('/frog/:frogId/travel', async (req, res) => {
 /**
  * GET /api/badges/frog/:frogId/stats
  * 获取青蛙的徽章统计
+ * 已迁移至使用 UserBadge + TravelBadge
  */
 router.get('/frog/:frogId/stats', async (req, res) => {
   try {
@@ -157,23 +173,27 @@ router.get('/frog/:frogId/stats', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Frog not found' });
     }
     
-    // 获取统计
-    const badges = await prisma.earnedTravelBadge.findMany({
-      where: { frogId: frog.id }
+    // 获取所有徽章总数 (非隐藏)
+    const totalBadges = await prisma.travelBadge.count({
+      where: { isHidden: false }
     });
     
-    // 总共 5 种旅行徽章
-    const total = 5;
-    const earned = badges.length;
-    const progress = Math.round((earned / total) * 100);
+    // 获取已解锁徽章
+    const userBadges = await prisma.userBadge.findMany({
+      where: { frogId: frog.id },
+      include: { badge: true }
+    });
+    
+    const earned = userBadges.length;
+    const progress = totalBadges > 0 ? Math.round((earned / totalBadges) * 100) : 0;
     
     res.json({
       success: true,
       data: {
-        total,
+        total: totalBadges,
         earned,
         progress,
-        badges: badges.map(b => b.badgeType)
+        badges: userBadges.map(ub => ub.badge.code)
       }
     });
   } catch (error) {

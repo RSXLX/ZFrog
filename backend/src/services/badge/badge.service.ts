@@ -34,7 +34,8 @@ class BadgeService {
         badge.unlockType,
         badge.unlockCondition as any,
         stats,
-        context
+        context,
+        frogId
       );
 
       if (shouldUnlock) {
@@ -57,7 +58,8 @@ class BadgeService {
     type: string,
     condition: any,
     stats: any,
-    context: BadgeCheckContext
+    context: BadgeCheckContext,
+    frogId?: number
   ): Promise<boolean> {
     switch (type) {
       case 'TRIP_COUNT':
@@ -82,6 +84,96 @@ class BadgeService {
       case 'RARE_FIND':
         const maxRarity = Math.max(...context.discoveries.map(d => d.rarity));
         return maxRarity >= condition.minRarity;
+
+      case 'SOCIAL':
+        if (!frogId) return false;
+        return this.checkSocialCondition(frogId, condition);
+
+      case 'COLLECTION':
+        if (!frogId) return false;
+        return this.checkCollectionCondition(frogId, condition);
+
+      case 'SPECIAL':
+        // SPECIAL 类型需要单独的触发逻辑，不在旅行完成时自动检查
+        return false;
+
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * 检查社交互动条件
+   */
+  private async checkSocialCondition(frogId: number, condition: any): Promise<boolean> {
+    const { metric, threshold } = condition;
+
+    switch (metric) {
+      case 'friend_count': {
+        const friendships = await prisma.friendship.count({
+          where: {
+            OR: [
+              { requesterId: frogId, status: 'Accepted' },
+              { addresseeId: frogId, status: 'Accepted' },
+            ],
+          },
+        });
+        return friendships >= threshold;
+      }
+
+      case 'message_count': {
+        const messages = await prisma.visitorMessage.count({
+          where: { fromFrogId: frogId },
+        });
+        return messages >= threshold;
+      }
+
+      case 'gift_sent': {
+        const frog = await prisma.frog.findUnique({
+          where: { id: frogId },
+          select: { ownerAddress: true },
+        });
+        if (!frog) return false;
+        const gifts = await prisma.gift.count({
+          where: { fromAddress: frog.ownerAddress.toLowerCase() },
+        });
+        return gifts >= threshold;
+      }
+
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * 检查收藏成就条件
+   */
+  private async checkCollectionCondition(frogId: number, condition: any): Promise<boolean> {
+    const { metric, threshold } = condition;
+
+    switch (metric) {
+      case 'souvenir_count': {
+        const souvenirs = await prisma.souvenir.count({
+          where: { frogId },
+        });
+        return souvenirs >= threshold;
+      }
+
+      case 'photo_count': {
+        const photos = await prisma.photo.count({
+          where: { frogId },
+        });
+        return photos >= threshold;
+      }
+
+      case 'decoration_placed': {
+        const placed = await prisma.placedItem.count({
+          where: {
+            layout: { frogId },
+          },
+        });
+        return placed >= threshold;
+      }
 
       default:
         return false;

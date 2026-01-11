@@ -5,10 +5,9 @@ import { ChainKey, CHAIN_KEYS, SUPPORTED_CHAINS } from '../../config/chains';
 import { explorationService, Discovery } from './exploration.service';
 import { souvenirGenerator } from './souvenir.generator';
 import { badgeService } from '../badge/badge.service';
-import { buildTravelDiaryPrompt } from '../ai/prompts/travel-diary.prompt';
+import { aiService } from '../ai.service';
 import { logger } from '../../utils/logger';
 import { notifyTravelStarted, notifyTravelProgress, notifyTravelCompleted } from '../../websocket';
-import axios from 'axios';
 import { FrogStatus } from '@prisma/client';
 
 export interface StartTravelParams {
@@ -119,55 +118,18 @@ class TravelP0Service {
         exploration.discoveries
       );
 
-      // 3. 生成旅行日记
-      // Build prompt with enriched data
-      const prompt = `
-Generate a travel diary for a frog named ${frogName}.
-Location: ${chain} blockchain, Block #${blockNumber}.
-Time: ${exploration.timestamp.toLocaleTimeString()}.
-
-Wallet Visited: ${exploration.snapshot.address}
-- Balance: ${exploration.snapshot.nativeBalance} ${exploration.snapshot.nativeSymbol}
-- Transactions: ${exploration.snapshot.txCount}
-- Wallet Age: ${exploration.snapshot.walletAge}
-${exploration.snapshot.tokens && exploration.snapshot.tokens.length > 0 ? `- Token Holdings: ${exploration.snapshot.tokens.map(t => `${t.balance} ${t.symbol}`).join(', ')}` : ''}
-
-Context of this visit:
-${exploration.transactionContext ? `- Observed Transaction: Hash ${exploration.transactionContext.hash.slice(0, 10)}...` : ''}
-${exploration.transactionContext ? `- Action: ${exploration.transactionContext.method}` : ''}
-${exploration.transactionContext && parseFloat(exploration.transactionContext.value) > 0 ? `- Value: ${exploration.transactionContext.value} ${exploration.snapshot.nativeSymbol}` : ''}
-
-Network Conditions:
-${exploration.networkStatus ? `- Gas Price: ${exploration.networkStatus.gasPrice} Gwei` : ''}
-
-Discoveries made:
-${exploration.discoveries.map(d => `- [${d.type}] ${d.title}: ${d.description}`).join('\n')}
-
-The frog's personality is: Curious, slightly philosophical, loves observing blockchain activity.
-Write a short, engaging diary entry (max 200 words) describing this visit.
-Include specific details about what the frog saw (the wallet's status, the specific transaction action if any, the network atmosphere).
-If the gas price is high, mention traffic/congestion. If token holdings are found, mention them.
-User Language: Chinese
-
-IMPORTANT: Return the result in STRICT JSON format with the following structure:
-{
-  "title": "A short creative title for the diary",
-  "content": "The diary content here...",
-  "mood": "One of: HAPPY, CURIOUS, EXCITED, TIRED, MELANCHOLIC"
-}
-Do not include any markdown formatting (like \`\`\`json) in the response. Just the raw JSON string.
-`;
-
-      const diaryResult = await this.generateTravelDiary({
+      // 3. 生成旅行日记 - 使用统一的 AIService
+      notifyTravelProgress(frogTokenId, { phase: 'generating_story', message: '正在构思旅行故事...', percentage: 60 });
+      const diaryResult = await aiService.generateJournalFromExploration({
         frogName,
         chain,
+        chainId: SUPPORTED_CHAINS[chain].chainId,
         blockNumber,
-        timestamp: exploration.timestamp,
-        targetAddress,
         snapshot: exploration.snapshot,
         discoveries: exploration.discoveries,
+        transactionContext: exploration.transactionContext,
+        networkStatus: exploration.networkStatus,
         souvenir,
-        overridePrompt: prompt,
       });
 
       // 4. 计算经验值 (每小时 10 XP + 稀有发现额外 XP)
@@ -191,8 +153,13 @@ Do not include any markdown formatting (like \`\`\`json) in the response. Just t
             ...exploration.snapshot,
             discoveries: exploration.discoveries,
           } as any,
-          diary: diaryResult.content,
-          diaryMood: diaryResult.mood as any,
+          // 统一使用 journalContent 存储 JSON 格式日记
+          journalContent: JSON.stringify({
+            title: diaryResult.title,
+            content: diaryResult.content,
+            mood: diaryResult.mood,
+            highlights: exploration.discoveries.map(d => d.title),
+          }),
           souvenirData: souvenir as any,
           observedTxCount: exploration.snapshot.txCount,
           observedTotalValue: exploration.snapshot.nativeBalance,
@@ -251,55 +218,6 @@ Do not include any markdown formatting (like \`\`\`json) in the response. Just t
         where: { tokenId: frogTokenId },
         data: { status: FrogStatus.Idle },
       });
-    }
-  }
-
-  /**
-   * 生成旅行日记
-   */
-  private async generateTravelDiary(params: any): Promise<{ content: string; mood: string; title: string }> {
-    const prompt = params.overridePrompt || buildTravelDiaryPrompt(params);
-
-    try {
-      // 使用 AI 服务生成日记
-      const response = await axios.post(
-        'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
-        {
-          model: 'qwen-turbo',
-          input: { prompt },
-          parameters: {
-            max_tokens: 500,
-            temperature: 0.8,
-            result_format: 'message',
-          },
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${process.env.QWEN_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 15000,
-        }
-      );
-
-      const text = response.data.output.choices[0].message.content;
-      const parsed = JSON.parse(text);
-      
-      return {
-        content: parsed.content,
-        mood: parsed.mood,
-        title: parsed.title,
-      };
-
-    } catch (error) {
-      logger.error('Failed to generate AI diary:', error);
-      
-      // 降级方案
-      return {
-        content: `呱~ ${params.frogName} 今天去了 ${params.chain}，看到了很多有趣的东西！带回了 ${params.souvenir.name}，好开心呀！`,
-        mood: 'HAPPY',
-        title: '今天的旅行',
-      };
     }
   }
 
