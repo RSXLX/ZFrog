@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 
 const ADDRESSES_FILE = path.join(__dirname, "../deployed-addresses.json");
-const ZETA_FROG_NFT_ADDRESS = "0x21C6C9C82C7B2317E2fa25E2cdAa29E45C84fA1f";
+const ZETA_FROG_NFT_ADDRESS = "0x0721CDff3291a1Dd2af28633B5dEE5427553F09E";
 
 function loadAddresses() {
     if (fs.existsSync(ADDRESSES_FILE)) {
@@ -47,31 +47,29 @@ async function main() {
         console.log("⚠️ Could not read owner:", e.message);
     }
 
-    // Check for travelContract (Legacy Slot)
+    // Check for omniTravelContract
     try {
-        const currentTravelContract = await zetaFrog.travelContract();
-        console.log(`Current Travel Contract: ${currentTravelContract}`);
+        const currentOmniTravelContract = await zetaFrog.omniTravelContract();
+        console.log(`Current OmniTravel Contract: ${currentOmniTravelContract}`);
         
-        if (currentTravelContract.toLowerCase() === omniTravelAddress.toLowerCase()) {
-             console.log("✅ OmniTravel is ALREADY the Travel Contract.");
+        if (currentOmniTravelContract.toLowerCase() === omniTravelAddress.toLowerCase()) {
+             console.log("✅ OmniTravel is ALREADY authorized.");
              return;
         }
         
-        console.log("⚠️ Deployed NFT seems to be an older version (missing omniTravelContract).");
-        console.log("⚠️ Overwriting 'travelContract' slot with OmniTravel...");
+        console.log("⚠️ OmniTravel authorization needs update...");
         
-        const tx = await zetaFrog.setTravelContract(omniTravelAddress);
+        const tx = await zetaFrog.setOmniTravelContract(omniTravelAddress);
         console.log(`Transaction sent: ${tx.hash}`);
         await tx.wait();
-        console.log("✅ Permissions updated using 'setTravelContract'!");
+        console.log("✅ OmniTravel authorization complete!");
         return;
 
     } catch (e) {
-        console.log("⚠️ Could not read/set travelContract:", e.message);
+        console.log("⚠️ Could not read/set omniTravelContract:", e.message);
     }
     
     console.error("❌ Failed to set permissions. Contract interface mismatch.");
-    console.log("✅ Permissions updated successfully!");
 }
 
 main().catch((error) => {

@@ -28,31 +28,53 @@ export const SUPPORTED_CHAINS = [
   { id: '11155111', name: 'Sepolia', symbol: 'ETH', icon: '💎' },
 ];
 
-// Gateway ABI (简化版)
+// Gateway ABI - ZetaChain EVM Gateway 接口
+// Reference: https://www.zetachain.com/docs/developers/chains/evm
 const GATEWAY_ABI = [
+  // Deposit native gas tokens (ETH, BNB, etc.) to ZetaChain
   {
     name: 'deposit',
     type: 'function',
+    stateMutability: 'payable',
     inputs: [
       { name: 'receiver', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-      { name: 'asset', type: 'address' },
-      { name: 'message', type: 'bytes' },
+      { 
+        name: 'revertOptions', 
+        type: 'tuple',
+        components: [
+          { name: 'revertAddress', type: 'address' },
+          { name: 'callOnRevert', type: 'bool' },
+          { name: 'abortAddress', type: 'address' },
+          { name: 'revertMessage', type: 'bytes' },
+          { name: 'onRevertGasLimit', type: 'uint256' },
+        ]
+      },
     ],
     outputs: [],
   },
+  // Deposit native gas tokens and call a universal app
   {
     name: 'depositAndCall',
     type: 'function',
+    stateMutability: 'payable',
     inputs: [
       { name: 'receiver', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-      { name: 'asset', type: 'address' },
-      { name: 'message', type: 'bytes' },
+      { name: 'payload', type: 'bytes' },
+      { 
+        name: 'revertOptions', 
+        type: 'tuple',
+        components: [
+          { name: 'revertAddress', type: 'address' },
+          { name: 'callOnRevert', type: 'bool' },
+          { name: 'abortAddress', type: 'address' },
+          { name: 'revertMessage', type: 'bytes' },
+          { name: 'onRevertGasLimit', type: 'uint256' },
+        ]
+      },
     ],
     outputs: [],
   },
-];
+] as const;
 
 // ============ 类型定义 ============
 
@@ -207,19 +229,22 @@ export function useCrossChain(frogId: number) {
             throw new Error('Gateway not configured for this chain');
           }
 
-          // 编码消息
-          const message = params.message 
-            ? new TextEncoder().encode(params.message)
-            : new Uint8Array(0);
+          // 构造 RevertOptions - 如果失败则退回到发送者地址
+          const revertOptions = {
+            revertAddress: address as Address,
+            callOnRevert: false,
+            abortAddress: '0x0000000000000000000000000000000000000000' as Address,
+            revertMessage: '0x' as `0x${string}`,
+            onRevertGasLimit: BigInt(200000),
+          };
 
+          // 使用 deposit 函数进行简单转账
           const data = encodeFunctionData({
             abi: GATEWAY_ABI,
             functionName: 'deposit',
             args: [
               params.toAddress as Address,
-              parseEther(params.amount),
-              '0x0000000000000000000000000000000000000000' as Address, // Native token
-              `0x${Buffer.from(message).toString('hex')}` as `0x${string}`,
+              revertOptions,
             ],
           });
 

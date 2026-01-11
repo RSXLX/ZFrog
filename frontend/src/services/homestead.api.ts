@@ -1,4 +1,9 @@
 /**
+ * @deprecated 已弃用 - 请使用 home.api.ts 中的 homeApi
+ * 
+ * 此文件已合并到 home.api.ts
+ * import { homeApi } from './home.api';
+ * 
  * Homestead API Service - 家园系统前端 API
  */
 

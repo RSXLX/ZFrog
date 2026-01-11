@@ -1,3 +1,10 @@
+/**
+ * @deprecated 已弃用 - 请使用 home.api.ts 中的 homeApi
+ * 
+ * 此文件已合并到 home.api.ts
+ * import { homeApi } from './home.api';
+ */
+
 import { apiService } from './api';
 import { 
   GardenState, 
@@ -8,7 +15,7 @@ import {
 } from '../types/garden';
 
 /**
- * 家园系统 API 服务
+ * @deprecated Use homeApi from './home.api' instead
  */
 class GardenApiService {
   
