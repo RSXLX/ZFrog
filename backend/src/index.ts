@@ -27,6 +27,8 @@ import crossChainRoutes from './api/routes/cross-chain.routes';
 import messageRoutes from './api/routes/message.routes';
 import homesteadRoutes from './api/routes/homestead.routes';
 import crossChainTransferRoutes from './api/routes/crosschain-transfer.routes'; // 🆕 跨链转账
+import communityRoutes from './api/routes/community.routes'; // 🆕 社区系统
+
 
 const app = express();
 const httpServer = createServer(app);
@@ -63,6 +65,8 @@ app.use('/api/cross-chain', crossChainRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/homestead', homesteadRoutes); // 🆕 家园系统
 app.use('/api/crosschain-transfer', crossChainTransferRoutes); // 🆕 跨链转账
+app.use('/api/communities', communityRoutes); // 🆕 社区系统
+
 
 
 // Root route

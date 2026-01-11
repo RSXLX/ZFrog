@@ -10,6 +10,8 @@ import { Navbar } from './components/common/Navbar';
 import { LoadingSkeleton } from './components/common/LoadingSkeleton';
 import { FrogPet } from './components/frog/FrogPet';
 import { useWalletConnect } from './hooks/useWalletConnect';
+import { FriendFloatPanel } from './components/friend-float';
+
 
 // Lazy loaded pages for code splitting
 const TravelResultPage = lazy(() => import('./pages/TravelResultPage').then(m => ({ default: m.TravelResultPage })));
@@ -118,7 +120,11 @@ export function App() {
             <p className="mt-1">Built with ❤️ on ZetaChain</p>
           </footer>
         </div>
+        
+        {/* 好友浮窗 */}
+        <FriendFloatPanel />
       </BrowserRouter>
     </>
   );
 }
+

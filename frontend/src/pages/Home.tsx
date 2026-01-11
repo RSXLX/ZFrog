@@ -11,6 +11,7 @@ import { Button } from '../components/common/Button';
 import { TravelP0Form } from '../components/travel/TravelP0Form';
 import { apiService } from '../services/api';
 import { useFrogStore } from '../stores/frogStore';
+import CrossChainTransfer from '../components/crosschain/CrossChainTransfer';
 
 export function Home() {
   const { isConnected, address } = useAccount();
@@ -18,6 +19,7 @@ export function Home() {
   const [checkLoading, setCheckLoading] = useState(false);
   const { setCurrentFrog, currentFrog } = useFrogStore();
   const [showMint, setShowMint] = useState(false);
+  const [showCrossChainTransfer, setShowCrossChainTransfer] = useState(false);
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
@@ -204,6 +206,12 @@ export function Home() {
                     >
                       🎁 我的纪念品
                     </Link>
+                    <button
+                      onClick={() => setShowCrossChainTransfer(true)}
+                      className="block w-full text-center py-4 px-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl font-medium transition-all transform hover:scale-105 shadow-md"
+                    >
+                      ⚡ 跨链转账
+                    </button>
                     <div className="pt-3 border-t border-gray-200">
                       <button
                         onClick={() => window.open('https://athens.explorer.zetachain.com/', '_blank')}
@@ -219,6 +227,15 @@ export function Home() {
           </div>
         )}
       </div>
+      
+      {/* 跨链转账弹窗 */}
+      {currentFrog && (
+        <CrossChainTransfer
+          frogId={currentFrog.id}
+          isOpen={showCrossChainTransfer}
+          onClose={() => setShowCrossChainTransfer(false)}
+        />
+      )}
     </div>
   );
 }
