@@ -8,11 +8,12 @@ export function Navbar() {
   
   const navLinks = [
     { path: '/', label: '首页' },
-    { path: '/my-frog', label: '我的青蛙' },
-    { path: '/garden', label: '我的喂养' },
-    { path: '/souvenirs', label: '我的纪念品' },
+    { path: '/my-frog', label: '青蛙' },
+    { path: '/garden', label: '家园' },
+    { path: '/souvenirs', label: '纪念品' },
     { path: '/travel-history', label: '旅行日记' },
-    { path: '/friends', label: '好友系统' },
+    { path: '/badges', label: '徽章' },
+    // 好友系统改为浮窗入口，隐藏导航链接
   ];
   
   return (

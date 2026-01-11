@@ -1,0 +1,965 @@
+/* ===================================
+   好友系统浮窗样式
+   =================================== */
+
+/* CSS 变量 */
+:root {
+  --float-primary: #4CAF50;
+  --float-primary-dark: #45a049;
+  --float-primary-light: #e8f5e9;
+  --float-bg: #ffffff;
+  --float-border: #e0e0e0;
+  --float-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  --float-radius: 12px;
+  --float-radius-sm: 8px;
+  --float-z-index: 9999;
+}
+
+/* ===================================
+   收起态 - Collapsed State
+   =================================== */
+.friend-float-collapsed {
+  position: fixed;
+  z-index: var(--float-z-index);
+  width: 52px;
+  height: 52px;
+  background: linear-gradient(135deg, var(--float-primary), var(--float-primary-dark));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--float-shadow);
+}
+
+.friend-float-collapsed:hover {
+  transform: scale(1.05);
+}
+
+/* 贴边方向样式 */
+.friend-float-collapsed.dock-right {
+  right: 0;
+  border-radius: var(--float-radius) 0 0 var(--float-radius);
+}
+
+.friend-float-collapsed.dock-left {
+  left: 0;
+  border-radius: 0 var(--float-radius) var(--float-radius) 0;
+}
+
+.friend-float-collapsed.dock-top {
+  top: 0;
+  border-radius: 0 0 var(--float-radius) var(--float-radius);
+}
+
+.friend-float-collapsed.dock-bottom {
+  bottom: 0;
+  border-radius: var(--float-radius) var(--float-radius) 0 0;
+}
+
+/* 收起态头像 */
+.collapsed-avatar {
+  font-size: 1.75rem;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+/* 未读角标 */
+.collapsed-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 18px;
+  height: 18px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+/* 社区色条 */
+.collapsed-community-bar {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+/* ===================================
+   展开态 - Expanded State
+   =================================== */
+.friend-float-panel {
+  position: fixed;
+  z-index: var(--float-z-index);
+  background: var(--float-bg);
+  border-radius: var(--float-radius);
+  box-shadow: var(--float-shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 贴边位置调整 */
+.friend-float-panel.dock-right {
+  right: 0;
+  border-radius: var(--float-radius) 0 0 var(--float-radius);
+}
+
+.friend-float-panel.dock-left {
+  left: 0;
+  border-radius: 0 var(--float-radius) var(--float-radius) 0;
+}
+
+.friend-float-panel.dock-top {
+  top: 0;
+  border-radius: 0 0 var(--float-radius) var(--float-radius);
+}
+
+.friend-float-panel.dock-bottom {
+  bottom: 0;
+  border-radius: var(--float-radius) var(--float-radius) 0 0;
+}
+
+/* 社区主题边框 */
+.friend-float-panel[data-community-color] {
+  border-left: 4px solid var(--community-color, var(--float-primary));
+}
+
+.friend-float-panel.dock-left[data-community-color] {
+  border-left: none;
+  border-right: 4px solid var(--community-color, var(--float-primary));
+}
+
+.friend-float-panel.dock-top[data-community-color],
+.friend-float-panel.dock-bottom[data-community-color] {
+  border-left: none;
+  border-top: 4px solid var(--community-color, var(--float-primary));
+}
+
+/* ===================================
+   最大化态 - Maximized State
+   =================================== */
+.friend-float-maximized-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--float-z-index);
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+.friend-float-maximized {
+  width: 80vw;
+  max-width: 900px;
+  height: 80vh;
+  max-height: 700px;
+  background: var(--float-bg);
+  border-radius: var(--float-radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* ===================================
+   浮窗头部 Header
+   =================================== */
+.float-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--float-primary-light);
+  border-bottom: 1px solid var(--float-border);
+  cursor: move;
+  user-select: none;
+}
+
+.float-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--float-primary-dark);
+}
+
+.float-header-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.float-control-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  transition: all 0.15s ease;
+}
+
+.float-control-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #333;
+}
+
+.float-control-btn.close:hover {
+  background: #ef4444;
+  color: white;
+}
+
+/* ===================================
+   社区切换器
+   =================================== */
+.community-switcher {
+  position: relative;
+}
+
+.community-switcher-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--float-radius-sm);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--float-primary-dark);
+  transition: background 0.15s;
+}
+
+.community-switcher-trigger:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.community-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.5rem;
+  min-width: 200px;
+  background: var(--float-bg);
+  border-radius: var(--float-radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--float-border);
+  overflow: hidden;
+  z-index: 10;
+  animation: dropdownSlide 0.2s ease;
+}
+
+@keyframes dropdownSlide {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.community-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.community-dropdown-item:hover {
+  background: var(--float-primary-light);
+}
+
+.community-dropdown-item.active {
+  background: var(--float-primary-light);
+}
+
+.community-dropdown-item .icon {
+  font-size: 1.25rem;
+}
+
+.community-dropdown-item .name {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.community-dropdown-item .check {
+  color: var(--float-primary);
+}
+
+.community-dropdown-divider {
+  height: 1px;
+  background: var(--float-border);
+  margin: 0.25rem 0;
+}
+
+.community-dropdown-add {
+  color: var(--float-primary);
+  font-weight: 500;
+}
+
+/* ===================================
+   搜索框
+   =================================== */
+.float-search {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--float-border);
+}
+
+.float-search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem 0.5rem 2rem;
+  border: 1px solid var(--float-border);
+  border-radius: var(--float-radius-sm);
+  font-size: 0.875rem;
+  background: #f9fafb;
+  transition: all 0.2s;
+}
+
+.float-search-input:focus {
+  outline: none;
+  border-color: var(--float-primary);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+.float-search-wrapper {
+  position: relative;
+}
+
+.float-search-icon {
+  position: absolute;
+  left: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+/* ===================================
+   标签页 Tabs
+   =================================== */
+.float-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--float-border);
+  padding: 0 0.5rem;
+}
+
+.float-tab {
+  flex: 1;
+  padding: 0.6rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #666;
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s;
+}
+
+.float-tab:hover {
+  color: var(--float-primary);
+}
+
+.float-tab.active {
+  color: var(--float-primary);
+}
+
+.float-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: var(--float-primary);
+  border-radius: 2px 2px 0 0;
+}
+
+.float-tab-badge {
+  display: inline-block;
+  margin-left: 0.25rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  background: #ef4444;
+  color: white;
+  border-radius: 9px;
+}
+
+/* ===================================
+   好友列表内容区
+   =================================== */
+.float-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.float-friend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.5rem;
+  border-radius: var(--float-radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.float-friend-item:hover {
+  background: var(--float-primary-light);
+}
+
+.float-friend-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--float-primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  position: relative;
+}
+
+.float-friend-avatar .online-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  background: #22c55e;
+  border: 2px solid white;
+  border-radius: 50%;
+}
+
+.float-friend-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.float-friend-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.float-friend-status {
+  font-size: 0.75rem;
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.float-friend-actions {
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.float-friend-item:hover .float-friend-actions {
+  opacity: 1;
+}
+
+.float-friend-action-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.15s;
+}
+
+.float-friend-action-btn:hover {
+  background: var(--float-primary);
+  color: white;
+  transform: scale(1.1);
+}
+
+/* ===================================
+   底部操作区
+   =================================== */
+.float-footer {
+  padding: 0.75rem;
+  border-top: 1px solid var(--float-border);
+  display: flex;
+  gap: 0.5rem;
+}
+
+.float-footer-btn {
+  flex: 1;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid var(--float-border);
+  border-radius: var(--float-radius-sm);
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  transition: all 0.15s;
+}
+
+.float-footer-btn:hover {
+  border-color: var(--float-primary);
+  color: var(--float-primary);
+}
+
+.float-footer-btn.primary {
+  background: var(--float-primary);
+  border-color: var(--float-primary);
+  color: white;
+}
+
+.float-footer-btn.primary:hover {
+  background: var(--float-primary-dark);
+}
+
+/* ===================================
+   空状态
+   =================================== */
+.float-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #666;
+}
+
+.float-empty-icon {
+  font-size: 3rem;
+  margin-bottom: 0.75rem;
+  opacity: 0.5;
+}
+
+.float-empty-text {
+  font-size: 0.9rem;
+}
+
+/* ===================================
+   拉伸手柄
+   =================================== */
+.float-resize-handle {
+  position: absolute;
+  background: transparent;
+}
+
+.float-resize-handle.horizontal {
+  width: 6px;
+  height: 100%;
+  top: 0;
+  cursor: ew-resize;
+}
+
+.float-resize-handle.vertical {
+  width: 100%;
+  height: 6px;
+  left: 0;
+  cursor: ns-resize;
+}
+
+.float-resize-handle.dock-right.horizontal {
+  left: 0;
+}
+
+.float-resize-handle.dock-left.horizontal {
+  right: 0;
+}
+
+.float-resize-handle.dock-top.vertical {
+  bottom: 0;
+}
+
+.float-resize-handle.dock-bottom.vertical {
+  top: 0;
+}
+
+/* ===================================
+   响应式
+   =================================== */
+@media (max-width: 640px) {
+  .friend-float-maximized {
+    width: 95vw;
+    height: 90vh;
+  }
+  
+  .friend-float-panel {
+    max-width: 90vw;
+  }
+}
+
+/* ===================================
+   加入社区弹窗
+   =================================== */
+.join-community-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.join-community-content {
+  background: white;
+  border-radius: var(--float-radius);
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.join-community-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.join-community-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--float-border);
+  border-radius: var(--float-radius-sm);
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+}
+
+.join-community-input:focus {
+  outline: none;
+  border-color: var(--float-primary);
+}
+
+.join-community-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+/* ===================================
+   拖拽视觉反馈 (P0)
+   =================================== */
+
+/* 拖拽中状态 */
+.friend-float-panel.dragging,
+.friend-float-collapsed.dragging {
+  opacity: 0.85;
+  transform: scale(1.02);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  cursor: grabbing !important;
+  transition: none; /* 拖拽时禁用过渡 */
+}
+
+.friend-float-panel.dragging * {
+  cursor: grabbing !important;
+}
+
+/* 拉伸中状态 */
+.friend-float-panel.resizing {
+  transition: none; /* 拉伸时禁用过渡 */
+}
+
+/* 拉伸手柄悬停 */
+.float-resize-handle:hover {
+  background: rgba(76, 175, 80, 0.15);
+}
+
+.float-resize-handle:active {
+  background: rgba(76, 175, 80, 0.25);
+}
+
+/* ===================================
+   吸附预览指示器
+   =================================== */
+.dock-preview-indicator {
+  position: fixed;
+  background: rgba(76, 175, 80, 0.08);
+  border: 2px dashed var(--float-primary);
+  border-radius: var(--float-radius);
+  pointer-events: none;
+  z-index: 9998;
+  animation: dockPulse 1.5s ease-in-out infinite;
+}
+
+.dock-preview-indicator.dock-left {
+  left: 0;
+  top: 20%;
+  width: 300px;
+  height: 60%;
+  border-radius: 0 var(--float-radius) var(--float-radius) 0;
+}
+
+.dock-preview-indicator.dock-right {
+  right: 0;
+  top: 20%;
+  width: 300px;
+  height: 60%;
+  border-radius: var(--float-radius) 0 0 var(--float-radius);
+}
+
+.dock-preview-indicator.dock-top {
+  top: 0;
+  left: 20%;
+  width: 60%;
+  height: 300px;
+  border-radius: 0 0 var(--float-radius) var(--float-radius);
+}
+
+.dock-preview-indicator.dock-bottom {
+  bottom: 0;
+  left: 20%;
+  width: 60%;
+  height: 300px;
+  border-radius: var(--float-radius) var(--float-radius) 0 0;
+}
+
+@keyframes dockPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+/* ===================================
+   framer-motion 兼容样式
+   =================================== */
+.friend-float-motion {
+  will-change: transform, width, height;
+}
+
+/* 确保动画容器正确定位 */
+.friend-float-motion.dock-right {
+  right: 0;
+}
+
+.friend-float-motion.dock-left {
+  left: 0;
+}
+
+.friend-float-motion.dock-top {
+  top: 0;
+}
+
+.friend-float-motion.dock-bottom {
+  bottom: 0;
+}
+
+/* ===================================
+   悬停预览面板 (P1)
+   =================================== */
+.collapsed-preview {
+  position: absolute;
+  min-width: 180px;
+  background: var(--float-bg);
+  border-radius: var(--float-radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  padding: 0.75rem;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.collapsed-preview-content {
+  text-align: left;
+}
+
+.collapsed-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--float-border);
+}
+
+.collapsed-preview-header .preview-icon {
+  font-size: 1.25rem;
+}
+
+.collapsed-preview-header .preview-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--float-primary-dark);
+}
+
+.collapsed-preview-stats {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.preview-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.preview-stat .stat-count {
+  background: #ef4444;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 9px;
+}
+
+.preview-stat .stat-label {
+  color: #666;
+}
+
+.preview-hint {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.preview-hint kbd {
+  display: inline-block;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.65rem;
+  font-family: inherit;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+}
+
+/* ===================================
+   触摸设备适配 (P2)
+   =================================== */
+
+/* 触摸设备上隐藏键盘快捷键提示 */
+@media (hover: none) and (pointer: coarse) {
+  .preview-hint kbd {
+    display: none;
+  }
+  
+  .preview-hint::after {
+    content: '长按预览';
+  }
+  
+  /* 增大触摸目标尺寸 */
+  .friend-float-collapsed {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .float-control-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 1.1rem;
+  }
+  
+  .float-tab {
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .float-friend-item {
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .float-friend-action-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+  }
+  
+  /* 触摸设备始终显示操作按钮 */
+  .float-friend-actions {
+    opacity: 1;
+  }
+  
+  /* 拉伸手柄增大 */
+  .float-resize-handle.horizontal {
+    width: 12px;
+  }
+  
+  .float-resize-handle.vertical {
+    height: 12px;
+  }
+  
+  /* 底部操作按钮更大 */
+  .float-footer-btn {
+    padding: 0.75rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* 长按状态样式 */
+.friend-float-collapsed.long-pressing {
+  transform: scale(1.1);
+  box-shadow: 0 8px 32px rgba(76, 175, 80, 0.4);
+}
+
+/* 底部抽屉式布局（小屏幕） */
+@media (max-width: 480px) {
+  .friend-float-panel {
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: 60vh !important;
+    border-radius: 16px 16px 0 0 !important;
+    transform: none !important;
+  }
+  
+  .friend-float-collapsed {
+    bottom: 20px !important;
+    right: 20px !important;
+    top: auto !important;
+    left: auto !important;
+    border-radius: 50% !important;
+  }
+  
+  /* 拖拽指示器 */
+  .friend-float-panel::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    background: #d1d5db;
+    border-radius: 2px;
+  }
+}
+
+
+
