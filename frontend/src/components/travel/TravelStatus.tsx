@@ -6,8 +6,11 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { CrossChainTravelTracker } from './CrossChainTravelTracker';
 import { OnChainStats } from './OnChainStats';
 import { DiscoveryList } from './DiscoveryList';
+import { FeedButton } from './FeedButton';
+import { AddressTag, AddressType } from './AddressTag';
 import type { DiscoveryData } from './DiscoveryCard';
 import type { Travel } from '../../types';
+import { travelApi } from '../../services/travel.api';
 
 export interface TravelStatusProps {
     travel: Travel;
@@ -32,6 +35,11 @@ export const TravelStatus = memo(function TravelStatus({ travel, frogName }: Tra
         gasUsed?: string;
         exploredAddress?: string;
     }>({});
+
+    // V2.0: 地址类型和投喂状态
+    const [addressType, setAddressType] = useState<AddressType>('normal');
+    const [addressBonus, setAddressBonus] = useState<number>(1.0);
+    const [feedCount, setFeedCount] = useState<number>(0);
 
     const { socket } = useWebSocket();
 
@@ -64,12 +72,42 @@ export const TravelStatus = memo(function TravelStatus({ travel, frogName }: Tra
         }
     }, [travel.id]);
 
+    // V2.0: 获取地址类型信息
+    const fetchAddressType = useCallback(async (address: string, chainId: number) => {
+        try {
+            const result = await travelApi.analyzeAddress(address, chainId);
+            setAddressType(result.type);
+            setAddressBonus(result.bonus);
+        } catch (error) {
+            console.error('Failed to analyze address:', error);
+        }
+    }, []);
+
+    // V2.0: 获取投喂历史
+    const fetchFeedHistory = useCallback(async () => {
+        try {
+            const feeds = await travelApi.getFeedHistory(travel.id);
+            setFeedCount(feeds.length);
+        } catch (error) {
+            console.error('Failed to fetch feed history:', error);
+        }
+    }, [travel.id]);
+
     // Initial fetch and polling
     useEffect(() => {
         if (!isCrossChain && (travel.status === 'Active' || travel.status === 'Processing')) {
              fetchVisualizationData();
+             fetchFeedHistory();
         }
-    }, [isCrossChain, travel.status, fetchVisualizationData]);
+    }, [isCrossChain, travel.status, fetchVisualizationData, fetchFeedHistory]);
+
+    // V2.0: 地址变化时分析类型
+    useEffect(() => {
+        const addr = onChainData.exploredAddress || targetAddress;
+        if (addr && travel.chainId) {
+            fetchAddressType(addr, travel.chainId);
+        }
+    }, [onChainData.exploredAddress, targetAddress, travel.chainId, fetchAddressType]);
 
     useEffect(() => {
         const updateTime = () => {
@@ -204,6 +242,27 @@ export const TravelStatus = memo(function TravelStatus({ travel, frogName }: Tra
                     </p>
                 </div>
                 <span className="text-2xl animate-bounce">✈️</span>
+            </div>
+
+            {/* V2.0: 地址类型标签 + 投喂按钮 */}
+            <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                    {(targetAddress || onChainData.exploredAddress) && (
+                        <AddressTag type={addressType} bonus={addressBonus} size="medium" />
+                    )}
+                    {feedCount > 0 && (
+                        <span className="text-xs text-gray-500">🍭 {feedCount} 次投喂</span>
+                    )}
+                </div>
+                {travel.frog && (
+                    <FeedButton
+                        travelId={travel.id}
+                        feederId={travel.frog.id}
+                        targetFrogName={frogName}
+                        onFeedSuccess={() => fetchFeedHistory()}
+                        disabled={travel.status !== 'Active'}
+                    />
+                )}
             </div>
 
             {/* 进度条 */}

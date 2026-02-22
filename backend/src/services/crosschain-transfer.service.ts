@@ -93,18 +93,12 @@ export async function updateTransferStatus(input: UpdateCctxInput) {
  * 检查并解锁跨链转账相关成就
  */
 async function checkAndUnlockTransferAchievements(fromFrogId: number, toFrogId: number) {
-  // 检查是否是好友
-  const fromFrog = await prisma.frog.findUnique({ where: { id: fromFrogId } });
-  const toFrog = await prisma.frog.findUnique({ where: { id: toFrogId } });
-  
-  if (!fromFrog || !toFrog) return;
-
-  // 检查好友关系
-  const friendship = await (prisma as any).friendship.findFirst({
+  // 检查好友关系 - 使用 frogId 查询，Friendship 通过 requesterId/addresseeId 关联 Frog
+  const friendship = await prisma.friendship.findFirst({
     where: {
       OR: [
-        { requesterAddress: fromFrog.ownerAddress, addresseeAddress: toFrog.ownerAddress, status: 'ACCEPTED' },
-        { requesterAddress: toFrog.ownerAddress, addresseeAddress: fromFrog.ownerAddress, status: 'ACCEPTED' },
+        { requesterId: fromFrogId, addresseeId: toFrogId, status: 'Accepted' },
+        { requesterId: toFrogId, addresseeId: fromFrogId, status: 'Accepted' },
       ],
     },
   });
@@ -249,26 +243,26 @@ export async function getTransferableFriends(frogId: number) {
   const frog = await prisma.frog.findUnique({ where: { id: frogId } });
   if (!frog) throw new Error('Frog not found');
 
-  // 获取所有好友
-  const friendships = await (prisma as any).friendship.findMany({
+  // 获取所有好友 - 使用 requesterId/addresseeId 查询
+  const friendships = await prisma.friendship.findMany({
     where: {
       OR: [
-        { requesterAddress: frog.ownerAddress, status: 'ACCEPTED' },
-        { addresseeAddress: frog.ownerAddress, status: 'ACCEPTED' },
+        { requesterId: frogId, status: 'Accepted' },
+        { addresseeId: frogId, status: 'Accepted' },
       ],
     },
     include: {
-      requesterFrog: true,
-      addresseeFrog: true,
+      requester: true,
+      addressee: true,
     },
   });
 
   // 提取好友青蛙
-  const friends = friendships.map((f: any) => {
-    if (f.requesterAddress === frog.ownerAddress) {
-      return f.addresseeFrog;
+  const friends = friendships.map((f) => {
+    if (f.requesterId === frogId) {
+      return f.addressee;
     }
-    return f.requesterFrog;
+    return f.requester;
   }).filter(Boolean);
 
   return friends;

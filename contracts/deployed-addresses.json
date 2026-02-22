@@ -1,24 +1,13 @@
 {
   "zetaAthens": {
-    "omniTravel": "0x0F4B80d84363B3FCdC1F4fBb8d749c894B087E5a",
-    "omniTravelV2": "0x51D60F01B8e19CFd94097933ca26bA0f77eB0241",
     "zetaFrogNFT": "0x0721CDff3291a1Dd2af28633B5dEE5427553F09E",
-    "gateway": "0x6c533f7fe93fae114d0954697069df33c9b74fd7",
-    "zetaFrogNFT_proxy": "0x0721CDff3291a1Dd2af28633B5dEE5427553F09E",
-    "zetaFrogNFT_impl": "0x9065367EE6d2d8Fa5721498656A57BfA4D9955e1",
-    "omniTravel_v3": "0x7e85A33380f6994e510F884238f37827B25e50d5",
-    "travel": "0x566EA8C0cd7569e9E2472F39dF32e01c655e2E33",
-    "travel_v2": "0x4e8884F6a8CEadBCfAaEEa9B888560Ac9570fbB3",
-    "souvenirNFT": "0xCE871f9F009f7Fa49f23f0EEE09977FfB7b4DbF5",
-    "souvenirNFT_v2": "0xCE871f9F009f7Fa49f23f0EEE09977FfB7b4DbF5",
-    "finalContracts": {
-      "zetaFrogNFT": "0x0721CDff3291a1Dd2af28633B5dEE5427553F09E",
-      "travel": "0x4e8884F6a8CEadBCfAaEEa9B888560Ac9570fbB3",
-      "omniTravel": "0x7e85A33380f6994e510F884238f37827B25e50d5",
-      "souvenirNFT": "0xCE871f9F009f7Fa49f23f0EEE09977FfB7b4DbF5"
-    },
-    "omniTravelImpl": "0xDF07Ee0A6A0E7E5A92a767f0dD4317c15a48384D",
-    "deployedAt": "2026-01-07T07:43:41.112Z"
+    "zetaFrogNFTImpl": "0xA735Cf3DB3b3c299dFe6F8ddc4E41d1064F8e45",
+    "omniTravel": "0xA12a2506E6B6604650c0661227F11aae1BDDf3af",
+    "travel": "0x4e8884F6a8CEadBCfAaEEa9B888560Ac9570fbB3",
+    "souvenir": "0xCE871f9F009f7Fa49f23f0EEE09977FfB7b4DbF5",
+    "deployedAt": "2026-02-05T05:30:00.000Z",
+    "note": "ZetaFrogNFT upgraded to v2.1.0 with adminResetHasMinted",
+    "omniTravelOld": "0x7e85A33380f6994e510F884238f37827B25e50d5"
   },
   "bscTestnet": {
     "frogConnector": "0x1E8D44A6D21C29332a4528439d107Fa9e9aF4752",

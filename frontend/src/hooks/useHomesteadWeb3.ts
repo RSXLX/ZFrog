@@ -99,6 +99,7 @@ export function useHomesteadWeb3() {
         const timestamp = Math.floor(Date.now() / 1000);
         
         const signature = await walletClient.signTypedData({
+          account: address as Address,
           domain: EIP712_DOMAIN,
           types: MESSAGE_TYPES,
           primaryType: 'VisitorMessage',
@@ -133,10 +134,20 @@ export function useHomesteadWeb3() {
       setIsLoading(true);
       
       try {
+        // @ts-ignore - kzg is optional but TS is strict
         const hash = await walletClient.sendTransaction({
+          account: address as Address,
           to: toAddress as Address,
           value: parseEther(amountInEther),
+          chain: walletClient.chain,
         });
+        
+        // 等待交易确认
+        if (publicClient) {
+          await publicClient.waitForTransactionReceipt({ hash });
+        }
+
+        return { success: true, txHash: hash };
 
         // 等待交易确认
         if (publicClient) {
@@ -181,9 +192,12 @@ export function useHomesteadWeb3() {
           args: [address, toAddress as Address, BigInt(tokenId)],
         });
 
+        // @ts-ignore
         const hash = await walletClient.sendTransaction({
+          account: address as Address,
           to: nftContract as Address,
           data,
+          chain: walletClient.chain,
         });
 
         // 等待交易确认
@@ -244,9 +258,12 @@ export function useHomesteadWeb3() {
           args: [address, ipfsUri],
         });
 
+        // @ts-ignore
         const hash = await walletClient.sendTransaction({
+          account: address as Address,
           to: PHOTO_NFT_CONTRACT as Address,
           data,
+          chain: walletClient.chain,
         });
 
         // 等待交易确认并获取 tokenId (简化版)
@@ -256,7 +273,8 @@ export function useHomesteadWeb3() {
           return { 
             success: true, 
             txHash: hash,
-            tokenId: receipt.logs[0]?.topics[3]?.toString() || '0', 
+            // @ts-ignore
+            tokenId: receipt.logs[0]?.topics?.[3]?.toString() || '0', 
           };
         }
 

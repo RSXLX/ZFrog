@@ -53,6 +53,40 @@ export const FriendFloatList: React.FC<FriendFloatListProps> = ({
     }
   };
 
+  // 亲密度等级辅助函数
+  const getIntimacyColor = (level: number) => {
+    switch (level) {
+      case 1: return '#9ca3af'; // 灰色 - 陌生人
+      case 2: return '#60a5fa'; // 蓝色 - 点头之交
+      case 3: return '#34d399'; // 绿色 - 好朋友
+      case 4: return '#f472b6'; // 粉色 - 亲密伙伴
+      case 5: return '#f59e0b'; // 金色 - 灵魂伴侣
+      default: return '#9ca3af';
+    }
+  };
+
+  const getIntimacyIcon = (level: number) => {
+    switch (level) {
+      case 1: return '🤝';
+      case 2: return '👋';
+      case 3: return '💚';
+      case 4: return '💖';
+      case 5: return '💫';
+      default: return '🤝';
+    }
+  };
+
+  const getIntimacyName = (level: number) => {
+    switch (level) {
+      case 1: return '陌生人';
+      case 2: return '点头之交';
+      case 3: return '好朋友';
+      case 4: return '亲密伙伴';
+      case 5: return '灵魂伴侣';
+      default: return '陌生人';
+    }
+  };
+
   // 过滤好友
   const filteredFriends = friends.filter(friend =>
     friend.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -118,7 +152,22 @@ export const FriendFloatList: React.FC<FriendFloatListProps> = ({
               </div>
               
               <div className="float-friend-info">
-                <div className="float-friend-name">{friend.name}</div>
+                <div className="float-friend-name">
+                  {friend.name}
+                  {/* 亲密度等级徽章 */}
+                  {(friend as any).intimacyLevel && (
+                    <span 
+                      className="ml-1 text-xs px-1.5 py-0.5 rounded-full"
+                      style={{
+                        backgroundColor: getIntimacyColor((friend as any).intimacyLevel),
+                        color: 'white',
+                      }}
+                      title={getIntimacyName((friend as any).intimacyLevel)}
+                    >
+                      {getIntimacyIcon((friend as any).intimacyLevel)}
+                    </span>
+                  )}
+                </div>
                 <div className="float-friend-status">
                   <span>{getStatusIcon(friend.status)}</span>
                   <span>{getStatusText(friend.status)}</span>

@@ -1,0 +1,136 @@
+/* frontend/src/components/travel/FeedButton.css */
+/* V2.0 投喂按钮样式 */
+
+.feed-button-container {
+  position: relative;
+  display: inline-block;
+}
+
+.feed-button-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #ff9a56 0%, #ff6b6b 100%);
+  border: none;
+  border-radius: 20px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+}
+
+.feed-button-trigger:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 107, 107, 0.4);
+}
+
+.feed-button-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.feed-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  background: rgba(20, 25, 40, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 8px;
+  min-width: 200px;
+  z-index: 100;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.feed-menu-header {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 4px;
+}
+
+.feed-menu-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.feed-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.feed-menu-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.feed-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.feed-emoji {
+  font-size: 20px;
+}
+
+.feed-name {
+  flex: 1;
+  font-size: 14px;
+}
+
+.feed-cost {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.feed-message {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+  animation: fadeIn 0.2s ease;
+}
+
+.feed-message.success {
+  background: rgba(76, 175, 80, 0.9);
+  color: white;
+}
+
+.feed-message.error {
+  background: rgba(244, 67, 54, 0.9);
+  color: white;
+}

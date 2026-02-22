@@ -4,8 +4,25 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '../components/common/Button';
 import { TravelResult } from '../components/travel/TravelResult';
+import { EmptyTravels } from '../components/common/EmptyState';
+import { AnimatedNumber } from '../components/common/MicroInteractions';
 import { apiService } from '../services/api';
 import { useAccount } from 'wagmi';
+import { 
+    Clock, 
+    MapPin, 
+    BookOpen, 
+    Trophy, 
+    Compass, 
+    Calendar, 
+    ArrowLeft, 
+    Search,
+    Filter,
+    ChevronLeft,
+    ChevronRight,
+    Map
+} from 'lucide-react';
+import clsx from 'clsx';
 
 interface Travel {
     id: number;
@@ -208,29 +225,31 @@ export function TravelHistoryPage() {
                 <motion.div
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="mb-6"
+                    className="mb-6 relative z-10"
                 >
-                    <Button
-                        variant="outline"
+                    <button
                         onClick={() => navigate('/')}
-                        className="flex items-center space-x-2"
+                        className="flex items-center gap-2 text-white/90 hover:text-white transition-colors group"
                     >
-                        <span>←</span>
-                        <span>返回首页</span>
-                    </Button>
+                        <div className="p-2 bg-white/10 rounded-full group-hover:bg-white/20 backdrop-blur-sm transition-all">
+                            <ArrowLeft size={20} />
+                        </div>
+                        <span className="font-exo font-medium">Back to Home</span>
+                    </button>
                 </motion.div>
 
                 {/* 标题 */}
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-8"
+                    className="text-center mb-10 relative"
                 >
-                    <h1 className="text-4xl font-bold text-green-600 mb-2">
-                        📖 旅行日记
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-green-400/20 rounded-full blur-3xl -z-10" />
+                    <h1 className="text-5xl font-orbitron font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-teal-500 mb-3 drop-shadow-sm">
+                        Travel Journal
                     </h1>
-                    <p className="text-gray-700">
-                        记录青蛙的每一次探险故事
+                    <p className="text-gray-600 font-exo text-lg">
+                        Adventures across the multiverse
                     </p>
                 </motion.div>
 
@@ -239,10 +258,11 @@ export function TravelHistoryPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="flex justify-end mb-6"
+                    className="flex justify-end mb-8"
                 >
-                    <div className="flex items-center space-x-2 bg-white/50 backdrop-blur p-2 rounded-xl border border-white/20">
-                        <span className="text-sm font-medium text-gray-700 mr-2">筛选青蛙:</span>
+                    <div className="flex items-center bg-white/40 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/40 shadow-sm hover:shadow-md transition-shadow">
+                        <Filter size={18} className="text-green-600 mr-2" />
+                        <span className="text-sm font-semibold text-gray-700 mr-3">Filter Frog:</span>
                         <select 
                             value={selectedFrogId}
                             onChange={(e) => {
@@ -254,9 +274,9 @@ export function TravelHistoryPage() {
                                 else url.searchParams.delete('frogId');
                                 window.history.replaceState({}, '', url);
                             }}
-                            className="bg-transparent border-none focus:ring-0 text-gray-800 font-medium cursor-pointer"
+                            className="bg-transparent border-none focus:ring-0 text-gray-800 font-medium cursor-pointer outline-none font-exo"
                         >
-                            <option value="all">🐸 所有青蛙</option>
+                            <option value="all">🐸 All Frogs</option>
                             {frogs.map(frog => (
                                 <option key={frog.id} value={frog.tokenId}>
                                     🐸 {frog.name} (#{frog.tokenId})
@@ -275,32 +295,32 @@ export function TravelHistoryPage() {
                         className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
                     >
                         <StatCard
-                            icon="🎒"
-                            label="总旅行次数"
+                            icon={<Map size={32} />}
+                            label="Total Trips"
                             value={stats.totalTrips}
-                            color="from-blue-400 to-blue-600"
+                            color="from-blue-500 to-indigo-600"
                         />
                         <StatCard
-                            icon="✨"
-                            label="总发现"
+                            icon={<BookOpen size={32} />}
+                            label="Discoveries"
                             value={stats.totalDiscoveries}
-                            color="from-purple-400 to-purple-600"
+                            color="from-purple-500 to-fuchsia-600"
                         />
                         <StatCard
-                            icon="💎"
-                            label="稀有发现"
+                            icon={<Trophy size={32} />}
+                            label="Rare Finds"
                             value={stats.rareFinds}
-                            color="from-yellow-400 to-yellow-600"
+                            color="from-amber-400 to-orange-500"
                         />
                         <StatCard
-                            icon="🏆"
-                            label="访问链数"
+                            icon={<Compass size={32} />}
+                            label="Chains Visited"
                             value={Object.entries({
                                 bsc: stats.bscTrips,
                                 eth: stats.ethTrips,
                                 zeta: stats.zetaTrips,
                             }).filter(([_, count]) => count > 0).length}
-                            color="from-green-400 to-green-600"
+                            color="from-emerald-400 to-teal-600"
                         />
                     </motion.div>
                 )}
@@ -311,10 +331,13 @@ export function TravelHistoryPage() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3 }}
-                        className="bg-white/50 backdrop-blur rounded-2xl p-6 mb-8"
+                        className="bg-white/40 backdrop-blur-md rounded-3xl p-8 mb-8 border border-white/30 shadow-sm"
                     >
-                        <h3 className="text-lg font-bold text-gray-800 mb-4">探索足迹</h3>
-                        <div className="space-y-3">
+                        <h3 className="text-xl font-orbitron font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            <MapPin className="text-green-500" />
+                            Exploration Footprint
+                        </h3>
+                        <div className="space-y-4">
                             {Object.entries({
                                 BSC_TESTNET: stats.bscTrips,
                                 ETH_SEPOLIA: stats.ethTrips,
@@ -328,23 +351,23 @@ export function TravelHistoryPage() {
                                     : 0;
                                 
                                 return (
-                                    <div key={chain} className="flex items-center space-x-3">
-                                        <span className="text-2xl">{config.icon}</span>
+                                    <div key={chain} className="flex items-center space-x-4 group">
+                                        <div className="text-2xl p-2 bg-white/50 rounded-xl shadow-sm">{config.icon}</div>
                                         <div className="flex-1">
-                                            <div className="flex justify-between mb-1">
-                                                <span className="font-medium text-gray-700">
+                                            <div className="flex justify-between mb-2">
+                                                <span className="font-exo font-semibold text-gray-700">
                                                     {config.name}
                                                 </span>
-                                                <span className="text-sm text-gray-600">
-                                                    {count} 次
+                                                <span className="text-sm font-bg font-bold text-gray-600 bg-white/40 px-2 py-0.5 rounded-lg">
+                                                    {count} Trips
                                                 </span>
                                             </div>
-                                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                            <div className="h-3 bg-gray-100/50 rounded-full overflow-hidden border border-white/20">
                                                 <motion.div
-                                                    className={`h-full bg-gradient-to-r ${config.color}`}
+                                                    className={`h-full bg-gradient-to-r ${config.color} shadow-[0_0_10px_rgba(0,0,0,0.1)]`}
                                                     initial={{ width: 0 }}
                                                     animate={{ width: `${percentage}%` }}
-                                                    transition={{ duration: 0.5 }}
+                                                    transition={{ duration: 0.8, ease: "easeOut" }}
                                                 />
                                             </div>
                                         </div>
@@ -362,25 +385,24 @@ export function TravelHistoryPage() {
                     transition={{ delay: 0.4 }}
                     className="space-y-4"
                 >
-                    <h3 className="text-lg font-bold text-gray-800">最近的旅行</h3>
+                    <h3 className="text-xl font-orbitron font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <Clock className="text-blue-500" />
+                        Recent Journeys
+                    </h3>
                     
                     {(!travels || travels.length === 0) ? (
-                        <div className="text-center py-12 bg-white/50 backdrop-blur rounded-2xl">
-                            <p className="text-gray-600 mb-4">还没有旅行记录</p>
-                            <Button onClick={() => navigate('/')} variant="primary">
-                                                        开始第一次旅行
-                                                    </Button>                        </div>
+                        <EmptyTravels onStartTravel={() => navigate('/')} />
                     ) : (
                         travels.map((travel, index) => {
                             const chainIdToKey: Record<number, keyof typeof chainConfig> = {
-    97: 'BSC_TESTNET',
-    11155111: 'ETH_SEPOLIA',
-    7001: 'ZETACHAIN_ATHENS',
-};
-const chain = chainConfig[chainIdToKey[travel.chainId] || 'ZETACHAIN_ATHENS'];
+                                97: 'BSC_TESTNET',
+                                11155111: 'ETH_SEPOLIA',
+                                7001: 'ZETACHAIN_ATHENS',
+                            };
+                            const chain = chainConfig[chainIdToKey[travel.chainId] || 'ZETACHAIN_ATHENS'];
                             
                             // 优先从 journal 对象获取内容，如果没有则从 journalContent 获取
-                            const journalTitle = travel.journal?.title || `旅行 #${travel.id}`;
+                            const journalTitle = travel.journal?.title || `Journey #${travel.id}`;
                             const journalContent = travel.journal?.content || travel.journalContent || travel.diary || '';
                             const journalMood = travel.journal?.mood || travel.diaryMood || 'happy';
                             
@@ -390,65 +412,77 @@ const chain = chainConfig[chainIdToKey[travel.chainId] || 'ZETACHAIN_ATHENS'];
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ delay: 0.05 * index }}
-                                    whileHover={{ x: 5 }}
-                                    className="bg-white/50 backdrop-blur rounded-xl p-4 cursor-pointer hover:bg-white/70 transition-all"
+                                    whileHover={{ x: 5, scale: 1.01 }}
+                                    className="bg-white/60 backdrop-blur-md rounded-2xl p-5 cursor-pointer hover:bg-white/80 transition-all border border-white/40 shadow-sm hover:shadow-md group"
                                     onClick={() => handleTravelClick(travel)}
                                 >
                                     <div className="flex items-start justify-between">
-                                        <div className="flex items-start space-x-3">
-                                            <span className="text-2xl">{chain?.icon || '🌍'}</span>
+                                        <div className="flex items-start gap-4">
+                                            <div className="text-3xl p-3 bg-white/60 rounded-2xl shadow-sm border border-white/30">
+                                                {chain?.icon || '🌍'}
+                                            </div>
                                             <div>
-                                                <div className="flex items-center space-x-2">
-                                                    <p className="font-medium text-gray-800">
-                                                        {chain?.name || '未知链'}
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <p className="font-exo font-bold text-gray-800 text-lg group-hover:text-green-600 transition-colors">
+                                                        {chain?.name || 'Unknown Realm'}
                                                     </p>
                                                     {travel.frog && (
-                                                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                                                        <span className="text-xs px-2 py-0.5 bg-green-100/80 text-green-700 font-bold rounded-lg border border-green-200">
                                                             {travel.frog.name}
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p className="font-medium text-gray-700 text-sm">
+                                                <p className="font-medium text-gray-700 text-sm mb-1 bg-white/30 inline-block px-2 py-0.5 rounded-md">
                                                     {journalTitle}
                                                 </p>
-                                                {travel.exploredBlock && (
-                                                    <p className="text-sm text-gray-600">
-                                                        区块 #{travel.exploredBlock}
-                                                    </p>
-                                                )}
-                                                {travel.completedAt && (
-                                                    <p className="text-xs text-gray-500">
-                                                        {new Date(travel.completedAt).toLocaleString()}
-                                                    </p>
-                                                )}
+                                                <div className="flex items-center gap-3 text-xs text-gray-500 font-exo">
+                                                    {travel.exploredBlock && (
+                                                        <span className="flex items-center gap-1">
+                                                            <div className="w-1.5 h-1.5 bg-blue-400 rounded-full" />
+                                                            Block #{travel.exploredBlock}
+                                                        </span>
+                                                    )}
+                                                    {travel.completedAt && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Clock size={12} />
+                                                            {new Date(travel.completedAt).toLocaleString()}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                         
-                                        <div className="flex items-center space-x-2">
+                                        <div className="flex items-center gap-2">
                                             {journalMood && (
-                                                <span className="text-xl">
+                                                <span className="text-2xl filter drop-shadow-sm hover:scale-110 transition-transform cursor-help" title={`Mood: ${journalMood}`}>
                                                     {moodEmojis[journalMood.toLowerCase()] || moodEmojis[journalMood.toUpperCase()] || '😊'}
                                                 </span>
                                             )}
-                                            {travel.souvenir && (
-                                                <div className="flex items-center space-x-1 px-2 py-1 bg-purple-100 text-purple-700 rounded overflow-hidden">
-                                                    {(() => {
-                                                        const sId = travel.souvenir.tokenId;
-                                                        const imgUrl = sId ? souvenirImages[sId] : null;
-                                                        return imgUrl ? (
-                                                            <img src={imgUrl} className="w-4 h-4 rounded-sm object-cover" alt="" />
-                                                        ) : (
-                                                            <span>🎁</span>
-                                                        );
-                                                    })()}
-                                                    <span className="text-xs font-medium">{travel.souvenir.name}</span>
-                                                </div>
-                                            )}
+                                            <ChevronRight className="text-gray-400 group-hover:text-green-500 transition-colors" />
                                         </div>
                                     </div>
                                     
+                                    {/* 纪念品展示 (如果有) */}
+                                    {travel.souvenir && (
+                                        <div className="mt-3 ml-16 p-2 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-100 flex items-center gap-3 w-fit">
+                                            {(() => {
+                                                const sId = travel.souvenir.tokenId;
+                                                const imgUrl = sId ? souvenirImages[sId] : null;
+                                                return imgUrl ? (
+                                                    <img src={imgUrl} className="w-8 h-8 rounded-md object-cover shadow-sm" alt="" />
+                                                ) : (
+                                                    <span className="text-xl">🎁</span>
+                                                );
+                                            })()}
+                                            <div>
+                                                <p className="text-xs font-bold text-purple-700">{travel.souvenir.name}</p>
+                                                <p className="text-[10px] text-purple-500 uppercase tracking-wider font-bold">{travel.souvenir.rarity}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
                                     {journalContent && (
-                                        <p className="mt-2 text-sm text-gray-600 line-clamp-2 italic">
+                                        <p className="mt-3 ml-16 text-sm text-gray-600 line-clamp-2 italic border-l-2 border-green-300 pl-3">
                                             "{journalContent}"
                                         </p>
                                     )}
@@ -463,25 +497,25 @@ const chain = chainConfig[chainIdToKey[travel.chainId] || 'ZETACHAIN_ATHENS'];
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="flex justify-center mt-8 space-x-2"
+                        className="flex justify-center mt-10 gap-4"
                     >
-                        <Button
-                            variant="outline"
+                        <button
                             disabled={page === 1}
                             onClick={() => setPage(page - 1)}
+                            className="p-2 bg-white/40 hover:bg-white/60 disabled:opacity-30 disabled:hover:bg-white/40 rounded-xl transition-all border border-white/30 backdrop-blur-sm"
                         >
-                            上一页
-                        </Button>
-                        <span className="flex items-center px-4 text-gray-600">
-                            {page} / {Math.ceil(total / pageSize)}
+                            <ChevronLeft />
+                        </button>
+                        <span className="flex items-center px-6 bg-white/40 rounded-xl font-orbitron font-bold text-gray-700 border border-white/30 backdrop-blur-sm shadow-sm">
+                            {page} <span className="mx-2 text-gray-400">/</span> {Math.ceil(total / pageSize)}
                         </span>
-                        <Button
-                            variant="outline"
+                        <button
                             disabled={page >= Math.ceil(total / pageSize)}
                             onClick={() => setPage(page + 1)}
+                            className="p-2 bg-white/40 hover:bg-white/60 disabled:opacity-30 disabled:hover:bg-white/40 rounded-xl transition-all border border-white/30 backdrop-blur-sm"
                         >
-                            下一页
-                        </Button>
+                            <ChevronRight />
+                        </button>
                     </motion.div>
                 )}
 
@@ -526,19 +560,26 @@ const chain = chainConfig[chainIdToKey[travel.chainId] || 'ZETACHAIN_ATHENS'];
 }
 
 function StatCard({ icon, label, value, color }: {
-    icon: string;
+    icon: React.ReactNode;
     label: string;
     value: number;
     color: string;
 }) {
     return (
         <motion.div
-            whileHover={{ y: -5 }}
-            className={`bg-gradient-to-br ${color} rounded-xl p-4 text-white text-center shadow-lg`}
+            whileHover={{ y: -5, scale: 1.02 }}
+            className={`bg-gradient-to-br ${color} rounded-2xl p-4 text-white text-center shadow-lg relative overflow-hidden group`}
         >
-            <div className="text-3xl mb-2">{icon}</div>
-            <div className="text-2xl font-bold">{value}</div>
-            <div className="text-sm opacity-90">{label}</div>
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
+                {icon}
+            </div>
+            <div className="relative z-10 flex flex-col items-center justify-center h-full">
+                <div className="text-3xl mb-2 opacity-90 drop-shadow-sm">{icon}</div>
+                <div className="text-3xl font-orbitron font-bold tracking-tight">
+                    <AnimatedNumber value={value} />
+                </div>
+                <div className="text-xs font-exo uppercase tracking-wider opacity-80 mt-1">{label}</div>
+            </div>
         </motion.div>
     );
 }

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Frog, FriendInteraction, InteractionType } from '../../types';
 import { apiService } from '../../services/api';
+import { BreedPanel } from '../breed';
+import { LevelUpCelebration } from '../common/MicroInteractions';
 
 interface FriendInteractionProps {
   friend: Frog;
@@ -22,6 +24,13 @@ const FriendInteractionModal: React.FC<FriendInteractionProps> = ({
   const [loading, setLoading] = useState(false);
   const [interactions, setInteractions] = useState<FriendInteraction[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  // P3.1 亲密度和每日限制
+  const [intimacyInfo, setIntimacyInfo] = useState<any>(null);
+  const [lastIntimacyResult, setLastIntimacyResult] = useState<any>(null);
+  // P5 繁殖系统
+  const [showBreedPanel, setShowBreedPanel] = useState(false);
+  // 升级庆祝动画
+  const [showLevelUp, setShowLevelUp] = useState(false);
 
   const interactionTypes: { type: InteractionType; label: string; icon: string; placeholder: string }[] = [
     { type: 'Message', label: '留言', icon: '💬', placeholder: '想对好友说点什么...' },
@@ -34,6 +43,7 @@ const FriendInteractionModal: React.FC<FriendInteractionProps> = ({
 
   useEffect(() => {
     fetchInteractionHistory();
+    fetchIntimacyInfo();
   }, [friendshipId]);
 
   const fetchInteractionHistory = async () => {
@@ -48,6 +58,17 @@ const FriendInteractionModal: React.FC<FriendInteractionProps> = ({
     }
   };
 
+  const fetchIntimacyInfo = async () => {
+    try {
+      const response = await apiService.get(`/friends/${friendshipId}/intimacy`);
+      if (response.success) {
+        setIntimacyInfo(response.data);
+      }
+    } catch (err) {
+      console.error('Error fetching intimacy info:', err);
+    }
+  };
+
   const handleInteraction = async () => {
     if (!message.trim() && selectedType === 'Message') {
       alert('请输入留言内容');
@@ -58,15 +79,27 @@ const FriendInteractionModal: React.FC<FriendInteractionProps> = ({
     try {
       const metadata = {};
       
-      await apiService.post(`/friends/${friendshipId}/interact`, {
+      const result = await apiService.post(`/friends/${friendshipId}/interact`, {
         actorId: currentFrogId,
         type: selectedType,
         message: message.trim() || undefined,
         metadata
       });
 
+      // 保存亲密度结果用于显示
+      if (result.success && result.data?.intimacy) {
+        setLastIntimacyResult(result.data.intimacy);
+        // 如果升级了，显示庆祝动画
+        if (result.data.intimacy.levelUp) {
+          setShowLevelUp(true);
+        }
+        // 3秒后清除
+        setTimeout(() => setLastIntimacyResult(null), 3000);
+      }
+
       setMessage('');
       await fetchInteractionHistory();
+      await fetchIntimacyInfo();
       onInteractionComplete?.();
     } catch (err) {
       console.error('Error creating interaction:', err);
@@ -117,6 +150,57 @@ const FriendInteractionModal: React.FC<FriendInteractionProps> = ({
             ✕
           </button>
         </div>
+
+        {/* P3.1 亲密度信息卡片 */}
+        {intimacyInfo && (
+          <div className="mb-4 p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl border border-pink-100">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">💗</span>
+                <span className="font-medium text-gray-700">亲密度</span>
+                <span className="px-2 py-0.5 bg-pink-100 text-pink-700 text-xs rounded-full">
+                  {intimacyInfo.levelName}
+                </span>
+              </div>
+              <span className="text-sm text-gray-500">
+                {intimacyInfo.intimacy}/100
+              </span>
+            </div>
+            {/* 进度条 */}
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-pink-400 to-purple-500 transition-all duration-500"
+                style={{ width: `${intimacyInfo.intimacy}%` }}
+              />
+            </div>
+            {intimacyInfo.nextLevel && (
+              <p className="mt-2 text-xs text-gray-500">
+                距离「{intimacyInfo.nextLevel.name}」还需 {intimacyInfo.nextLevel.required - intimacyInfo.intimacy} 点亲密度
+              </p>
+            )}
+            {/* P5 繁殖入口 */}
+            {intimacyInfo.intimacy >= 100 && (
+              <button
+                onClick={() => setShowBreedPanel(true)}
+                className="mt-3 w-full py-2 bg-gradient-to-r from-pink-500 to-purple-500 text-white 
+                           rounded-lg text-sm font-medium hover:from-pink-600 hover:to-purple-600
+                           transition-all transform hover:scale-[1.02]"
+              >
+                💕 繁殖配对
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* 亲密度获得反馈 */}
+        {lastIntimacyResult && lastIntimacyResult.success && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-center animate-pulse">
+            <span className="text-green-600 font-medium">
+              💗 亲密度 +{lastIntimacyResult.intimacyGained}
+              {lastIntimacyResult.levelUp && ' 🎉 升级啦！'}
+            </span>
+          </div>
+        )}
 
         {/* 互动类型选择 */}
         <div className="mb-4">
@@ -215,6 +299,25 @@ const FriendInteractionModal: React.FC<FriendInteractionProps> = ({
           )}
         </div>
       </div>
+
+      {/* P5 繁殖面板 Modal */}
+      {showBreedPanel && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <BreedPanel
+            friendFrogId={friend.id}
+            friendName={friend.name}
+            intimacy={intimacyInfo?.intimacy || 0}
+            onClose={() => setShowBreedPanel(false)}
+          />
+        </div>
+      )}
+
+      {/* 升级庆祝动画 */}
+      <LevelUpCelebration
+        show={showLevelUp}
+        level={intimacyInfo?.level || 1}
+        onComplete={() => setShowLevelUp(false)}
+      />
     </div>
   );
 };

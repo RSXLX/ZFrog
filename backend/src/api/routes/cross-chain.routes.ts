@@ -73,10 +73,16 @@ router.post('/travel', async (req: Request, res: Response) => {
     // Verify eligibility
     const eligibility = await omniTravelService.canStartCrossChainTravel(tokenId, targetChainId);
     if (!eligibility.canStart) {
-      return res.status(400).json({
-        success: false,
-        error: eligibility.reason,
-      });
+      // FIX: If travel just started on-chain (but not in DB), allow creation
+      if (eligibility.reason === 'Travel_Just_Started') {
+         logger.info(`[Travel] Detected 'Just Started' on-chain travel for token ${tokenId}. Allowing record creation.`);
+         // Proceed...
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: eligibility.reason,
+        });
+      }
     }
 
     // Create travel record

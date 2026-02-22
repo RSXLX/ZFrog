@@ -532,3 +532,59 @@ export function notifyTravelStageUpdate(tokenId: number, data: {
         logger.info(`Notified travel:stageUpdate for frog ${tokenId}: stage=${data.stage}, progress=${data.progress}`);
     }
 }
+
+// ========== P4 通知系统 WebSocket 推送函数 ==========
+
+/**
+ * 推送新通知到前端
+ */
+export function notifyNotification(frogId: number, notification: {
+    id: number;
+    type: string;
+    title: string;
+    message: string;
+    priority: string;
+    metadata?: any;
+}): void {
+    if (io) {
+        io.to(`frog:${frogId}`).emit('notification:new', {
+            frogId,
+            ...notification,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified notification:new for frog ${frogId}, type=${notification.type}`);
+    }
+}
+
+/**
+ * 通知未读数量更新
+ */
+export function notifyUnreadCountChanged(frogId: number, unreadCount: number): void {
+    if (io) {
+        io.to(`frog:${frogId}`).emit('notification:unreadCount', {
+            frogId,
+            unreadCount,
+            timestamp: Date.now()
+        });
+    }
+}
+
+/**
+ * 推送状态警告通知
+ */
+export function notifyStatusWarning(frogId: number, warning: {
+    type: 'hunger_warning' | 'clean_warning' | 'health_warning' | 'energy_warning' | 'death_warning';
+    currentValue: number;
+    threshold: number;
+    message: string;
+}): void {
+    if (io) {
+        io.to(`frog:${frogId}`).emit('status:warning', {
+            frogId,
+            ...warning,
+            timestamp: Date.now()
+        });
+        logger.info(`Notified status:warning for frog ${frogId}, type=${warning.type}, value=${warning.currentValue}`);
+    }
+}
+

@@ -1,0 +1,107 @@
+/* frontend/src/components/travel/AddressTag.css */
+/* V2.0 地址标签样式 */
+
+.address-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 16px;
+  border: 1px solid;
+  font-weight: 500;
+}
+
+.address-tag--small {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.address-tag--medium {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.address-tag--large {
+  padding: 6px 14px;
+  font-size: 15px;
+}
+
+.address-tag-emoji {
+  font-size: 1.1em;
+}
+
+.address-tag-label {
+  font-weight: 600;
+}
+
+.address-tag-bonus {
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.85em;
+  font-weight: 700;
+  color: white;
+}
+
+/* Gold Label */
+.gold-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #ffd700 0%, #ff9500 100%);
+  border-radius: 20px;
+  color: #333;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+}
+
+.gold-label-icon {
+  font-size: 16px;
+}
+
+.gold-label-text {
+  font-weight: 500;
+}
+
+.gold-label-text strong {
+  font-weight: 700;
+}
+
+.gold-label-date {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+/* Lucky Buff Tag */
+.lucky-buff-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #81c784 0%, #66bb6a 100%);
+  border-radius: 16px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(129, 199, 132, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(129, 199, 132, 0);
+  }
+}
+
+.lucky-buff-icon {
+  font-size: 14px;
+}
+
+.lucky-buff-timer {
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  font-size: 11px;
+}

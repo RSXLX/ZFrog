@@ -157,6 +157,28 @@ contract ZetaFrogNFTUpgradeable is
         emit FrogStatusUpdated(tokenId, status);
     }
 
+    /**
+     * @notice Reset hasMinted flag for an address (owner only, for testing)
+     * @dev WARNING: This allows re-minting. Use only for testing purposes.
+     */
+    function adminResetHasMinted(address user) external onlyOwner {
+        require(user != address(0), "Invalid address");
+        hasMinted[user] = false;
+        ownerToTokenId[user] = 0;
+    }
+
+    /**
+     * @notice Batch reset hasMinted flags (owner only, for testing)
+     */
+    function adminBatchResetHasMinted(address[] calldata users) external onlyOwner {
+        for (uint i = 0; i < users.length; i++) {
+            if (users[i] != address(0)) {
+                hasMinted[users[i]] = false;
+                ownerToTokenId[users[i]] = 0;
+            }
+        }
+    }
+
     // ============ Migration Functions ============
     
     /**
@@ -361,7 +383,7 @@ contract ZetaFrogNFTUpgradeable is
      * @notice Get contract version
      */
     function version() external pure returns (string memory) {
-        return "2.0.0";
+        return "2.1.0";
     }
 
     // ============ Required Overrides ============

@@ -7,7 +7,7 @@ import { logger } from '../utils/logger';
 import { config } from '../config';
 import { notifyTravelInteraction, notifyTravelStageUpdate, notifyTravelCompleted } from '../websocket';
 import { explorationScheduler } from './exploration-scheduler.service';
-import { badgeChecker } from './badge-checker.service';
+import { badgeService } from './badge/badge.service';
 
 // FrogConnector ABI (事件部分)
 const FROG_CONNECTOR_ABI = [
@@ -483,10 +483,21 @@ class CrossChainListenerService {
         isContract: false
       });
       
-      // 检查并授予徽章
-      const badges = await badgeChecker.checkAndAwardTravelBadges(travel.frogId);
-      if (badges.length > 0) {
-        logger.info(`[CrossChainListener] Awarded badges to frog ${travel.frogId}: ${badges.join(', ')}`);
+      // 检查并授予徽章 (使用统一的 badgeService)
+      let badges: string[] = [];
+      try {
+        const chainKey = travel.targetChain as any;
+        badges = await badgeService.checkAndUnlock(travel.frogId, {
+          chain: chainKey || 'BSC_TESTNET',
+          travelId: travel.id,
+          discoveries: [],
+          ownerAddress: travel.frog?.ownerAddress
+        });
+        if (badges.length > 0) {
+          logger.info(`[CrossChainListener] Awarded badges to frog ${travel.frogId}: ${badges.join(', ')}`);
+        }
+      } catch (badgeError) {
+        logger.error(`[CrossChainListener] Failed to check badges:`, badgeError);
       }
       
       // 生成旅行日记 (P0 修复)

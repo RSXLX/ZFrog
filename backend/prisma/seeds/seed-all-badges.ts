@@ -17,6 +17,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.TRIP_COUNT,
     unlockCondition: { threshold: 1 },
     rarity: 1,
+    airdropEnabled: true,
+    airdropAmount: '100000000000000000', // 0.1 ZETA
   },
   {
     code: 'FREQUENT_TRAVELER',
@@ -26,6 +28,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.TRIP_COUNT,
     unlockCondition: { threshold: 5 },
     rarity: 2,
+    airdropEnabled: true,
+    airdropAmount: '200000000000000000', // 0.2 ZETA
   },
   {
     code: 'SEASONED_TRAVELER',
@@ -35,6 +39,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.TRIP_COUNT,
     unlockCondition: { threshold: 10 },
     rarity: 2,
+    airdropEnabled: true,
+    airdropAmount: '300000000000000000', // 0.3 ZETA
   },
   {
     code: 'WORLD_EXPLORER',
@@ -44,6 +50,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.TRIP_COUNT,
     unlockCondition: { threshold: 50 },
     rarity: 4,
+    airdropEnabled: true,
+    airdropAmount: '1000000000000000000', // 1 ZETA
   },
   {
     code: 'LEGENDARY_WANDERER',
@@ -53,6 +61,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.TRIP_COUNT,
     unlockCondition: { threshold: 100 },
     rarity: 5,
+    airdropEnabled: true,
+    airdropAmount: '2000000000000000000', // 2 ZETA
   },
   {
     code: 'NIGHT_OWL',
@@ -63,6 +73,8 @@ const BADGES = [
     unlockCondition: { type: 'departure_hour', hour: 0 },
     rarity: 3,
     isHidden: true,
+    airdropEnabled: true,
+    airdropAmount: '500000000000000000', // 0.5 ZETA
   },
   {
     code: 'EARLY_BIRD',
@@ -73,6 +85,8 @@ const BADGES = [
     unlockCondition: { type: 'departure_hour', before: 5 },
     rarity: 3,
     isHidden: true,
+    airdropEnabled: true,
+    airdropAmount: '500000000000000000', // 0.5 ZETA
   },
 
   // ========== ⛓️ 跨链探索类 ==========
@@ -84,6 +98,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.CHAIN_VISIT,
     unlockCondition: { chain: 'ZETACHAIN_ATHENS', threshold: 5 },
     rarity: 2,
+    airdropEnabled: true,
+    airdropAmount: '200000000000000000', // 0.2 ZETA
   },
   {
     code: 'ZETA_MASTER',
@@ -93,6 +109,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.CHAIN_VISIT,
     unlockCondition: { chain: 'ZETACHAIN_ATHENS', threshold: 20 },
     rarity: 4,
+    airdropEnabled: true,
+    airdropAmount: '1000000000000000000', // 1 ZETA
   },
   {
     code: 'ETH_NATIVE',
@@ -102,6 +120,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.CHAIN_VISIT,
     unlockCondition: { chain: 'ETH_SEPOLIA', threshold: 5 },
     rarity: 2,
+    airdropEnabled: true,
+    airdropAmount: '200000000000000000', // 0.2 ZETA
   },
   {
     code: 'ETH_WHISPERER',
@@ -111,6 +131,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.CHAIN_VISIT,
     unlockCondition: { chain: 'ETH_SEPOLIA', threshold: 20 },
     rarity: 4,
+    airdropEnabled: true,
+    airdropAmount: '1000000000000000000', // 1 ZETA
   },
   {
     code: 'BSC_EXPLORER',
@@ -120,6 +142,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.CHAIN_VISIT,
     unlockCondition: { chain: 'BSC_TESTNET', threshold: 5 },
     rarity: 2,
+    airdropEnabled: true,
+    airdropAmount: '200000000000000000', // 0.2 ZETA
   },
   {
     code: 'BSC_VETERAN',
@@ -129,6 +153,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.CHAIN_VISIT,
     unlockCondition: { chain: 'BSC_TESTNET', threshold: 20 },
     rarity: 4,
+    airdropEnabled: true,
+    airdropAmount: '1000000000000000000', // 1 ZETA
   },
   {
     code: 'DUAL_CHAIN_TRAVELER',
@@ -138,6 +164,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.MULTI_CHAIN,
     unlockCondition: { threshold: 2 },
     rarity: 3,
+    airdropEnabled: true,
+    airdropAmount: '500000000000000000', // 0.5 ZETA
   },
   {
     code: 'CROSS_CHAIN_MASTER',
@@ -147,6 +175,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.MULTI_CHAIN,
     unlockCondition: { threshold: 3 },
     rarity: 5,
+    airdropEnabled: true,
+    airdropAmount: '2000000000000000000', // 2 ZETA
   },
   {
     code: 'BRIDGE_BUILDER',
@@ -156,6 +186,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.SPECIAL,
     unlockCondition: { type: 'first_real_crosschain' },
     rarity: 3,
+    airdropEnabled: true,
+    airdropAmount: '500000000000000000', // 0.5 ZETA
   },
 
   // ========== 🔍 探索发现类 ==========
@@ -167,6 +199,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.RARE_FIND,
     unlockCondition: { minRarity: 3 },
     rarity: 2,
+    airdropEnabled: true,
+    airdropAmount: '200000000000000000', // 0.2 ZETA
   },
   {
     code: 'TREASURE_HUNTER',
@@ -176,6 +210,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.RARE_FIND,
     unlockCondition: { minRarity: 4 },
     rarity: 3,
+    airdropEnabled: true,
+    airdropAmount: '500000000000000000', // 0.5 ZETA
   },
   {
     code: 'LEGENDARY_SEEKER',
@@ -185,6 +221,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.RARE_FIND,
     unlockCondition: { minRarity: 5 },
     rarity: 5,
+    airdropEnabled: true,
+    airdropAmount: '2000000000000000000', // 2 ZETA
   },
   {
     code: 'WHALE_WATCHER',
@@ -195,6 +233,8 @@ const BADGES = [
     unlockCondition: { type: 'whale_wallet_visited', minBalance: '100' },
     rarity: 4,
     isHidden: true,
+    airdropEnabled: true,
+    airdropAmount: '1000000000000000000', // 1 ZETA
   },
   {
     code: 'CONTRACT_DETECTIVE',
@@ -204,6 +244,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.SPECIAL,
     unlockCondition: { type: 'contract_count', threshold: 10 },
     rarity: 3,
+    airdropEnabled: true,
+    airdropAmount: '500000000000000000', // 0.5 ZETA
   },
   {
     code: 'GENESIS_HUNTER',
@@ -214,6 +256,8 @@ const BADGES = [
     unlockCondition: { type: 'oldest_block', maxBlock: 1000 },
     rarity: 5,
     isHidden: true,
+    airdropEnabled: true,
+    airdropAmount: '2000000000000000000', // 2 ZETA
   },
 
   // ========== 🤝 社交互动类 ==========
@@ -225,6 +269,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.SOCIAL,
     unlockCondition: { metric: 'friend_count', threshold: 1 },
     rarity: 1,
+    airdropEnabled: true,
+    airdropAmount: '100000000000000000', // 0.1 ZETA
   },
   {
     code: 'SOCIAL_BUTTERFLY',
@@ -234,6 +280,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.SOCIAL,
     unlockCondition: { metric: 'friend_count', threshold: 10 },
     rarity: 3,
+    airdropEnabled: true,
+    airdropAmount: '500000000000000000', // 0.5 ZETA
   },
   {
     code: 'POPULAR_FROG',
@@ -243,6 +291,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.SOCIAL,
     unlockCondition: { metric: 'friend_count', threshold: 50 },
     rarity: 5,
+    airdropEnabled: true,
+    airdropAmount: '2000000000000000000', // 2 ZETA
   },
   {
     code: 'FIRST_MESSAGE',
@@ -252,6 +302,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.SOCIAL,
     unlockCondition: { metric: 'message_count', threshold: 1 },
     rarity: 1,
+    airdropEnabled: true,
+    airdropAmount: '100000000000000000', // 0.1 ZETA
   },
   {
     code: 'CHATTERBOX',
@@ -261,6 +313,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.SOCIAL,
     unlockCondition: { metric: 'message_count', threshold: 50 },
     rarity: 3,
+    airdropEnabled: true,
+    airdropAmount: '500000000000000000', // 0.5 ZETA
   },
   {
     code: 'GIFT_GIVER',
@@ -270,6 +324,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.SOCIAL,
     unlockCondition: { metric: 'gift_sent', threshold: 1 },
     rarity: 2,
+    airdropEnabled: true,
+    airdropAmount: '200000000000000000', // 0.2 ZETA
   },
   {
     code: 'SANTA_FROG',
@@ -279,6 +335,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.SOCIAL,
     unlockCondition: { metric: 'gift_sent', threshold: 20 },
     rarity: 4,
+    airdropEnabled: true,
+    airdropAmount: '1000000000000000000', // 1 ZETA
   },
 
   // ========== 🏠 家园收藏类 ==========
@@ -290,6 +348,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.COLLECTION,
     unlockCondition: { metric: 'souvenir_count', threshold: 1 },
     rarity: 1,
+    airdropEnabled: true,
+    airdropAmount: '100000000000000000', // 0.1 ZETA
   },
   {
     code: 'SOUVENIR_COLLECTOR',
@@ -299,6 +359,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.COLLECTION,
     unlockCondition: { metric: 'souvenir_count', threshold: 10 },
     rarity: 3,
+    airdropEnabled: true,
+    airdropAmount: '500000000000000000', // 0.5 ZETA
   },
   {
     code: 'MEMORY_KEEPER',
@@ -308,6 +370,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.COLLECTION,
     unlockCondition: { metric: 'souvenir_count', threshold: 50 },
     rarity: 5,
+    airdropEnabled: true,
+    airdropAmount: '2000000000000000000', // 2 ZETA
   },
   {
     code: 'PHOTOGRAPHER',
@@ -317,6 +381,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.COLLECTION,
     unlockCondition: { metric: 'photo_count', threshold: 5 },
     rarity: 2,
+    airdropEnabled: true,
+    airdropAmount: '200000000000000000', // 0.2 ZETA
   },
   {
     code: 'PRO_PHOTOGRAPHER',
@@ -326,6 +392,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.COLLECTION,
     unlockCondition: { metric: 'photo_count', threshold: 20 },
     rarity: 3,
+    airdropEnabled: true,
+    airdropAmount: '500000000000000000', // 0.5 ZETA
   },
   {
     code: 'INTERIOR_DESIGNER',
@@ -335,6 +403,8 @@ const BADGES = [
     unlockType: BadgeUnlockType.COLLECTION,
     unlockCondition: { metric: 'decoration_placed', threshold: 10 },
     rarity: 3,
+    airdropEnabled: true,
+    airdropAmount: '500000000000000000', // 0.5 ZETA
   },
 
   // ========== 🎭 隐藏/特殊类 ==========
@@ -347,6 +417,8 @@ const BADGES = [
     unlockCondition: { type: 'tokenId_lte', value: 100 },
     rarity: 5,
     isHidden: true,
+    airdropEnabled: true,
+    airdropAmount: '2000000000000000000', // 2 ZETA
   },
   {
     code: 'SEVEN_SEVEN_SEVEN',
@@ -357,6 +429,8 @@ const BADGES = [
     unlockCondition: { type: 'tokenId_contains', pattern: '777' },
     rarity: 4,
     isHidden: true,
+    airdropEnabled: true,
+    airdropAmount: '1000000000000000000', // 1 ZETA
   },
   {
     code: 'MARATHON_FROG',
@@ -367,6 +441,8 @@ const BADGES = [
     unlockCondition: { type: 'travel_duration', minSeconds: 86400 },
     rarity: 4,
     isHidden: true,
+    airdropEnabled: true,
+    airdropAmount: '1000000000000000000', // 1 ZETA
   },
   {
     code: 'COMPLETIONIST',
@@ -377,14 +453,16 @@ const BADGES = [
     unlockCondition: { type: 'all_visible_badges' },
     rarity: 5,
     isHidden: true,
+    airdropEnabled: true,
+    airdropAmount: '5000000000000000000', // 5 ZETA
   },
 ];
 
 async function main() {
-  console.log('🚀 开始播种徽章数据...\n');
+  console.log('🚀 开始播种徽章数据...\\n');
 
   let created = 0;
-  let skipped = 0;
+  let updated = 0;
 
   for (const badge of BADGES) {
     const existing = await prisma.travelBadge.findUnique({
@@ -403,10 +481,13 @@ async function main() {
           unlockCondition: badge.unlockCondition,
           rarity: badge.rarity,
           isHidden: badge.isHidden ?? false,
+          airdropEnabled: badge.airdropEnabled ?? false,
+          airdropAmount: badge.airdropAmount ?? null,
         },
       });
-      console.log(`  [UPDATE] ${badge.icon} ${badge.name}`);
-      skipped++;
+      const airdrop = badge.airdropAmount ? ` (${Number(BigInt(badge.airdropAmount)) / 1e18} ZETA)` : '';
+      console.log(`  [UPDATE] ${badge.icon} ${badge.name}${airdrop}`);
+      updated++;
     } else {
       await prisma.travelBadge.create({
         data: {
@@ -418,14 +499,17 @@ async function main() {
           unlockCondition: badge.unlockCondition,
           rarity: badge.rarity,
           isHidden: badge.isHidden ?? false,
+          airdropEnabled: badge.airdropEnabled ?? false,
+          airdropAmount: badge.airdropAmount ?? null,
         },
       });
-      console.log(`  [CREATE] ${badge.icon} ${badge.name}`);
+      const airdrop = badge.airdropAmount ? ` (${Number(BigInt(badge.airdropAmount)) / 1e18} ZETA)` : '';
+      console.log(`  [CREATE] ${badge.icon} ${badge.name}${airdrop}`);
       created++;
     }
   }
 
-  console.log(`\n✅ 完成！创建 ${created} 个，更新 ${skipped} 个，共 ${BADGES.length} 个徽章。`);
+  console.log(`\\n✅ 完成！创建 ${created} 个，更新 ${updated} 个，共 ${BADGES.length} 个徽章。`);
 }
 
 main()
@@ -436,3 +520,4 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+

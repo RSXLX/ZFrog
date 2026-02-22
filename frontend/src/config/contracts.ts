@@ -14,7 +14,7 @@ export const SOUVENIR_ADDRESS = getAddress(import.meta.env.VITE_CONTRACT_ADDRESS
 export const TRAVEL_ADDRESS = getAddress(import.meta.env.VITE_CONTRACT_ADDRESS_TRAVEL);
 // IMPORTANT: These are hardcoded to ensure the latest deployed addresses are used
 // After new deployments, update these values directly
-export const OMNI_TRAVEL_ADDRESS = getAddress(import.meta.env.VITE_CONTRACT_ADDRESS_OMNI) || '0x0F4B80d84363B3FCdC1F4fBb8d749c894B087E5a' as `0x${string}`;
+export const OMNI_TRAVEL_ADDRESS = getAddress(import.meta.env.VITE_CONTRACT_ADDRESS_OMNI) || '0xA12a2506E6B6604650c0661227F11aae1BDDf3af' as `0x${string}`;
 export const BSC_CONNECTOR_ADDRESS = '0x1E8D44A6D21C29332a4528439d107Fa9e9aF4752' as `0x${string}`;
 export const SEPOLIA_CONNECTOR_ADDRESS = '0x1c31e32A91dcF6f76D61fDef4Aa7B2eC047Cc7A9' as `0x${string}`;
 
@@ -67,6 +67,57 @@ export const ZETAFROG_ABI = [
     type: 'function'
   },
 
+
+  
+  // === 旅行功能 (继承自 Travel) ===
+  {
+    inputs: [
+      {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
+      {"internalType": "address", "name": "targetWallet", "type": "address"},
+      {"internalType": "uint256", "name": "duration", "type": "uint256"},
+      {"internalType": "uint256", "name": "targetChainId", "type": "uint256"}
+    ],
+    name: 'startTravel',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    name: 'cancelTravel',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    name: 'getActiveTravel',
+    outputs: [
+      {"internalType": "uint64", "name": "startTime", "type": "uint64"},
+      {"internalType": "uint64", "name": "endTime", "type": "uint64"},
+      {"internalType": "address", "name": "targetWallet", "type": "address"},
+      {"internalType": "uint256", "name": "targetChainId", "type": "uint256"},
+      {"internalType": "bool", "name": "completed", "type": "bool"},
+      {"internalType": "bool", "name": "isRandom", "type": "bool"}
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    name: 'getTravelJournals',
+    outputs: [{"internalType": "string[]", "name": "", "type": "string[]"}],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    name: 'canTravel',
+    outputs: [{"internalType": "bool", "name": "", "type": "bool"}],
+    stateMutability: 'view',
+    type: 'function'
+  },
+
   // === 事件 ===
   {
     anonymous: false,
@@ -87,6 +138,31 @@ export const ZETAFROG_ABI = [
       { indexed: false, name: 'timestamp', type: 'uint256' }
     ],
     name: 'LevelUp',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'tokenId', type: 'uint256' },
+      { indexed: true, name: 'targetWallet', type: 'address' },
+      { indexed: false, name: 'targetChainId', type: 'uint256' },
+      { indexed: false, name: 'startTime', type: 'uint64' },
+      { indexed: false, name: 'endTime', type: 'uint64' },
+      { indexed: false, name: 'isRandom', type: 'bool' }
+    ],
+    name: 'TravelStarted',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'tokenId', type: 'uint256' },
+      { indexed: false, name: 'journalHash', type: 'string' },
+      { indexed: false, name: 'souvenirId', type: 'uint256' },
+      { indexed: false, name: 'timestamp', type: 'uint256' },
+      { indexed: false, name: 'xpReward', type: 'uint256' }
+    ],
+    name: 'TravelCompleted',
     type: 'event'
   }
 ] as const;

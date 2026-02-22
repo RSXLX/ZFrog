@@ -1,7 +1,7 @@
 import { PrismaClient, ImageGenerationStatus } from '@prisma/client';
 import { DashScopeImageService, MODEL_CONFIG, SIZE_OPTIONS } from './dashscope-image.service';
 import { PromptBuilderService } from './prompt-builder.service';
-import { IPFSUploaderService } from './ipfs-uploader.service';
+import { ipfsService } from './ipfs.service';
 import { ImageProcessorService } from './image-processor.service';
 
 const prisma = new PrismaClient();
@@ -18,14 +18,14 @@ export interface GenerateSouvenirImageInput {
 export class NFTImageOrchestratorService {
   private imageService: DashScopeImageService;
   private promptBuilder: PromptBuilderService;
-  private ipfsUploader: IPFSUploaderService;
+  // 使用统一的 IPFS 服务（从 ipfs.service.ts 导出的单例）
   private imageProcessor: ImageProcessorService;
 
   constructor() {
     const apiKey = process.env.QWEN_API_KEY!;
     this.imageService = new DashScopeImageService(apiKey);
     this.promptBuilder = new PromptBuilderService();
-    this.ipfsUploader = new IPFSUploaderService();
+    // ipfsService 已是单例，无需实例化
     this.imageProcessor = new ImageProcessorService();
   }
 
@@ -87,9 +87,10 @@ export class NFTImageOrchestratorService {
         status: ImageGenerationStatus.UPLOADING,
       });
 
-      const ipfsResult = await this.ipfsUploader.uploadImage({
+      const ipfsResult = await ipfsService.uploadFile({
         buffer: processed.buffer,
         filename: `zetafrog-${input.souvenirType}-${input.rarity}-${Date.now()}.png`,
+        contentType: 'image/png',
       });
 
       // 6. 更新记录为完成

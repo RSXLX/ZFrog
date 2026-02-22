@@ -52,7 +52,7 @@ export const config = {
   // ============ Cross-Chain Contracts ============
   // Cross-chain travel contracts - HARDCODED to ensure correct addresses
   // Cross-chain travel contracts
-  OMNI_TRAVEL_ADDRESS: process.env.OMNI_TRAVEL_ADDRESS || '0x7e85A33380f6994e510F884238f37827B25e50d5',
+  OMNI_TRAVEL_ADDRESS: process.env.OMNI_TRAVEL_ADDRESS || '0xA12a2506E6B6604650c0661227F11aae1BDDf3af',
   BSC_CONNECTOR_ADDRESS: '0x8E79969718D2ffFf2a16DA65DE8cE097ceA04aec',
   SEPOLIA_CONNECTOR_ADDRESS: '0xca54986f91129D1AF3de67b331eBB36b330863C9',
   

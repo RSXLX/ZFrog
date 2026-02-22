@@ -6,7 +6,7 @@ import { explorationService } from '../../services/travel/exploration.service';
 import { ChainKey, SUPPORTED_CHAINS, getRandomTargetChain, getChainKey } from '../../config/chains';
 import { travelProcessor } from '../../workers/travelProcessor';
 import { logger } from '../../utils/logger';
-import { parsePositiveInt, isValidDuration } from '../../utils/validation';
+import { parsePositiveInt, parseNonNegativeInt, isValidDuration } from '../../utils/validation';
 
 // 递归处理 BigInt 序列化问题
 // ... (原有代码)
@@ -435,47 +435,24 @@ router.get('/:travelId/interactions', async (req, res) => {
 router.get('/:travelId/explorations', async (req, res) => {
     try {
         const travelId = parseInt(req.params.travelId);
-        const category = req.query.category as string; // 'contract' | 'wallet' | 'all'
+        const category = req.query.category as string; // 'contract' | 'wallet' | 'all' | undefined
         const limit = parseInt(req.query.limit as string) || 50;
         const offset = parseInt(req.query.offset as string) || 0;
         
         if (isNaN(travelId)) {
             return res.status(400).json({ error: 'Invalid travel ID' });
         }
-        
-        // 构建查询条件
-        const whereClause: any = { travelId };
-        if (category === 'contract') {
-            whereClause.isContract = true;
-        } else if (category === 'wallet') {
-            whereClause.isContract = false;
-        }
-        
-        // 获取分类统计 (Unified)
-        const [
-            interactionTotal, interactionContract, interactionWallet,
-            discoveryTotal, discoveryContract, discoveryWallet
-        ] = await Promise.all([
-            prisma.travelInteraction.count({ where: { travelId } }),
-            prisma.travelInteraction.count({ where: { travelId, isContract: true } }),
-            prisma.travelInteraction.count({ where: { travelId, isContract: false } }),
-            prisma.travelDiscovery.count({ where: { travelId } }),
-            prisma.travelDiscovery.count({ where: { travelId, metadata: { path: ['isContract'], equals: true } } }), // JSON filtering logic might be tricky, simplifying for now
-            prisma.travelDiscovery.count({ where: { travelId, metadata: { path: ['isContract'], equals: false } } })
-        ]);
 
-        // 获取 TravelInteraction 记录
+        // 获取所有 TravelInteraction 记录
         const interactions = await prisma.travelInteraction.findMany({
-            where: whereClause,
+            where: { travelId },
             orderBy: { createdAt: 'desc' },
-            take: limit, // Fetching limit from both is not perfect pagination, but acceptable for now
         });
 
-        // 获取 TravelDiscovery 记录
+        // 获取所有 TravelDiscovery 记录
         const discoveries = await prisma.travelDiscovery.findMany({
             where: { travelId }, 
             orderBy: { createdAt: 'desc' },
-            take: limit
         });
 
         // 映射助手函数
@@ -502,14 +479,14 @@ router.get('/:travelId/explorations', async (req, res) => {
                 blockNumber: e.blockNumber.toString(),
                 blockUrl: `${explorerBase}/block/${e.blockNumber}`,
                 message: e.message,
-                aiAnalysis: e.message, // Interaction message IS the analysis usually
+                aiAnalysis: e.message,
                 exploredAddress: e.exploredAddress,
                 exploredUrl: e.exploredAddress ? `${explorerBase}/address/${e.exploredAddress}` : null,
                 isContract: e.isContract,
                 txHash: e.txHash,
                 txUrl: e.txHash ? `${explorerBase}/tx/${e.txHash}` : null,
                 timestamp: e.createdAt.toISOString(),
-                source: 'interaction'
+                source: 'interaction' as const
             };
         });
 
@@ -529,24 +506,40 @@ router.get('/:travelId/explorations', async (req, res) => {
                 blockNumber: d.blockNumber?.toString() || '0',
                 blockUrl: d.blockNumber ? `${explorerBase}/block/${d.blockNumber}` : null,
                 message: `${d.title}: ${d.description}`,
-                aiAnalysis: `${d.title} - ${d.description}`, // Discovery IS AI generated
+                aiAnalysis: `${d.title} - ${d.description}`,
                 exploredAddress: meta.address || meta.from || null,
                 exploredUrl: (meta.address || meta.from) ? `${explorerBase}/address/${meta.address || meta.from}` : null,
-                isContract: meta.isContract || false,
+                isContract: meta.isContract === true,  // 严格布尔值
                 txHash: meta.txHash || meta.hash || null,
                 txUrl: (meta.txHash || meta.hash) ? `${explorerBase}/tx/${meta.txHash || meta.hash}` : null,
                 timestamp: d.createdAt.toISOString(),
-                source: 'discovery'
+                source: 'discovery' as const
             };
         });
 
-        // 合并并排序
+        // 合并所有数据
         let allData = [...interactionData, ...discoveryData];
         
-        // 排序 (前端做筛选，后端返回全部)
+        // 按时间排序
         allData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-        // P2: Calculate unique addresses for summary
+        // 先计算全量统计（用于 summary 显示）
+        const totalContracts = allData.filter(d => d.isContract === true).length;
+        const totalWallets = allData.filter(d => d.isContract === false).length;
+        const totalAll = allData.length;
+
+        // 根据 category 筛选数据
+        if (category === 'contract') {
+            allData = allData.filter(d => d.isContract === true);
+        } else if (category === 'wallet') {
+            allData = allData.filter(d => d.isContract === false);
+        }
+        // category === 'all' 或 undefined 时不筛选
+
+        // 应用分页
+        const paginatedData = allData.slice(offset, offset + limit);
+
+        // 计算筛选后的唯一地址
         const uniqueAddresses = new Set(
             allData
                 .map(d => d.exploredAddress?.toLowerCase())
@@ -557,12 +550,21 @@ router.get('/:travelId/explorations', async (req, res) => {
             success: true,
             data: {
                 summary: {
-                    total: allData.length,
-                    uniqueAddresses: uniqueAddresses.size,  // P2: Unique address count
-                    contracts: allData.filter(d => d.isContract).length,
-                    wallets: allData.filter(d => !d.isContract).length,
+                    // 全量统计（不受筛选影响）
+                    totalAll,
+                    totalContracts,
+                    totalWallets,
+                    // 当前筛选结果
+                    filtered: allData.length,
+                    uniqueAddresses: uniqueAddresses.size,
                 },
-                explorations: allData, // 返回全部数据，前端做筛选
+                explorations: paginatedData,
+                pagination: {
+                    offset,
+                    limit,
+                    total: allData.length,
+                    hasMore: offset + limit < allData.length
+                }
             }
         });
     } catch (error) {
@@ -978,14 +980,14 @@ router.post('/group', async (req, res) => {
         
         logger.info(`[TravelAPI] POST /group: leader=${leaderId}, companion=${companionId}, chain=${targetChain}, duration=${duration}`);
         
-        // [P2] Enhanced input validation
-        const parsedLeaderId = parsePositiveInt(leaderId);
-        const parsedCompanionId = parsePositiveInt(companionId);
+        // [P2] Enhanced input validation - use parseNonNegativeInt for tokenId (0 is valid)
+        const parsedLeaderId = parseNonNegativeInt(leaderId);
+        const parsedCompanionId = parseNonNegativeInt(companionId);
         
-        if (!parsedLeaderId || !parsedCompanionId) {
+        if (parsedLeaderId === null || parsedCompanionId === null) {
             return res.status(400).json({ 
                 success: false, 
-                error: 'leaderId and companionId must be valid positive integers' 
+                error: 'leaderId and companionId must be valid non-negative integers' 
             });
         }
         
@@ -1162,6 +1164,306 @@ router.get('/:travelId/group', async (req, res) => {
         res.status(500).json({ 
             success: false, 
             error: error.message || 'Internal server error' 
+        });
+    }
+});
+
+// ============ 🆕 V2.0 投喂系统 API ============
+
+import { travelFeedService } from '../../services/travel/travel-feed.service';
+
+/**
+ * POST /api/travels/:travelId/feed
+ * 投喂旅行中的青蛙
+ */
+router.post('/:travelId/feed', async (req, res) => {
+    try {
+        const travelId = parseInt(req.params.travelId);
+        const { feederId, feedType = 'energy' } = req.body;
+
+        if (isNaN(travelId)) {
+            return res.status(400).json({ success: false, error: 'Invalid travel ID' });
+        }
+
+        if (!feederId) {
+            return res.status(400).json({ success: false, error: 'feederId is required' });
+        }
+
+        logger.info(`[TravelAPI] Feed request: travelId=${travelId}, feederId=${feederId}, type=${feedType}`);
+
+        const result = await travelFeedService.feedTravel(travelId, feederId, feedType);
+
+        if (!result.success) {
+            return res.status(400).json({
+                success: false,
+                error: result.message,
+            });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                timeReduced: result.timeReduced,
+                newEndTime: result.newEndTime.toISOString(),
+            },
+            message: result.message,
+        });
+    } catch (error: any) {
+        logger.error('[TravelAPI] Error feeding travel:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error',
+        });
+    }
+});
+
+/**
+ * GET /api/travels/:travelId/feeds
+ * 获取旅行的投喂记录
+ */
+router.get('/:travelId/feeds', async (req, res) => {
+    try {
+        const travelId = parseInt(req.params.travelId);
+
+        if (isNaN(travelId)) {
+            return res.status(400).json({ success: false, error: 'Invalid travel ID' });
+        }
+
+        const feeds = await travelFeedService.getFeedHistory(travelId);
+
+        res.json({
+            success: true,
+            data: feeds,
+        });
+    } catch (error: any) {
+        logger.error('[TravelAPI] Error fetching feed history:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error',
+        });
+    }
+});
+
+// ============ 🆕 V2.0 P1 偏好和探索脚印 API ============
+
+import { snackPreferenceService } from '../../services/travel/snack-preference.service';
+import { explorationFootprintService } from '../../services/travel/exploration-footprint.service';
+
+/**
+ * GET /api/travels/:travelId/share
+ * 生成旅行分享卡片
+ */
+router.get('/:travelId/share', async (req, res) => {
+    try {
+        const travelId = parseInt(req.params.travelId);
+
+        if (isNaN(travelId)) {
+            return res.status(400).json({ success: false, error: 'Invalid travel ID' });
+        }
+
+        const travel = await prisma.travel.findUnique({
+            where: { id: travelId },
+            include: { frog: true },
+        });
+
+        if (!travel) {
+            return res.status(404).json({ success: false, error: 'Travel not found' });
+        }
+
+        // 生成分享卡片
+        const shareCard = await explorationFootprintService.generateShareCard(
+            travelId,
+            travel.frog.name
+        );
+
+        res.json({
+            success: true,
+            data: shareCard,
+        });
+    } catch (error: any) {
+        logger.error('[TravelAPI] Error generating share card:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error',
+        });
+    }
+});
+
+/**
+ * GET /api/travels/frog/:frogId/preference
+ * 获取青蛙的零食偏好
+ */
+router.get('/frog/:frogId/preference', async (req, res) => {
+    try {
+        const frogId = parseInt(req.params.frogId);
+        const chainKey = req.query.chainKey as string;
+
+        if (isNaN(frogId)) {
+            return res.status(400).json({ success: false, error: 'Invalid frog ID' });
+        }
+
+        const preference = await snackPreferenceService.getPreference(frogId, chainKey);
+        const snackTypes = snackPreferenceService.getAllSnackTypes();
+
+        res.json({
+            success: true,
+            data: {
+                preference,
+                allSnacks: snackTypes,
+            },
+        });
+    } catch (error: any) {
+        logger.error('[TravelAPI] Error getting frog preference:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error',
+        });
+    }
+});
+
+/**
+ * GET /api/travels/frog/:frogId/discoveries
+ * 获取青蛙的地址发现记录
+ */
+router.get('/frog/:frogId/discoveries', async (req, res) => {
+    try {
+        const frogId = parseInt(req.params.frogId);
+
+        if (isNaN(frogId)) {
+            return res.status(400).json({ success: false, error: 'Invalid frog ID' });
+        }
+
+        const discoveries = await explorationFootprintService.getFrogDiscoveries(frogId);
+
+        res.json({
+            success: true,
+            data: discoveries,
+        });
+    } catch (error: any) {
+        logger.error('[TravelAPI] Error getting frog discoveries:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error',
+        });
+    }
+});
+
+/**
+ * GET /api/travels/leaderboard/gold-label
+ * 获取 Gold Label 排行榜
+ */
+router.get('/leaderboard/gold-label', async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit as string) || 10;
+        const leaderboard = await explorationFootprintService.getGoldLabelLeaderboard(limit);
+
+        res.json({
+            success: true,
+            data: leaderboard,
+        });
+    } catch (error: any) {
+        logger.error('[TravelAPI] Error getting gold label leaderboard:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error',
+        });
+    }
+});
+
+// ============ 🆕 V2.0 P2 救援系统 API ============
+
+import { rescueService } from '../../services/travel/rescue.service';
+
+/**
+ * GET /api/travels/rescue/public
+ * 获取公共救援请求列表
+ */
+router.get('/rescue/public', async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit as string) || 20;
+        const requests = await rescueService.getPublicRequests(limit);
+
+        res.json({
+            success: true,
+            data: requests,
+        });
+    } catch (error: any) {
+        logger.error('[TravelAPI] Error getting public rescue requests:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error',
+        });
+    }
+});
+
+/**
+ * GET /api/travels/rescue/friends/:frogId
+ * 获取好友的待救援请求
+ */
+router.get('/rescue/friends/:frogId', async (req, res) => {
+    try {
+        const frogId = parseInt(req.params.frogId);
+
+        if (isNaN(frogId)) {
+            return res.status(400).json({ success: false, error: 'Invalid frog ID' });
+        }
+
+        const requests = await rescueService.getFriendRequests(frogId);
+
+        res.json({
+            success: true,
+            data: requests,
+        });
+    } catch (error: any) {
+        logger.error('[TravelAPI] Error getting friend rescue requests:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error',
+        });
+    }
+});
+
+/**
+ * POST /api/travels/rescue/:requestId
+ * 执行救援
+ */
+router.post('/rescue/:requestId', async (req, res) => {
+    try {
+        const requestId = parseInt(req.params.requestId);
+        const { rescuerId } = req.body;
+
+        if (isNaN(requestId)) {
+            return res.status(400).json({ success: false, error: 'Invalid request ID' });
+        }
+
+        if (!rescuerId) {
+            return res.status(400).json({ success: false, error: 'rescuerId is required' });
+        }
+
+        logger.info(`[TravelAPI] Rescue request: requestId=${requestId}, rescuerId=${rescuerId}`);
+
+        const result = await rescueService.performRescue(requestId, rescuerId);
+
+        if (!result.success) {
+            return res.status(400).json({
+                success: false,
+                error: result.message,
+            });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                xpEarned: result.xpEarned,
+                reputationEarned: result.reputationEarned,
+            },
+            message: result.message,
+        });
+    } catch (error: any) {
+        logger.error('[TravelAPI] Error performing rescue:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error',
         });
     }
 });

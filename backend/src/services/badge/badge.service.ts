@@ -1,14 +1,14 @@
-// backend/src/services/badge/badge.service.ts
-
 import { prisma } from '../../database';
 import { ChainKey } from '../../config/chains';
 import { Discovery } from '../travel/exploration.service';
 import { logger } from '../../utils/logger';
+import { airdropService } from '../airdrop/airdrop.service';
 
 export interface BadgeCheckContext {
   chain: ChainKey;
   travelId: number;
   discoveries: Discovery[];
+  ownerAddress?: string; // 新增：用于空投发放
 }
 
 class BadgeService {
@@ -39,7 +39,7 @@ class BadgeService {
       );
 
       if (shouldUnlock) {
-        await prisma.userBadge.create({
+        const userBadge = await prisma.userBadge.create({
           data: {
             frogId,
             badgeId: badge.id,
@@ -48,6 +48,20 @@ class BadgeService {
         });
         unlockedBadges.push(badge.code);
         logger.info(`Badge ${badge.code} unlocked for frog ${frogId}`);
+
+        // 检查并创建空投奖励记录
+        if (badge.airdropEnabled && badge.airdropAmount && context.ownerAddress) {
+          try {
+            await airdropService.createRewardRecord(
+              userBadge.id,
+              context.ownerAddress,
+              badge.airdropAmount
+            );
+            logger.info(`Airdrop reward created for badge ${badge.code}: ${badge.airdropAmount} wei`);
+          } catch (error) {
+            logger.error(`Failed to create airdrop reward for badge ${badge.code}:`, error);
+          }
+        }
       }
     }
 

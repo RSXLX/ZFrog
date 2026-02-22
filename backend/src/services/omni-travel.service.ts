@@ -26,7 +26,7 @@ const OMNI_TRAVEL_ABI = parseAbi([
   'function crossChainTravels(uint256 tokenId) external view returns (uint256 tokenId, address owner, uint256 targetChainId, bytes32 outboundMessageId, bytes32 returnMessageId, uint64 startTime, uint64 maxDuration, uint8 status, bytes travelData)',
   'function canStartCrossChainTravel(uint256 tokenId) external view returns (bool)',
   'function emergencyReturn(uint256 tokenId) external',
-  'function markTravelCompleted(uint256 tokenId, uint256 xpReward) external',
+  'function markTravelCompleted(uint256 tokenId, uint256 xpReward, string souvenirUri) external',
   'event CrossChainTravelStarted(uint256 indexed tokenId, address indexed owner, uint256 targetChainId, bytes32 messageId, uint64 startTime, uint64 maxDuration)',
   'event CrossChainTravelCompleted(uint256 indexed tokenId, bytes32 messageId, uint256 xpReward, uint256 timestamp)',
   'event CrossChainTravelFailed(uint256 indexed tokenId, bytes32 messageId, string reason, uint256 timestamp)',
@@ -48,6 +48,7 @@ const ZETA_FROG_NFT_ABI = parseAbi([
 ]);
 
 // Chain configurations for cross-chain
+// NOTE: All addresses MUST be provided via config - no hardcoded fallbacks
 const CHAIN_CONFIGS: Record<number, {
   name: string;
   chainType: ChainType;
@@ -57,20 +58,20 @@ const CHAIN_CONFIGS: Record<number, {
   7001: {
     name: 'ZetaChain Athens',
     chainType: 'ZETACHAIN_ATHENS' as ChainType,
-    rpcUrl: config.ZETACHAIN_RPC_URL || 'https://zetachain-athens.g.allthatnode.com/archive/evm',
-    connectorAddress: config.OMNI_TRAVEL_ADDRESS || '0x52B090700Ca9fb2EBBbc964fDde60A0513Df7cd7',
+    rpcUrl: config.ZETACHAIN_RPC_URL,
+    connectorAddress: config.OMNI_TRAVEL_ADDRESS,
   },
   97: {
     name: 'BSC Testnet',
     chainType: 'BSC_TESTNET' as ChainType,
-    rpcUrl: config.BSC_TESTNET_RPC_URL || 'https://bsc-testnet-rpc.publicnode.com',
-    connectorAddress: config.BSC_CONNECTOR_ADDRESS || '0x1cBD20108cb166D45B32c6D3eCAD551c8d03eAD1',
+    rpcUrl: config.BSC_TESTNET_RPC_URL,
+    connectorAddress: config.BSC_CONNECTOR_ADDRESS,
   },
   11155111: {
     name: 'ETH Sepolia',
     chainType: 'ETH_SEPOLIA' as ChainType,
-    rpcUrl: config.ETH_SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com',
-    connectorAddress: config.SEPOLIA_CONNECTOR_ADDRESS || '0xBfE0D6341E52345d5384D3DD4f106464A377D241',
+    rpcUrl: config.ETH_SEPOLIA_RPC_URL,
+    connectorAddress: config.SEPOLIA_CONNECTOR_ADDRESS,
   },
 };
 
@@ -159,7 +160,18 @@ export class OmniTravelService {
         });
         
         if (!activeDbTravel) {
-          // DB has no active travel but chain says cannot start -> frog is stuck
+          // DB has no active travel but chain says cannot start -> could be stuck OR just started
+          
+          // CRITICAL FIX: Check if travel started recently (< 10 mins) before assuming it's stuck
+          const onChainStatus = await this.getCrossChainTravelStatus(tokenId);
+          const isJustStarted = onChainStatus && (Date.now() - onChainStatus.startTime.getTime() < 10 * 60 * 1000); // 10 mins
+
+          if (isJustStarted) {
+             logger.info(`[Eligibility] Frog ${tokenId} started traveling recently (<10m). Skipping unlock, assuming race condition.`);
+             return { canStart: false, reason: 'Travel_Just_Started' };
+          }
+
+          // Only unlock if it's genuinely stuck (older than 10 mins)
           logger.warn(`[Eligibility] Frog ${tokenId} is stuck on chain! Attempting emergency unlock...`);
           
           // Try to call markTravelCompleted to unlock
@@ -178,7 +190,7 @@ export class OmniTravelService {
                 address: config.OMNI_TRAVEL_ADDRESS as Hex,
                 abi: OMNI_TRAVEL_ABI,
                 functionName: 'markTravelCompleted',
-                args: [BigInt(tokenId), BigInt(0)], // 0 XP for emergency unlock
+                args: [BigInt(tokenId), BigInt(0), ''], // 0 XP and empty souvenirUri for emergency unlock
                 chain: { id: 7001, name: 'ZetaChain Athens', nativeCurrency: { name: 'ZETA', symbol: 'ZETA', decimals: 18 }, rpcUrls: { default: { http: [config.ZETACHAIN_RPC_URL] } } } as any,
               });
               
@@ -279,6 +291,12 @@ export class OmniTravelService {
       },
     });
 
+    // 【修复】更新青蛙状态为 Traveling
+    await prisma.frog.update({
+      where: { id: frogId },
+      data: { status: 'Traveling' },
+    });
+
     logger.info(`Created cross-chain travel record: ${travel.id} for frog ${tokenId} to chain ${targetChainId}`);
 
     return { travelId: travel.id };
@@ -363,7 +381,98 @@ export class OmniTravelService {
       },
     });
 
+    // 🆕 触发跨链探索任务
+    const travel = await prisma.travel.findFirst({
+      where: {
+        frog: { tokenId },
+        isCrossChain: true,
+        crossChainMessageId: messageId,
+      },
+      include: { frog: true },
+    });
+
+    if (travel) {
+      this.startCrossChainExploration(travel).catch(err => {
+        logger.error(`Failed to start cross-chain exploration for travel ${travel.id}:`, err);
+      });
+    }
+
     logger.info(`Frog ${tokenId} arrived at target chain, messageId: ${messageId}`);
+  }
+
+  /**
+   * 跨链旅行进行中的实时探索
+   * 每隔 30 秒生成一条探索记录，直到旅行完成
+   */
+  private async startCrossChainExploration(travel: any): Promise<void> {
+    const targetChainId = travel.chainId;
+    const chainKey = this.chainIdToKey(targetChainId);
+    const explorationInterval = 30000; // 30 秒
+
+    logger.info(`[CrossChain] Starting real-time exploration for travel ${travel.id} on ${chainKey}`);
+
+    const explore = async () => {
+      // 检查旅行是否仍在进行
+      const currentTravel = await prisma.travel.findUnique({
+        where: { id: travel.id },
+        select: { status: true, crossChainStatus: true },
+      });
+
+      if (!currentTravel || currentTravel.crossChainStatus !== 'ON_TARGET_CHAIN') {
+        logger.info(`[CrossChain] Exploration stopped for travel ${travel.id}: status changed to ${currentTravel?.crossChainStatus}`);
+        return;
+      }
+
+      try {
+        // 获取随机区块进行探索
+        const blockNumber = await explorationService.pickRandomBlock(chainKey);
+        const targetAddress = await explorationService.getRandomTargetAddress(chainKey);
+
+        // 执行探索
+        const explorationResult = await explorationService.explore(chainKey, blockNumber, targetAddress);
+
+        // 保存 TravelInteraction 记录
+        await prisma.travelInteraction.create({
+          data: {
+            travelId: travel.id,
+            chainId: targetChainId,
+            blockNumber: BigInt(blockNumber),
+            exploredAddress: targetAddress,
+            isContract: explorationResult.snapshot?.isContract || false,
+            message: explorationResult.discoveries?.[0]?.description || '正在探索链上世界...',
+            txHash: null,
+          },
+        });
+
+        // 保存 TravelDiscovery 记录（如果有发现）
+        for (const discovery of explorationResult.discoveries || []) {
+          await prisma.travelDiscovery.create({
+            data: {
+              travelId: travel.id,
+              type: this.mapDiscoveryType(discovery.type),
+              title: discovery.title,
+              description: discovery.description,
+              rarity: discovery.rarity,
+              blockNumber: blockNumber,
+              chainType: this.chainIdToChainType(targetChainId),
+              metadata: { address: targetAddress, isContract: explorationResult.snapshot?.isContract || false },
+            },
+          });
+        }
+
+        logger.info(`[CrossChain] Exploration tick for travel ${travel.id}: ${explorationResult.discoveries?.length || 0} discoveries at block ${blockNumber}`);
+
+        // 继续下一轮探索
+        setTimeout(explore, explorationInterval);
+      } catch (error) {
+        logger.error(`[CrossChain] Exploration error for travel ${travel.id}:`, error);
+        // 出错后延迟重试
+        setTimeout(explore, explorationInterval * 2);
+      }
+    };
+
+    // 启动第一次探索
+    explore();
   }
 
   /**
@@ -863,7 +972,8 @@ export class OmniTravelService {
           address: config.OMNI_TRAVEL_ADDRESS as Hex,
           abi: OMNI_TRAVEL_ABI,
           functionName: 'markTravelCompleted',
-          args: [BigInt(tokenId), BigInt(xpReward)],
+          // TODO: Pass actual souvenir IPFS URI once souvenir generation is moved before this call
+          args: [BigInt(tokenId), BigInt(xpReward), ''],
           chain: zetaChainDef as any,
         });
         
@@ -961,9 +1071,9 @@ export class OmniTravelService {
         const connectorAddress = CHAIN_CONFIGS[7001].connectorAddress as Hex;
         const txHash = await this.walletClient.writeContract({
           address: connectorAddress,
-          abi: parseAbi(['function markTravelCompleted(uint256 tokenId, uint256 xpReward) external']),
+          abi: parseAbi(['function markTravelCompleted(uint256 tokenId, uint256 xpReward, string souvenirUri) external']),
           functionName: 'markTravelCompleted',
-          args: [BigInt(tokenId), BigInt(xpReward)],
+          args: [BigInt(tokenId), BigInt(xpReward), ''],
           chain: { id: 7001, name: 'ZetaChain Athens', nativeCurrency: { name: 'ZETA', symbol: 'ZETA', decimals: 18 }, rpcUrls: { default: { http: [CHAIN_CONFIGS[7001].rpcUrl] } } },
         });
         logger.info(`Sent markTravelCompleted tx: ${txHash}`);

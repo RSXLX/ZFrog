@@ -53,6 +53,17 @@ export interface EnhancedStoryContext {
         isRandom: boolean;
         source: 'interesting' | 'local_frog' | 'chain_pool' | 'random';
     };
+    // 🆕 V2.0 社交上下文
+    social?: {
+        isGroupTravel?: boolean;           // 是否结伴旅行
+        companionName?: string;            // 同伴名称
+        affinityLevel?: number;            // 友情等级 1-10
+        feeders?: { name: string; snack: string }[];  // 投喂者列表
+        wasStranded?: boolean;             // 是否曾迷路
+        rescuerName?: string;              // 救援者名称
+        addressType?: 'normal' | 'contract' | 'defi' | 'whale';  // 地址类型
+        isFirstDiscoverer?: boolean;       // 是否首位发现者
+    };
 }
 
 
@@ -441,7 +452,7 @@ ${context.interesting ? `【特别关注】青蛙发现了 ${context.interesting
      * 增强版 Prompt 构建
      */
     private buildEnhancedPrompt(context: EnhancedStoryContext): string {
-        const { frog, chain, wallet, interesting, travel } = context;
+        const { frog, chain, wallet, interesting, travel, social } = context;
         
         // 生成钱包描述
         let walletDescription = '';
@@ -476,6 +487,49 @@ ${context.interesting ? `【特别关注】青蛙发现了 ${context.interesting
             'chain_pool': '🔗 这是链上活跃地址',
             'random': '🎲 这是随机发现的地址',
         };
+
+        // 🆕 V2.0 社交上下文构建
+        let socialContext = '';
+        if (social) {
+            const socialParts: string[] = [];
+            
+            if (social.isGroupTravel && social.companionName) {
+                socialParts.push(`👫 这是一次结伴旅行！和好友「${social.companionName}」一起探险`);
+                if (social.affinityLevel) {
+                    socialParts.push(`💕 友情等级: Lv.${social.affinityLevel}`);
+                }
+            }
+            
+            if (social.feeders && social.feeders.length > 0) {
+                const feedList = social.feeders.map(f => `${f.name}送了${f.snack}`).join('、');
+                socialParts.push(`🍭 旅途中收到了投喂: ${feedList}`);
+            }
+            
+            if (social.wasStranded) {
+                if (social.rescuerName) {
+                    socialParts.push(`😅 旅途中曾迷路，被「${social.rescuerName}」救援！`);
+                } else {
+                    socialParts.push(`😅 旅途中曾短暂迷路，但最终找到了方向`);
+                }
+            }
+            
+            if (social.isFirstDiscoverer) {
+                socialParts.push(`🏆 你是这个地址的首位发现者！获得了 Gold Label！`);
+            }
+            
+            if (social.addressType && social.addressType !== 'normal') {
+                const typeDesc: Record<string, string> = {
+                    'contract': '🤖 智能合约地址',
+                    'defi': '🏦 DeFi 协议地址（探索加成 x1.5）',
+                    'whale': '🐋 巨鲸地址（探索加成 x2.0）',
+                };
+                socialParts.push(typeDesc[social.addressType]);
+            }
+            
+            if (socialParts.length > 0) {
+                socialContext = `\n【社交互动】💬\n${socialParts.join('\n')}`;
+            }
+        }
         
         return `
 为 ${frog.name} 写一篇旅行日记，它刚从 ${travel.duration} 小时的 ${chain.name} 之旅归来。
@@ -502,11 +556,12 @@ ${context.footprints && context.footprints.length > 0 ? `
 【青蛙留下的足迹】🐾
 ${context.footprints.map(fp => `- 在 ${fp.location.slice(0,8)}... 留言: "${fp.message}"`).join('\n')}
 ` : ''}
+${socialContext}
 
 请返回 JSON：
 {
-  "title": "日记标题（包含地点或发现）",
-  "content": "200-350字的日记内容",
+  "title": "日记标题（包含地点或发现${social?.isGroupTravel ? '或同伴' : ''}）",
+  "content": "200-350字的日记内容${social?.isGroupTravel ? '，要提到和同伴的互动' : ''}${social?.wasStranded ? '，提到迷路和被救的经历' : ''}${social?.feeders ? '，感谢投喂的朋友' : ''}",
   "mood": "happy/excited/thoughtful/adventurous/tired",
   "highlights": ["3个旅行亮点"]
 }`;

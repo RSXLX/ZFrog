@@ -204,9 +204,12 @@ export function useCrossChain(frogId: number) {
         // 判断是同链还是跨链
         if (chainId.toString() === params.targetChain) {
           // 同链转账 - 直接发送
+          // @ts-ignore
           const hash = await walletClient.sendTransaction({
+            account: address as Address,
             to: params.toAddress as Address,
             value: parseEther(params.amount),
+            chain: walletClient.chain,
           });
 
           // 更新状态
@@ -248,10 +251,13 @@ export function useCrossChain(frogId: number) {
             ],
           });
 
+          // @ts-ignore
           const hash = await walletClient.sendTransaction({
+            account: address as Address,
             to: gatewayAddress,
             value: parseEther(params.amount),
             data,
+            chain: walletClient.chain,
           });
 
           // 更新状态为确认中

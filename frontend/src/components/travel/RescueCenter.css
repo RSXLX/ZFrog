@@ -1,0 +1,143 @@
+/* frontend/src/components/travel/RescueCenter.css */
+/* V2.0 救援中心样式 */
+
+.rescue-center {
+  background: rgba(20, 25, 40, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rescue-center-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.rescue-center-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  color: white;
+}
+
+.rescue-center-header p {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.rescue-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.rescue-tab {
+  flex: 1;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rescue-tab:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.rescue-tab.active {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff9a56 100%);
+  border-color: transparent;
+  color: white;
+  font-weight: 600;
+}
+
+.rescue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.rescue-loading,
+.rescue-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+}
+
+.rescue-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.rescue-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 107, 107, 0.3);
+}
+
+.rescue-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.rescue-frog-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+}
+
+.rescue-chain {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.rescue-card-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.rescue-time {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.rescue-button {
+  width: 100%;
+  padding: 10px;
+  background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rescue-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.rescue-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

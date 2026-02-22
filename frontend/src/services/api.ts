@@ -175,6 +175,36 @@ class ApiService {
   }
 
   /**
+   * 获取待领取奖励
+   */
+  async getPendingRewards(ownerAddress: string): Promise<any[]> {
+    const res = await this.get(`/api/badges/rewards?ownerAddress=${ownerAddress}`);
+    return res.data || [];
+  }
+
+  /**
+   * 领取单个奖励
+   */
+  async claimReward(rewardId: string): Promise<{ txHash: string }> {
+    const res = await this.post('/api/badges/rewards/claim', { rewardId });
+    if (!res.success) {
+      throw new Error(res.error || 'Failed to claim reward');
+    }
+    return res.data;
+  }
+
+  /**
+   * 批量领取所有奖励
+   */
+  async claimAllRewards(ownerAddress: string): Promise<{ successCount: number; txHashes: string[] }> {
+    const res = await this.post('/api/badges/rewards/claim-all', { ownerAddress });
+    if (!res.success) {
+      throw new Error(res.error || 'Failed to claim rewards');
+    }
+    return res.data;
+  }
+
+  /**
    * 获取纪念品（支持青蛙筛选）
    */
   async getSouvenirs(frogId?: number, ownerAddress?: string): Promise<any> {

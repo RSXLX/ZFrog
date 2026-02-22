@@ -101,7 +101,8 @@ export function useFrogStatus(frogId: number | undefined): UseFrogStatusReturn {
     eventName: 'TravelStarted',
     onLogs(logs) {
       logs.forEach(log => {
-        const args = log.args as { tokenId?: bigint; targetWallet?: string; targetChainId?: bigint; startTime?: bigint; endTime?: bigint };
+        // Use Type assertion carefully as wagmi logs are generic
+        const args = (log as any).args || {};
         if (args.tokenId?.toString() === frogId?.toString()) {
           setStatus('Traveling');
           setTravel({
@@ -126,7 +127,7 @@ export function useFrogStatus(frogId: number | undefined): UseFrogStatusReturn {
     eventName: 'TravelCompleted',
     onLogs(logs) {
       logs.forEach(log => {
-        const args = log.args as { tokenId?: bigint };
+        const args = (log as any).args || {};
         if (args.tokenId?.toString() === frogId?.toString()) {
           setStatus('Idle');
           setTravel(null);
@@ -221,7 +222,7 @@ export function useFrogStatus(frogId: number | undefined): UseFrogStatusReturn {
 
   useEffect(() => {
     if (travelData) {
-      const [startTime, endTime, targetWallet, targetChainId, completed] = travelData as [bigint, bigint, string, bigint, boolean];
+      const [startTime, endTime, targetWallet, targetChainId, completed] = travelData as readonly [bigint, bigint, string, bigint, boolean, boolean];
       if (!completed && Number(endTime) > 0) {
         setTravel({
           startTime: Number(startTime) * 1000,

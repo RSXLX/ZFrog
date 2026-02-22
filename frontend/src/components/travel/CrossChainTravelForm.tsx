@@ -294,30 +294,17 @@ export function CrossChainTravelForm({ frogId, tokenId, frogName, onSuccess }: C
              const messageId = hash; 
              await notifyCrossChainTravelStarted(newTravelId, messageId, hash);
              
-             // P0 Fix: Dispatch event for immediate UI update in FrogDetail
-             window.dispatchEvent(new CustomEvent('travel:started', {
-                detail: {
-                    frogId,
-                    targetWallet: '0x0000000000000000000000000000000000000000',
-                    duration,
-                    chainId: targetChainId,
-                    isRandom: false
-                }
-             }));
-
-             // Clear pending state to exit TravelPending UI
-             clearPendingTravel();
-
-             if (onSuccess) onSuccess();
+             // 【改进】直接跳转到旅行详情页，简化状态管理
+             window.location.href = `/travel/${newTravelId}`;
          } catch(e) {
              console.error("Failed to create travel record post-transaction:", e);
-             // Also clear pending on API error to avoid stuck UI
              clearPendingTravel();
+             setError('创建旅行记录失败，请刷新页面重试');
          }
       };
       createAndNotify();
     }
-  }, [isSuccess, hash, travelId, createCrossChainTravel, notifyCrossChainTravelStarted, frogId, tokenId, targetChainId, duration, address, onSuccess, clearPendingTravel]);
+  }, [isSuccess, hash, travelId, createCrossChainTravel, notifyCrossChainTravelStarted, frogId, tokenId, targetChainId, duration, address, clearPendingTravel]);
 
   // Handle failed transaction (Revert)
   useEffect(() => {

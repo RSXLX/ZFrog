@@ -18,6 +18,17 @@ import { AchievementWall } from '../components/garden/AchievementWall';
 import { CrossChainTransfer } from '../components/crosschain/CrossChainTransfer';
 import { GardenDock } from '../components/garden/GardenDock';
 import { FrogActionMenu } from '../components/garden/FrogActionMenu';
+import { useToast } from '../components/common/ToastProvider';
+import { 
+  ArrowLeft, 
+  Settings, 
+  UserPlus, 
+  Users, 
+  Zap, 
+  Rocket, 
+  ExternalLink,
+  X
+} from 'lucide-react';
 
 export const GardenPage: React.FC = () => {
   // 支持两种模式：/garden（我的家园）和 /visit/:address（访问他人）
@@ -37,6 +48,9 @@ export const GardenPage: React.FC = () => {
   
   // 是否是家园主人
   const isOwner = !isVisiting;
+  
+  // Toast 通知
+  const { toast } = useToast();
   
   // 家园状态
   const [gardenState, setGardenState] = useState<GardenState | null>(null);
@@ -243,11 +257,11 @@ export const GardenPage: React.FC = () => {
         duration: 3600
       });
       if (response.success) {
-        alert(`🐸🐸 ${frog.name} 和 ${companionFrog.name} 一起出发旅行啦！`);
+        toast.success(`${frog.name} 和 ${companionFrog.name} 一起出发旅行啦！`);
         navigate(`/frog/${frog.tokenId}`);
       }
     } catch (error: any) {
-      alert(error?.message || '发起结伴旅行失败');
+      toast.error(error?.message || '发起结伴旅行失败');
     } finally {
       setIsStartingGroupTravel(false);
     }
@@ -284,34 +298,40 @@ export const GardenPage: React.FC = () => {
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
       {/* 顶部导航 */}
-      <div className="flex items-center justify-between px-4 py-3 bg-white border-b">
+      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-3 
+                      bg-white/10 backdrop-blur-md border-b border-white/20 shadow-sm">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center text-gray-600 hover:text-gray-800"
+          className="flex items-center text-white hover:text-green-200 transition-colors gap-1"
         >
-          <span className="mr-2">←</span>
-          <span>返回</span>
+          <ArrowLeft size={20} />
+          <span className="font-exo font-medium text-sm">Back</span>
         </button>
         
-        <h1 className="text-lg font-semibold">
-          {frog.name} 的家园
+        <h1 className="text-xl font-orbitron font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-300 drop-shadow-sm">
+          {frog.name}'s Garden
         </h1>
         
         <div className="flex gap-2">
           <button 
             onClick={() => { loadFriends(); setShowInviteModal(true); }}
-            className="px-3 py-1 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600"
+            className="flex items-center gap-1 px-3 py-1.5 bg-green-500/80 hover:bg-green-500 text-white 
+                       text-xs rounded-full backdrop-blur-sm transition-all shadow-lg hover:shadow-green-500/30"
           >
-            👋 邀请好友
+            <UserPlus size={14} />
+            <span>Invite</span>
           </button>
-          <button className="p-2 hover:bg-gray-100 rounded-full" title="设置">
-            ⚙️
-          </button>
-          <button className="p-2 hover:bg-gray-100 rounded-full" title="编辑">
-            ✏️
+          <button 
+            className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-all" 
+            title="Settings"
+          >
+            <Settings size={18} />
           </button>
         </div>
       </div>
+      
+      {/* Spacer for flow (since top bar is absolute) */}
+      <div className="h-14"></div>
 
       {/* 主体内容 */}
       <div className="flex-1 flex overflow-hidden">
@@ -325,6 +345,7 @@ export const GardenPage: React.FC = () => {
               onParcelClick={() => setActiveTab('gifts')}
               hasNewMail={unreadMessageCount > 0}
               hasNewGift={unopenedGiftCount > 0}
+              currentUserFrogId={myFrog?.id}
             />
           )}
           
@@ -491,26 +512,43 @@ export const GardenPage: React.FC = () => {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl p-6 w-96 max-h-[80vh] overflow-y-auto"
+              className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-6 w-96 max-h-[80vh] overflow-y-auto 
+                         text-white shadow-2xl"
               onClick={e => e.stopPropagation()}
             >
-              <h2 className="text-xl font-bold mb-4">👋 邀请好友来玩</h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-orbitron font-bold flex items-center gap-2">
+                  <Users className="text-green-400" />
+                  Invite Friends
+                </h2>
+                <button 
+                  onClick={() => setShowInviteModal(false)}
+                  className="p-1 hover:bg-white/10 rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
               
               {friendsList.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">
-                  还没有好友，快去添加一些吧！
-                </p>
+                <div className="text-center py-12 bg-white/5 rounded-2xl border border-dashed border-white/10">
+                  <UserPlus size={48} className="mx-auto text-green-400/50 mb-4" />
+                  <p className="text-gray-300">No friends yet.</p>
+                  <p className="text-xs text-gray-500 mt-2">Go verify cross-chain to find frens!</p>
+                </div>
               ) : (
                 <div className="space-y-3">
                   {friendsList.map((friendFrog: any) => (
                     <div 
                       key={friendFrog.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors"
                     >
-                      <div>
-                        <p className="font-semibold">{friendFrog.name}</p>
-                        <p className="text-xs text-gray-500">
-                          等级 {friendFrog.level} · {friendFrog.status === 'Idle' ? '空闲' : '旅行中'}
+                      <div className="flex flex-col">
+                        <p className="font-exo font-semibold text-green-300">{friendFrog.name}</p>
+                        <p className="text-xs text-gray-400 flex items-center gap-1">
+                          Lv.{friendFrog.level} · 
+                          <span className={friendFrog.status === 'Idle' ? 'text-blue-300' : 'text-orange-300'}>
+                             {friendFrog.status}
+                          </span>
                         </p>
                       </div>
                       <div className="flex gap-2">
@@ -520,25 +558,27 @@ export const GardenPage: React.FC = () => {
                             setShowInviteModal(false);
                             setShowTransfer(true);
                           }}
-                          className="px-2 py-1 bg-purple-100 text-purple-600 text-xs rounded hover:bg-purple-200"
-                          title="跨链转账"
+                          className="p-2 bg-purple-500/20 text-purple-300 rounded-xl hover:bg-purple-500/40 transition-colors"
+                          title="Transfer"
                         >
-                          ⚡
+                          <Zap size={14} />
                         </button>
                         <button
                           onClick={() => handleInviteFriend(friendFrog)}
                           disabled={isInviting}
-                          className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50"
+                          className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-xl 
+                                     shadow-lg hover:shadow-green-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          邀请
+                          Invite
                         </button>
                         {friendFrog.status === 'Idle' && frog?.status === 'Idle' && (
                           <button
                             onClick={() => handleStartGroupTravel(friendFrog)}
                             disabled={isStartingGroupTravel}
-                            className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:opacity-50"
+                            className="p-2 bg-blue-500/20 text-blue-300 rounded-xl hover:bg-blue-500/40 transition-colors"
+                            title="Group Travel"
                           >
-                            🚀 一起旅行
+                            <Rocket size={14} />
                           </button>
                         )}
                       </div>
@@ -549,9 +589,10 @@ export const GardenPage: React.FC = () => {
               
               <button
                 onClick={() => setShowInviteModal(false)}
-                className="w-full mt-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                className="w-full mt-6 py-3 bg-white/5 border border-white/10 text-gray-300 rounded-2xl 
+                           hover:bg-white/10 transition-all font-exo font-medium text-sm"
               >
-                关闭
+                Close
               </button>
             </motion.div>
           </motion.div>

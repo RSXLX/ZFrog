@@ -33,23 +33,41 @@ router.get('/:frogId/layout/:sceneType', async (req: Request, res: Response) => 
 });
 
 /**
- * 保存完整布局 (POST)
+ * 保存完整布局 (POST) - V2.0 支持网格坐标
  */
 router.post('/:frogId/layout/:sceneType', async (req: Request, res: Response) => {
   try {
     const { frogId, sceneType } = req.params;
-    const { items, createSnapshot = true } = req.body;
+    const { items, createSnapshot = true, sessionId, validateGrid = true } = req.body;
     
     const layout = await decorationService.saveLayout(
       parseInt(frogId),
       sceneType,
       items,
-      createSnapshot
+      { createSnapshot, sessionId, validateGrid }
     );
     
-    res.json({ success: true, data: layout });
+    // V2.0: 返回舒适度和 Buff 信息
+    let activeBuffs: any[] = [];
+    if (layout) {
+      activeBuffs = await decorationService.getActiveBuffs(layout.id);
+    }
+    
+    res.json({ 
+      success: true, 
+      data: { 
+        ...layout,
+        activeBuffs,
+      } 
+    });
   } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+    if (error.message.startsWith('GRID_VALIDATION_FAILED')) {
+      res.status(400).json({ success: false, error: error.message });
+    } else if (error.message.startsWith('EDIT_LOCK_INVALID')) {
+      res.status(409).json({ success: false, error: error.message });
+    } else {
+      res.status(500).json({ success: false, error: error.message });
+    }
   }
 });
 
@@ -93,6 +111,136 @@ router.get('/:frogId/layout/:sceneType/history', async (req: Request, res: Respo
     );
     
     res.json({ success: true, data: snapshots });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============ V2.0 编辑锁 API ============
+
+/**
+ * V2.0: 获取编辑锁
+ */
+router.post('/:frogId/layout/:sceneType/lock', async (req: Request, res: Response) => {
+  try {
+    const { frogId, sceneType } = req.params;
+    const { sessionId, ttlMs } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'sessionId is required' });
+    }
+
+    // 获取布局
+    const layout = await decorationService.getLayout(parseInt(frogId), sceneType);
+    if (!layout) {
+      return res.status(404).json({ success: false, error: 'Layout not found' });
+    }
+
+    const result = await decorationService.acquireEditLock(layout.id, sessionId, ttlMs);
+    
+    if (result.success) {
+      res.json({ success: true, data: { locked: true, expiresAt: result.expiresAt } });
+    } else {
+      res.status(409).json({ success: false, error: result.error });
+    }
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * V2.0: 释放编辑锁
+ */
+router.delete('/:frogId/layout/:sceneType/lock', async (req: Request, res: Response) => {
+  try {
+    const { frogId, sceneType } = req.params;
+    const { sessionId } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'sessionId is required' });
+    }
+
+    const layout = await decorationService.getLayout(parseInt(frogId), sceneType);
+    if (!layout) {
+      return res.status(404).json({ success: false, error: 'Layout not found' });
+    }
+
+    const released = await decorationService.releaseEditLock(layout.id, sessionId);
+    
+    res.json({ success: true, data: { released } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * V2.0: 释放编辑锁 (POST 替代 DELETE，用于前端兼容)
+ */
+router.post('/:frogId/layout/:sceneType/lock/release', async (req: Request, res: Response) => {
+  try {
+    const { frogId, sceneType } = req.params;
+    const { sessionId } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'sessionId is required' });
+    }
+
+    const layout = await decorationService.getLayout(parseInt(frogId), sceneType);
+    if (!layout) {
+      return res.status(404).json({ success: false, error: 'Layout not found' });
+    }
+
+    const released = await decorationService.releaseEditLock(layout.id, sessionId);
+    
+    res.json({ success: true, data: { released } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============ V2.0 舒适度 API ============
+
+/**
+ * V2.0: 获取舒适度和 Buff
+ */
+router.get('/:frogId/comfort', async (req: Request, res: Response) => {
+  try {
+    const { frogId } = req.params;
+    const sceneType = (req.query.sceneType as string) || 'yard';
+
+    const layout = await decorationService.getLayout(parseInt(frogId), sceneType);
+    
+    if (!layout) {
+      return res.json({ 
+        success: true, 
+        data: { 
+          comfortScore: 0, 
+          maxScore: 100, 
+          level: '空荡荡',
+          activeBuffs: [] 
+        } 
+      });
+    }
+
+    const activeBuffs = await decorationService.getActiveBuffs(layout.id);
+    
+    // 根据舒适度分数确定等级
+    let level = '空荡荡';
+    if (layout.comfortScore >= 80) level = '超级舒适';
+    else if (layout.comfortScore >= 60) level = '舒适';
+    else if (layout.comfortScore >= 40) level = '温馨';
+    else if (layout.comfortScore >= 20) level = '简陋';
+    else if (layout.comfortScore > 0) level = '有点装饰';
+
+    res.json({ 
+      success: true, 
+      data: { 
+        comfortScore: layout.comfortScore,
+        maxScore: 100,
+        level,
+        activeBuffs,
+      } 
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

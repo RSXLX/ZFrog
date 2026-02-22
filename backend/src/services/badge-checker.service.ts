@@ -1,3 +1,12 @@
+/**
+ * @deprecated 此服务已废弃，请使用统一的 badge/badge.service.ts
+ * 
+ * 迁移指南：
+ * - 原调用：badgeChecker.checkAndAwardTravelBadges(frogId)
+ * - 新调用：badgeService.checkAndUnlock(frogId, context)
+ * 
+ * 注意：新服务需要提供 BadgeCheckContext，包含 chain、travelId、discoveries 等信息
+ */
 // backend/src/services/badge-checker.service.ts
 // 徽章检查服务 - 检查并奖励跨链探索成就徽章
 

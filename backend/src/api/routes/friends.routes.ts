@@ -7,6 +7,8 @@ import {
   notifyFriendInteraction, 
   notifyFriendRemoved 
 } from '../../websocket/index';
+import * as intimacyService from '../../services/intimacy.service';
+import * as notificationService from '../../services/notification.service';
 
 const router = Router();
 
@@ -235,7 +237,10 @@ router.get('/list/:frogId', async (req, res) => {
         ...friend,
         friendshipId: friendship.id,
         lastInteraction: friendship.interactions[0] || null,
-        isOnline: isFrogOnline(friend.id)
+        isOnline: isFrogOnline(friend.id),
+        // P3.1 亲密度数据
+        intimacy: friendship.intimacy,
+        intimacyLevel: friendship.intimacyLevel,
       };
     });
 
@@ -377,13 +382,37 @@ router.post('/:friendshipId/interact', async (req, res) => {
       }
     });
 
+    // 记录亲密度
+    const intimacyResult = await intimacyService.recordInteraction(
+      parseInt(friendshipId),
+      type as InteractionType,
+      metadata?.giftValue
+    );
+
+    // 如果亲密度升级，发送通知
+    if (intimacyResult.levelUp) {
+      const levelInfo = intimacyService.getIntimacyLevel(intimacyResult.newIntimacy);
+      const targetFrogId = friendship.requesterId === actorId 
+        ? friendship.addresseeId 
+        : friendship.requesterId;
+      
+      await notificationService.createNotification(
+        targetFrogId,
+        notificationService.NotificationType.INTIMACY_LEVEL_UP,
+        { friendName: interaction.actor.name, levelName: levelInfo.name }
+      );
+    }
+
     // 发送WebSocket通知给好友双方
     const targetId = friendship.requesterId === actorId 
       ? friendship.addresseeId 
       : friendship.requesterId;
     notifyFriendInteraction(parseInt(friendshipId), actorId, targetId, interaction);
 
-    res.status(201).json(interaction);
+    res.status(201).json({
+      ...interaction,
+      intimacy: intimacyResult,
+    });
   } catch (error) {
     console.error('Error creating interaction:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -412,6 +441,45 @@ router.get('/:friendshipId/interactions', async (req, res) => {
     res.json(interactions);
   } catch (error) {
     console.error('Error fetching interactions:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/friends/:friendshipId/intimacy
+ * 获取亲密度详情
+ */
+router.get('/:friendshipId/intimacy', async (req, res) => {
+  try {
+    const friendshipId = parseInt(req.params.friendshipId);
+    
+    const intimacyDetails = await intimacyService.getFriendshipIntimacy(friendshipId);
+    
+    if (!intimacyDetails) {
+      return res.status(404).json({ error: 'Friendship not found' });
+    }
+    
+    res.json(intimacyDetails);
+  } catch (error) {
+    console.error('Error fetching intimacy details:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/friends/:friendshipId/daily-limit/:type
+ * 检查每日互动限制
+ */
+router.get('/:friendshipId/daily-limit/:type', async (req, res) => {
+  try {
+    const friendshipId = parseInt(req.params.friendshipId);
+    const type = req.params.type as InteractionType;
+    
+    const limitCheck = await intimacyService.checkDailyLimit(friendshipId, type);
+    
+    res.json(limitCheck);
+  } catch (error) {
+    console.error('Error checking daily limit:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

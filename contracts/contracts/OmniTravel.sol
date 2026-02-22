@@ -161,6 +161,34 @@ contract OmniTravel is Ownable, ReentrancyGuard, Pausable {
         uint256 timestamp
     );
     
+    // ============ Group Travel Events ============
+    event GroupCrossChainTravelStarted(
+        uint256 indexed leaderTokenId,
+        uint256 indexed companionTokenId,
+        address indexed leaderOwner,
+        address companionOwner,
+        uint256 targetChainId,
+        bytes32 messageId,
+        uint64 startTime,
+        uint64 maxDuration
+    );
+    
+    event GroupCrossChainTravelCompleted(
+        uint256 indexed leaderTokenId,
+        uint256 indexed companionTokenId,
+        bytes32 messageId,
+        uint256 xpReward,
+        uint256 timestamp
+    );
+    
+    event GroupEmergencyReturn(
+        uint256 indexed leaderTokenId,
+        uint256 indexed companionTokenId,
+        address indexed caller,
+        string reason,
+        uint256 timestamp
+    );
+    
     // ============ Modifiers ============
     modifier onlyTravelManager() {
         require(msg.sender == travelManager || msg.sender == owner(), "Not authorized");
@@ -742,6 +770,214 @@ contract OmniTravel is Ownable, ReentrancyGuard, Pausable {
      */
     function getRemainingProvisions(uint256 tokenId) external view returns (uint256) {
         return frogProvisions[tokenId];
+    }
+    
+    // ============ Group Cross-Chain Travel Functions ============
+    
+    /**
+     * @notice Calculate provisions for group travel (1.5x single traveler)
+     */
+    function calculateGroupProvisions(uint256 durationHours) public view returns (uint256) {
+        uint256 singleProvisions = calculateProvisions(durationHours);
+        return singleProvisions * 3 / 2; // 1.5x social discount
+    }
+    
+    /**
+     * @notice Start a group cross-chain travel for two frogs
+     * @param leaderTokenId Leader frog token ID (msg.sender must be owner)
+     * @param companionTokenId Companion frog token ID (must be idle)
+     * @param targetChainId Target chain ID
+     * @param duration Travel duration in seconds
+     */
+    function startGroupCrossChainTravel(
+        uint256 leaderTokenId,
+        uint256 companionTokenId,
+        uint256 targetChainId,
+        uint256 duration
+    ) external payable whenNotPaused nonReentrant {
+        // 1. Validate leader ownership
+        require(zetaFrogNFT.ownerOf(leaderTokenId) == msg.sender, "Not leader owner");
+        
+        // 2. Validate chain support
+        require(supportedChains[targetChainId], "Chain not supported");
+        require(chainConnectors[targetChainId].length > 0, "Connector not set");
+        
+        // 3. Validate duration
+        require(duration > 0 && duration <= MAX_TRAVEL_DURATION, "Invalid duration");
+        
+        // 4. Validate both frogs are idle
+        require(canStartCrossChainTravel(leaderTokenId), "Leader not available");
+        require(canStartCrossChainTravel(companionTokenId), "Companion not available");
+        
+        // 5. Calculate and validate group provisions (1.5x single)
+        uint256 durationHours = (duration + 3599) / 3600;
+        uint256 requiredProvisions = calculateGroupProvisions(durationHours);
+        require(msg.value >= requiredProvisions, "Insufficient provisions");
+        
+        // 6. Lock leader NFT (companion is tracked in backend DB)
+        zetaFrogNFT.setFrogStatus(leaderTokenId, IZetaFrogNFT.FrogStatus.Traveling);
+        
+        // 7. Generate message ID
+        bytes32 messageId = keccak256(abi.encodePacked(
+            "GROUP",
+            leaderTokenId,
+            companionTokenId,
+            msg.sender,
+            targetChainId,
+            block.timestamp,
+            _messageNonce++
+        ));
+        
+        // 8. Store group travel info
+        groupTravels[messageId] = GroupCrossChainTravel({
+            leaderTokenId: leaderTokenId,
+            companionTokenId: companionTokenId,
+            leaderOwner: msg.sender,
+            companionOwner: zetaFrogNFT.ownerOf(companionTokenId),
+            targetChainId: targetChainId,
+            messageId: messageId,
+            status: CrossChainStatus.Locked
+        });
+        
+        // 9. Store provisions under leader tokenId
+        frogProvisions[leaderTokenId] = msg.value;
+        
+        // Map messageId to leader tokenId for refund
+        messageToToken[messageId] = leaderTokenId;
+        
+        // 10. Send cross-chain message (if not test mode)
+        if (!testMode) {
+            bytes memory travelData = abi.encode(
+                leaderTokenId,
+                companionTokenId,
+                msg.sender,
+                duration
+            );
+            _sendCrossChainMessage(targetChainId, messageId, travelData);
+        }
+        
+        // 11. Update status to traveling
+        groupTravels[messageId].status = CrossChainStatus.Traveling;
+        
+        // 12. Emit event
+        emit GroupCrossChainTravelStarted(
+            leaderTokenId,
+            companionTokenId,
+            msg.sender,
+            zetaFrogNFT.ownerOf(companionTokenId),
+            targetChainId,
+            messageId,
+            uint64(block.timestamp),
+            uint64(duration)
+        );
+    }
+    
+    /**
+     * @notice Complete group travel (called by backend after processing)
+     * @param messageId The group travel message ID
+     * @param xpReward XP reward for each frog
+     */
+    function completeGroupTravel(bytes32 messageId, uint256 xpReward) external onlyTravelManager {
+        GroupCrossChainTravel storage travel = groupTravels[messageId];
+        require(travel.status != CrossChainStatus.None, "No group travel found");
+        require(travel.status != CrossChainStatus.Completed, "Already completed");
+        
+        // 1. Unlock leader NFT
+        zetaFrogNFT.setFrogStatus(travel.leaderTokenId, IZetaFrogNFT.FrogStatus.Idle);
+        
+        // 2. Add XP to both frogs
+        if (xpReward > 0) {
+            zetaFrogNFT.addExperience(travel.leaderTokenId, xpReward);
+            zetaFrogNFT.addExperience(travel.companionTokenId, xpReward);
+        }
+        
+        // 3. Refund remaining provisions to leader
+        uint256 remaining = frogProvisions[travel.leaderTokenId];
+        if (remaining > 0) {
+            frogProvisions[travel.leaderTokenId] = 0;
+            (bool success, ) = travel.leaderOwner.call{value: remaining}("");
+            if (success) {
+                emit ProvisionsRefunded(travel.leaderTokenId, travel.leaderOwner, remaining, block.timestamp);
+            }
+        }
+        
+        // 4. Update status
+        travel.status = CrossChainStatus.Completed;
+        
+        // 5. Emit completion event
+        emit GroupCrossChainTravelCompleted(
+            travel.leaderTokenId,
+            travel.companionTokenId,
+            messageId,
+            xpReward,
+            block.timestamp
+        );
+    }
+    
+    /**
+     * @notice Emergency return for stuck group travel
+     * @param messageId The group travel message ID
+     */
+    function emergencyGroupReturn(bytes32 messageId) external nonReentrant {
+        GroupCrossChainTravel storage travel = groupTravels[messageId];
+        
+        require(
+            travel.leaderOwner == msg.sender || msg.sender == owner(),
+            "Not authorized"
+        );
+        require(
+            travel.status == CrossChainStatus.Traveling ||
+            travel.status == CrossChainStatus.Locked ||
+            travel.status == CrossChainStatus.OnTarget,
+            "Cannot emergency return"
+        );
+        
+        // 1. Unlock leader NFT
+        zetaFrogNFT.setFrogStatus(travel.leaderTokenId, IZetaFrogNFT.FrogStatus.Idle);
+        
+        // 2. Refund remaining provisions
+        uint256 remaining = frogProvisions[travel.leaderTokenId];
+        if (remaining > 0) {
+            frogProvisions[travel.leaderTokenId] = 0;
+            (bool success, ) = travel.leaderOwner.call{value: remaining}("");
+            if (success) {
+                emit ProvisionsRefunded(travel.leaderTokenId, travel.leaderOwner, remaining, block.timestamp);
+            }
+        }
+        
+        // 3. Update status
+        travel.status = CrossChainStatus.Completed;
+        
+        // 4. Emit event
+        emit GroupEmergencyReturn(
+            travel.leaderTokenId,
+            travel.companionTokenId,
+            msg.sender,
+            "Emergency return executed",
+            block.timestamp
+        );
+    }
+    
+    /**
+     * @notice Get group travel info
+     */
+    function getGroupTravel(bytes32 messageId) external view returns (
+        uint256 leaderTokenId,
+        uint256 companionTokenId,
+        address leaderOwner,
+        address companionOwner,
+        uint256 targetChainId,
+        CrossChainStatus status
+    ) {
+        GroupCrossChainTravel storage travel = groupTravels[messageId];
+        return (
+            travel.leaderTokenId,
+            travel.companionTokenId,
+            travel.leaderOwner,
+            travel.companionOwner,
+            travel.targetChainId,
+            travel.status
+        );
     }
     
     // ============ Receive Function ============

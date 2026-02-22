@@ -51,7 +51,9 @@ export const PhotoAlbum: React.FC<PhotoAlbumProps> = ({
   const loadPhotos = async () => {
     try {
       const response = await apiService.get(`/homestead/${frogId}/photos`, {
-        nftOnly: filter === 'nft' ? 'true' : 'false',
+        params: {
+          nftOnly: filter === 'nft' ? 'true' : 'false',
+        }
       });
       if (response.success) {
         setPhotos(response.data?.photos || []);

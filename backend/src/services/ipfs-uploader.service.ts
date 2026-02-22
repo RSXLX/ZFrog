@@ -1,3 +1,11 @@
+/**
+ * @deprecated 此服务已废弃，请使用统一的 ipfs.service.ts
+ * 功能已合并到 ipfsService.uploadFile() 方法中
+ * 
+ * 迁移指南：
+ * - 原调用：new IPFSUploaderService().uploadImage({ buffer, filename })
+ * - 新调用：ipfsService.uploadFile({ buffer, filename, contentType })
+ */
 import FormData from 'form-data';
 import axios from 'axios';
 

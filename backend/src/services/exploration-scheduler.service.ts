@@ -272,6 +272,134 @@ export class ExplorationSchedulerService {
                 logger.error(`[ExplorationScheduler] Error processing frog ${travel.frog?.tokenId}:`, err);
             }
         }
+        
+        // V2.0: Process cross-chain group travels
+        await this.processGroupTravels();
+    }
+    
+    /**
+     * V2.0: Process cross-chain group travels (both frogs share discoveries)
+     */
+    private async processGroupTravels(): Promise<void> {
+        try {
+            // Find active cross-chain group travels
+            const groupTravels = await prisma.groupTravel.findMany({
+                where: {
+                    status: 'ACTIVE'
+                },
+                include: {
+                    travel: true,
+                    leader: true,
+                    companion: true
+                }
+            });
+            
+            if (groupTravels.length === 0) return;
+            
+            logger.info(`[ExplorationScheduler] Found ${groupTravels.length} active group travels`);
+            
+            for (const groupTravel of groupTravels) {
+                try {
+                    await this.processGroupTravelExploration(groupTravel);
+                } catch (err) {
+                    logger.error(`[ExplorationScheduler] Error processing group travel ${groupTravel.id}:`, err);
+                }
+            }
+        } catch (err) {
+            logger.error('[ExplorationScheduler] Error in processGroupTravels:', err);
+        }
+    }
+    
+    /**
+     * V2.0: Process a single group travel - generate shared discoveries for both frogs
+     */
+    private async processGroupTravelExploration(groupTravel: any): Promise<void> {
+        const { travel, leader, companion } = groupTravel;
+        if (!travel || !leader || !companion) return;
+        
+        // Check interval - use testing mode interval
+        const TESTING_MODE = true;
+        const intervalMinutes = TESTING_MODE ? 1 : 5;
+        
+        const now = new Date();
+        const lastExplore = travel.targetChainArrivalTime || travel.startTime;
+        const timeSinceLastExplore = (now.getTime() - new Date(lastExplore).getTime()) / 1000 / 60;
+        
+        if (timeSinceLastExplore < intervalMinutes) {
+            return; // Not yet time
+        }
+        
+        logger.info(`[ExplorationScheduler] Triggering group exploration for leader=${leader.tokenId}, companion=${companion.tokenId}`);
+        
+        // Get chain config
+        const chainId = groupTravel.targetChainId || travel.chainId;
+        const chainConfig = this.chainConfigs.get(chainId);
+        if (!chainConfig) {
+            logger.warn(`[ExplorationScheduler] No config for chain ${chainId}`);
+            return;
+        }
+        
+        // Get explored addresses to avoid duplicates
+        const exploredSet = await this.getExploredAddressesForTravel(travel.id);
+        
+        // Pick a random address
+        const targetResult = this.getRandomTargetAddress(chainId, exploredSet);
+        const targetAddress = targetResult.address;
+        const interestingInfo = targetResult.interesting;
+        
+        // Generate shared observation
+        const observation = `${leader.name} 和 ${companion.name} 一起探索了 ${interestingInfo?.name || targetAddress.slice(0, 10)}...`;
+        
+        // Create discovery for BOTH frogs
+        const blockNumber = this.zetaProvider ? await this.zetaProvider.getBlockNumber() : 0;
+        
+        // Create interaction record for leader
+        await prisma.travelInteraction.create({
+            data: {
+                travelId: travel.id,
+                chainId: chainId,
+                blockNumber: BigInt(blockNumber),
+                message: `[结伴] ${observation}`,
+                exploredAddress: targetAddress,
+                isContract: interestingInfo?.category === 'defi' || interestingInfo?.category === 'bridge'
+            }
+        });
+        
+        // Update travel actions
+        await prisma.travel.update({
+            where: { id: travel.id },
+            data: {
+                targetChainActions: {
+                    push: {
+                        type: 'group_exploration',
+                        targetAddress: targetAddress,
+                        interestingName: interestingInfo?.name || null,
+                        observation,
+                        participants: [leader.tokenId, companion.tokenId],
+                        timestamp: new Date().toISOString()
+                    }
+                },
+                targetChainArrivalTime: new Date()
+            }
+        });
+        
+        // Add to explored cache
+        exploredSet.add(targetAddress.toLowerCase());
+        
+        // Notify both frogs via WebSocket
+        const discoveryPayload = {
+            type: (interestingInfo ? 'landmark' : 'encounter') as 'landmark' | 'encounter',
+            title: `🐸🐸 ${interestingInfo?.name || '发现钱包'}`,
+            description: observation,
+            location: `${targetAddress.slice(0, 10)}... (Chain ${chainId})`,
+            rarity: (interestingInfo?.rarity || 2) + 1, // Group bonus
+            metadata: { isGroupTravel: true }
+        };
+        
+        notifyCrossChainDiscovery(leader.tokenId, discoveryPayload);
+        notifyCrossChainDiscovery(companion.tokenId, discoveryPayload);
+        
+        logger.info(`[ExplorationScheduler] Group exploration completed: ${targetAddress}`);
     }
 
     /**

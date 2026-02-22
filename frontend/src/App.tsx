@@ -8,6 +8,7 @@ import { Friends } from './pages/Friends';
 import { GardenPage } from './pages/GardenPage';
 import { Navbar } from './components/common/Navbar';
 import { LoadingSkeleton } from './components/common/LoadingSkeleton';
+import { ToastProvider } from './components/common/ToastProvider';
 import { FrogPet } from './components/frog/FrogPet';
 import { useWalletConnect } from './hooks/useWalletConnect';
 import { FriendFloatPanel } from './components/friend-float';
@@ -69,10 +70,10 @@ export function App() {
   }
 
   return (
-    <>
+    <ToastProvider>
       <WalletInitializer />
       <BrowserRouter>
-        <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50">
+        <div className="min-h-screen">
           <Navbar />
           <main className="container mx-auto px-4 py-8">
             <Suspense fallback={<LoadingSkeleton type="page" />}>
@@ -115,7 +116,7 @@ export function App() {
           </main>
           
           {/* Footer */}
-          <footer className="py-8 text-center text-gray-500 text-sm">
+          <footer className="py-8 text-center text-slate-500 text-sm">
             <p>🐸 ZetaFrog - Hop Across Chains, Collect Stories</p>
             <p className="mt-1">Built with ❤️ on ZetaChain</p>
           </footer>
@@ -124,7 +125,7 @@ export function App() {
         {/* 好友浮窗 */}
         <FriendFloatPanel />
       </BrowserRouter>
-    </>
+    </ToastProvider>
   );
 }
 

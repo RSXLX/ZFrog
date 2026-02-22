@@ -9,6 +9,14 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "../interfaces/ZetaInterfaces.sol";
 
 /**
+ * @title ISouvenirNFT Interface
+ * @notice Interface for minting souvenir NFTs
+ */
+interface ISouvenirNFT {
+    function mintSouvenir(address to, uint256 frogTokenId, string memory uri) external returns (uint256);
+}
+
+/**
  * @title OmniTravelUpgradeable (v3 - Gateway Based + UUPS)
  * @notice Cross-chain travel controller for ZetaFrog NFTs using ZetaChain Gateway
  * @dev Upgradeable version using UUPS proxy pattern
@@ -94,8 +102,11 @@ contract OmniTravelUpgradeable is
     mapping(uint256 => uint256) public frogProvisions;
     uint256 private _messageNonce;
     
+    // V4: Souvenir NFT integration
+    ISouvenirNFT public souvenirNFT;
+    
     // Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    uint256[49] private __gap;
     
     // ============ Events ============
     event CrossChainTravelStarted(
@@ -212,7 +223,7 @@ contract OmniTravelUpgradeable is
      * @notice Get contract version
      */
     function version() external pure returns (string memory) {
-        return "3.0.0";
+        return "3.1.0";
     }
     
     // ============ Admin Functions ============
@@ -255,6 +266,51 @@ contract OmniTravelUpgradeable is
     function setChainConnector(uint256 chainId, bytes calldata connector) external onlyOwner {
         chainConnectors[chainId] = connector;
         supportedChains[chainId] = true;
+    }
+    
+    /**
+     * @notice Set SouvenirNFT contract address (V4)
+     */
+    function setSouvenirNFT(address _souvenirNFT) external onlyOwner {
+        require(_souvenirNFT != address(0), "Invalid souvenir address");
+        souvenirNFT = ISouvenirNFT(_souvenirNFT);
+    }
+    
+    /**
+     * @notice Admin function to clear a stuck cross-chain travel record
+     * @dev Use when markTravelCompleted fails or frog is stuck in invalid state
+     * @param tokenId The frog token ID to clear
+     */
+    function adminClearStuckTravel(uint256 tokenId) external onlyOwner {
+        CrossChainTravel storage travel = crossChainTravels[tokenId];
+        
+        // Reset NFT status to Idle
+        try zetaFrogNFT.setFrogStatus(tokenId, IZetaFrogNFT.FrogStatus.Idle) {
+            // Success
+        } catch {
+            // If setFrogStatus fails, continue anyway to clear the record
+        }
+        
+        // Clear the travel record
+        travel.status = CrossChainStatus.Completed;
+        
+        // Refund any remaining provisions
+        _refundRemainingProvisions(tokenId);
+        
+        emit CrossChainTravelCompleted(tokenId, travel.outboundMessageId, 0, block.timestamp);
+    }
+    
+    /**
+     * @notice Admin function to batch clear stuck travels
+     */
+    function adminBatchClearStuckTravels(uint256[] calldata tokenIds) external onlyOwner {
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            CrossChainTravel storage travel = crossChainTravels[tokenIds[i]];
+            try zetaFrogNFT.setFrogStatus(tokenIds[i], IZetaFrogNFT.FrogStatus.Idle) {} catch {}
+            travel.status = CrossChainStatus.Completed;
+            _refundRemainingProvisions(tokenIds[i]);
+            emit CrossChainTravelCompleted(tokenIds[i], travel.outboundMessageId, 0, block.timestamp);
+        }
     }
     
     function pause() external onlyOwner { _pause(); }
@@ -565,7 +621,21 @@ contract OmniTravelUpgradeable is
         emit EmergencyReturn(tokenId, msg.sender, "Emergency return executed", block.timestamp);
     }
     
-    function markTravelCompleted(uint256 tokenId, uint256 xpReward) external onlyTravelManager {
+    // V4: Event for failed souvenir minting
+    event SouvenirMintFailed(uint256 indexed tokenId, address owner, string reason);
+    event SouvenirMinted(uint256 indexed tokenId, address owner, uint256 souvenirId);
+    
+    /**
+     * @notice Mark cross-chain travel as completed (V4: with souvenir minting)
+     * @param tokenId The frog token ID
+     * @param xpReward XP reward amount
+     * @param souvenirUri IPFS URI for the souvenir NFT metadata (empty to skip minting)
+     */
+    function markTravelCompleted(
+        uint256 tokenId, 
+        uint256 xpReward,
+        string calldata souvenirUri
+    ) external onlyTravelManager {
         CrossChainTravel storage travel = crossChainTravels[tokenId];
         require(travel.status != CrossChainStatus.None, "No travel found");
         
@@ -574,10 +644,28 @@ contract OmniTravelUpgradeable is
             zetaFrogNFT.addExperience(tokenId, xpReward);
         }
         
+        // V4: Mint souvenir NFT if URI provided and souvenirNFT is configured
+        if (address(souvenirNFT) != address(0) && bytes(souvenirUri).length > 0) {
+            try souvenirNFT.mintSouvenir(travel.owner, tokenId, souvenirUri) returns (uint256 souvenirId) {
+                emit SouvenirMinted(tokenId, travel.owner, souvenirId);
+            } catch Error(string memory reason) {
+                emit SouvenirMintFailed(tokenId, travel.owner, reason);
+            } catch {
+                emit SouvenirMintFailed(tokenId, travel.owner, "Unknown error");
+            }
+        }
+        
         _refundRemainingProvisions(tokenId);
         travel.status = CrossChainStatus.Completed;
         
         emit CrossChainTravelCompleted(tokenId, travel.outboundMessageId, xpReward, block.timestamp);
+    }
+    
+    /**
+     * @notice Legacy markTravelCompleted without souvenir (backward compatible)
+     */
+    function markTravelCompletedLegacy(uint256 tokenId, uint256 xpReward) external onlyTravelManager {
+        this.markTravelCompleted(tokenId, xpReward, "");
     }
     
     // ============ Internal Functions ============
@@ -593,6 +681,117 @@ contract OmniTravelUpgradeable is
                 emit ProvisionsRefunded(tokenId, travelOwner, remaining, block.timestamp);
             }
         }
+    }
+    
+    // ============ Group Cross-Chain Travel Functions ============
+    
+    event GroupCrossChainTravelStarted(
+        uint256 indexed leaderTokenId,
+        uint256 indexed companionTokenId,
+        address indexed leaderOwner,
+        address companionOwner,
+        uint256 targetChainId,
+        bytes32 messageId,
+        uint64 startTime,
+        uint64 maxDuration
+    );
+    
+    /**
+     * @notice Calculate provisions for group travel (1.5x single traveler)
+     */
+    function calculateGroupProvisions(uint256 durationHours) public view returns (uint256) {
+        uint256 singleProvisions = calculateProvisions(durationHours);
+        return (singleProvisions * 3) / 2; // 1.5x social discount
+    }
+    
+    /**
+     * @notice Start a cross-chain group travel for two frogs
+     * @param leaderTokenId The leader frog token ID (pays gas)
+     * @param companionTokenId The companion frog token ID
+     * @param targetChainId The destination chain ID
+     * @param duration Travel duration in seconds
+     */
+    function startGroupCrossChainTravel(
+        uint256 leaderTokenId,
+        uint256 companionTokenId,
+        uint256 targetChainId,
+        uint256 duration
+    ) external payable whenNotPaused nonReentrant {
+        // 1. Validate leader ownership
+        require(zetaFrogNFT.ownerOf(leaderTokenId) == msg.sender, "Not leader owner");
+        
+        // 2. Validate chain support
+        require(supportedChains[targetChainId], "Chain not supported");
+        require(chainConnectors[targetChainId].length > 0, "Connector not set");
+        
+        // 3. Validate duration
+        require(duration > 0 && duration <= MAX_TRAVEL_DURATION, "Invalid duration");
+        
+        // 4. Validate both frogs are idle
+        require(canStartCrossChainTravel(leaderTokenId), "Leader not available");
+        require(canStartCrossChainTravel(companionTokenId), "Companion not available");
+        
+        // 5. Calculate and validate group provisions (1.5x single)
+        uint256 durationHours = (duration + 3599) / 3600;
+        uint256 requiredProvisions = calculateGroupProvisions(durationHours);
+        require(msg.value >= requiredProvisions, "Insufficient provisions");
+        
+        // 6. Lock leader NFT (companion is tracked in backend DB)
+        zetaFrogNFT.setFrogStatus(leaderTokenId, IZetaFrogNFT.FrogStatus.Traveling);
+        
+        // 7. Generate message ID
+        bytes32 messageId = keccak256(abi.encodePacked(
+            "GROUP",
+            leaderTokenId,
+            companionTokenId,
+            msg.sender,
+            targetChainId,
+            block.timestamp,
+            _messageNonce++
+        ));
+        
+        // 8. Store group travel info
+        groupTravels[messageId] = GroupCrossChainTravel({
+            leaderTokenId: leaderTokenId,
+            companionTokenId: companionTokenId,
+            leaderOwner: msg.sender,
+            companionOwner: zetaFrogNFT.ownerOf(companionTokenId),
+            targetChainId: targetChainId,
+            messageId: messageId,
+            status: CrossChainStatus.Locked
+        });
+        
+        // 9. Store provisions under leader tokenId
+        frogProvisions[leaderTokenId] = msg.value;
+        
+        // Map messageId to leader tokenId for refund
+        messageToToken[messageId] = leaderTokenId;
+        
+        // 10. Send cross-chain message (if not test mode)
+        if (!testMode) {
+            bytes memory travelData = abi.encode(
+                leaderTokenId,
+                companionTokenId,
+                msg.sender,
+                duration
+            );
+            _sendCrossChainMessage(targetChainId, messageId, travelData);
+        }
+        
+        // 11. Update status to traveling
+        groupTravels[messageId].status = CrossChainStatus.Traveling;
+        
+        // 12. Emit event
+        emit GroupCrossChainTravelStarted(
+            leaderTokenId,
+            companionTokenId,
+            msg.sender,
+            zetaFrogNFT.ownerOf(companionTokenId),
+            targetChainId,
+            messageId,
+            uint64(block.timestamp),
+            uint64(duration)
+        );
     }
     
     receive() external payable {}

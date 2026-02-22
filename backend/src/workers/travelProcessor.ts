@@ -15,7 +15,12 @@ import { ChainKey, CHAIN_ID_TO_KEY, getChainConfig } from '../config/chains';
 import { travelP0Service } from '../services/travel/travel-p0.service';
 import { NFTImageOrchestratorService } from '../services/nft-image-orchestrator.service';
 import { badgeService } from '../services/badge/badge.service';
-import { notifyTravelProgress } from '../websocket';
+import { notifyTravelProgress, notifyFriendInteraction } from '../websocket';
+// 🆕 V2.0 服务
+import { addressAnalysisService } from '../services/travel/address-analysis.service';
+import { affinityService } from '../services/friend/affinity.service';
+import { chainMaterialService } from '../services/travel/chain-material.service';
+import { rescueService } from '../services/travel/rescue.service';
 import type { Server } from 'socket.io';
 
 // 定义 ZetaChain Athens Testnet
@@ -135,6 +140,28 @@ class TravelProcessor {
                 }
                 lastScanTime.set(travel.id, now);
                 
+                // 🆕 V2.0: 检查是否触发救援事件 (Stranded)
+                try {
+                    const isStranded = await rescueService.checkAndTriggerStranded(travel.id);
+                    if (isStranded.isStranded) {
+                        logger.info(`🚨 Travel ${travel.id} is now STRANDED! Stopping normal processing.`);
+                        // 如果被困住，通知前端并跳过后续常规扫描
+                        if (this.io) {
+                            this.io.to(`frog:${travel.frog.tokenId}`).emit('travel:update', {
+                                travelId: travel.id,
+                                stage: 'STRANDED',
+                                message: {
+                                    text: '🆘 你的青蛙被困住了！请求救援！',
+                                    type: 'WARNING'
+                                }
+                            });
+                        }
+                        continue;
+                    }
+                } catch (rescueError) {
+                    logger.error(`Error checking stranded status for travel ${travel.id}:`, rescueError);
+                }
+
                 logger.debug(`🔄 Scanning travel ${travel.id} (interval: ${interval/1000}s)`);
                 
                 // Throttle updates: check last update time
@@ -517,8 +544,24 @@ class TravelProcessor {
                 }
             );
             
-            const xpGained = Math.max(10, (durationHours * 10) + (observation.notableEvents.length * 50));
-            logger.info(`Frog ${frog.tokenId} gained ${xpGained} XP`);
+            // 🆕 V2.0: 地址类型分析和探索加成
+            let addressBonus = 1.0;
+            let addressType = 'normal';
+            try {
+                const addressInfo = await addressAnalysisService.analyzeAddress(targetWallet, chainId || 7001);
+                addressBonus = addressInfo.bonus;
+                addressType = addressInfo.type;
+                if (addressInfo.type !== 'normal') {
+                    logger.info(`[V2.0] Address ${targetWallet} analyzed as ${addressInfo.type}, bonus: ${addressBonus}x`);
+                }
+            } catch (addressError) {
+                logger.warn('[V2.0] Address analysis failed, using default bonus:', addressError);
+            }
+            
+            // 应用地址加成到 XP 计算
+            const baseXp = Math.max(10, (durationHours * 10) + (observation.notableEvents.length * 50));
+            const xpGained = Math.floor(baseXp * addressBonus);
+            logger.info(`Frog ${frog.tokenId} gained ${xpGained} XP (base: ${baseXp}, bonus: ${addressBonus}x, type: ${addressType})`);
 
             const newXp = frog.xp + xpGained;
             const newLevel = Math.floor(newXp / 100) + 1;
@@ -579,6 +622,9 @@ class TravelProcessor {
             let dbSouvenirId: number | null = null;
             if (souvenirId && souvenirId > 0) {
                 try {
+                    // 🆕 V2.0: 获取链专属材料类型
+                    const materialType = chainMaterialService.getSouvenirMaterialType(chainKey);
+                    
                     const dbSouvenir = await prisma.souvenir.upsert({
                         where: { 
                             tokenId_chainType: {
@@ -594,9 +640,11 @@ class TravelProcessor {
                             rarity: finalRarity as any,
                             chainType: chainKey as ChainType,
                             mintedAt: new Date(),
+                            materialType, // 🆕 V2.0: 链专属材料
                         },
                     });
                     dbSouvenirId = dbSouvenir.id;
+                    logger.info(`[V2.0] Souvenir ${souvenirId} created with materialType: ${materialType}`);
 
                     const souvenirType = this.mapSouvenirTypeToPromptKey(finalRarity);
                     this.orchestrator.generateSouvenirImage({
@@ -663,6 +711,59 @@ class TravelProcessor {
                     where: { id: travel.groupTravel.id },
                     data: { status: 'COMPLETED' },
                 });
+                
+                // === 创建旅行完成互动记录并通知好友 ===
+                try {
+                    const friendship = await prisma.friendship.findFirst({
+                        where: {
+                            OR: [
+                                { requesterId: frog.id, addresseeId: travel.groupTravel.companionId },
+                                { requesterId: travel.groupTravel.companionId, addresseeId: frog.id }
+                            ],
+                            status: 'Accepted'
+                        }
+                    });
+                    
+                    if (friendship) {
+                        // 🆕 V2.0: 更新友情值
+                        try {
+                            const affinityResult = await affinityService.incrementAffinityByTravel(frog.id, travel.groupTravel.companionId);
+                            logger.info(`[V2.0] Affinity updated for friendship ${friendship.id}: level=${affinityResult.newLevel}, leveledUp=${affinityResult.leveledUp}`);
+                        } catch (affinityError) {
+                            logger.warn('[V2.0] Failed to update affinity:', affinityError);
+                        }
+                        
+                        const companionName = travel.groupTravel.companion?.name || '好友';
+                        const interaction = await prisma.friendInteraction.create({
+                            data: {
+                                friendshipId: friendship.id,
+                                actorId: frog.id,
+                                type: 'Travel',
+                                message: `${frog.name} 和 ${companionName} 完成了前往 ${chainConfig.displayName} 的冒险！`,
+                                metadata: {
+                                    travelId,
+                                    chainId,
+                                    chainName: chainConfig.displayName,
+                                    completedAt: new Date().toISOString(),
+                                    journalHash,
+                                    souvenirId: dbSouvenirId || null
+                                }
+                            }
+                        });
+                        
+                        // 通知好友旅行完成
+                        notifyFriendInteraction(
+                            friendship.id,
+                            frog.id,
+                            travel.groupTravel.companionId,
+                            interaction
+                        );
+                        
+                        logger.info(`[GroupTravel] Created completion interaction and notified companion for travel ${travelId}`);
+                    }
+                } catch (interactionError) {
+                    logger.warn(`[GroupTravel] Failed to create completion interaction:`, interactionError);
+                }
                 
                 if (chainKey) {
                     try {

@@ -1,5 +1,21 @@
 // backend/src/services/travel.service.ts
-// TypeScript migration of travel.service.js
+/**
+ * @deprecated 此文件已废弃。请使用以下模块化服务替代：
+ * 
+ * ❌ 不要使用此文件中的任何方法
+ * 
+ * ✅ 替代方案：
+ * - 旅行生命周期管理: backend/src/workers/travelProcessor.ts
+ * - 跨链旅行: backend/src/services/omni-travel.service.ts
+ * - 结伴旅行: backend/src/services/group-travel.service.ts
+ * - AI日记生成: backend/src/services/ai.service.ts
+ * - IPFS上传: backend/src/services/ipfs.service.ts
+ * - 钱包观察: backend/src/services/observer.service.ts
+ * - 探索逻辑: backend/src/services/travel/exploration.service.ts
+ * 
+ * 此文件保留仅供参考历史逻辑，计划在下一个版本中删除。
+ */
+// TypeScript migration of travel.service.js (DEPRECATED)
 
 import { PrismaClient, TravelStatus } from '@prisma/client';
 import { ethers, JsonRpcProvider, Wallet, Contract, parseEther } from 'ethers';

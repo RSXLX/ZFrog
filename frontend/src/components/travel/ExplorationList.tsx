@@ -27,9 +27,11 @@ interface Exploration {
 }
 
 interface ExplorationSummary {
-  total: number;
-  contracts: number;
-  wallets: number;
+  totalAll: number;
+  totalContracts: number;
+  totalWallets: number;
+  filtered: number;
+  uniqueAddresses: number;
 }
 
 interface ExplorationListProps {
@@ -47,7 +49,9 @@ const chainNames: Record<number, string> = {
 
 export function ExplorationList({ travelId, className = '' }: ExplorationListProps) {
   const [explorations, setExplorations] = useState<Exploration[]>([]);
-  const [summary, setSummary] = useState<ExplorationSummary>({ total: 0, contracts: 0, wallets: 0 });
+  const [summary, setSummary] = useState<ExplorationSummary>({ 
+    totalAll: 0, totalContracts: 0, totalWallets: 0, filtered: 0, uniqueAddresses: 0 
+  });
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,13 +69,19 @@ export function ExplorationList({ travelId, className = '' }: ExplorationListPro
       if (data.success && data.data) {
         if (reset) {
           setExplorations(data.data.explorations);
-          setOffset(data.data.explorations.length);
         } else {
           setExplorations(prev => [...prev, ...data.data.explorations]);
-          setOffset(currentOffset + data.data.explorations.length);
         }
         setSummary(data.data.summary);
-        setHasMore(data.data.hasMore);
+        // 使用新的 pagination 对象
+        if (data.data.pagination) {
+          setOffset(data.data.pagination.offset + data.data.explorations.length);
+          setHasMore(data.data.pagination.hasMore);
+        } else {
+          // 兼容旧格式
+          setOffset(currentOffset + data.data.explorations.length);
+          setHasMore(data.data.hasMore ?? false);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch explorations:', error);
@@ -148,7 +158,7 @@ export function ExplorationList({ travelId, className = '' }: ExplorationListPro
           链上探索记录
         </h3>
         <span className="text-sm text-gray-500">
-          已探索 {summary.total} 个地址
+          已探索 {summary.uniqueAddresses} 个地址
         </span>
       </div>
 
@@ -162,7 +172,7 @@ export function ExplorationList({ travelId, className = '' }: ExplorationListPro
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
         >
-          全部 ({summary.total})
+          全部 ({summary.totalAll})
         </button>
         <button
           onClick={() => handleCategoryChange('contract')}
@@ -172,7 +182,7 @@ export function ExplorationList({ travelId, className = '' }: ExplorationListPro
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
         >
-          📜 合约 ({summary.contracts})
+          📜 合约 ({summary.totalContracts})
         </button>
         <button
           onClick={() => handleCategoryChange('wallet')}
@@ -182,7 +192,7 @@ export function ExplorationList({ travelId, className = '' }: ExplorationListPro
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
         >
-          👛 钱包 ({summary.wallets})
+          👛 钱包 ({summary.totalWallets})
         </button>
       </div>
 

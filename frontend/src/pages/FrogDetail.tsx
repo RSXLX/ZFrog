@@ -10,12 +10,22 @@ import { TravelJournal } from '../components/travel/TravelJournal';
 import { Loading } from '../components/common/Loading';
 import { TravelPending } from '../components/travel/TravelPending';
 import { InteractionFeed } from '../components/travel/InteractionFeed';
+import { GroupTravelModal } from '../components/travel/GroupTravelModal';
 import { useWebSocket, useTravelEvents } from '../hooks/useWebSocket';
 import { useEffect, useState, useRef } from 'react';
 import { apiService, type Frog } from '../services/api';
 import { useAccount } from 'wagmi';
 import FriendInteractionModal from '../components/frog/FriendInteraction';
 import { useFrogStore } from '../stores/frogStore';
+import { NurturePanel } from '../components/frog/NurturePanel';
+import { TravelCheck } from '../components/frog/TravelCheck';
+import { useToast } from '../components/common/ToastProvider';
+import { AnimatedTabs } from '../components/common/AnimatedTabs';
+import { LevelUpCelebration } from '../components/common/MicroInteractions';
+import { RefreshCw, Home, Trophy, Gift, Users, Heart, Plane } from 'lucide-react';
+import { HibernationBadge } from '../components/frog/HibernationBadge';
+import { ReviveModal } from '../components/frog/ReviveModal';
+import { useHibernation } from '../hooks/useHibernation';
 
 
 interface TravelDetail {
@@ -62,6 +72,7 @@ export function FrogDetail() {
     
     const { address } = useAccount();
     const { setCurrentFrog } = useFrogStore();
+    const { toast } = useToast();
     const [userFrogs, setUserFrogs] = useState<Frog[]>([]);
     
     // 互动相关状态
@@ -70,8 +81,15 @@ export function FrogDetail() {
     const [isFetching, setIsFetching] = useState(false); // 防止重复获取数据
     const [activeMode, setActiveMode] = useState<'select' | 'local' | 'crosschain'>('select'); // 旅行模式：select (选择), local (本地探索), crosschain (跨链)
     const activeTravelRetryRef = useRef(0); // 重试计数器，限制最多3次
+    const [showGroupTravelModal, setShowGroupTravelModal] = useState(false); // 结伴旅行弹窗
+    const [mainTab, setMainTab] = useState<'travel' | 'nurture'>('nurture'); // 主 Tab：旅行或养成
+    const [showTravelCheck, setShowTravelCheck] = useState(false); // 旅行前置检查
+    const [showReviveModal, setShowReviveModal] = useState(false); // 唤醒弹窗
 
     const isOwner = frog && address && frog.ownerAddress.toLowerCase() === address.toLowerCase();
+    
+    // 🌙 冬眠状态管理
+    const hibernation = useHibernation(frog?.id || null);
 
     // 调试日志：帮助诊断 isOwner 判断问题
     useEffect(() => {
@@ -84,6 +102,15 @@ export function FrogDetail() {
             });
         }
     }, [frog, address]);
+
+    // 【改进】如果青蛙正在旅行，自动跳转到旅行详情页
+    useEffect(() => {
+        if (frog?.status === 'Traveling' && activeTravel?.id && activeTravel.id > 0) {
+            console.log('[FrogDetail] Frog is traveling, redirecting to travel page:', activeTravel.id);
+            window.location.href = `/travel/${activeTravel.id}`;
+        }
+    }, [frog?.status, activeTravel?.id]);
+
 
     const fetchData = async () => {
         // 防止重复调用
@@ -414,7 +441,7 @@ export function FrogDetail() {
                                 await fetchData();
                             } catch (e) {
                                 console.error(e);
-                                alert('同步失败，请确合约地址配置正确');
+                                toast.error('同步失败，请确认合约地址配置正确');
                             } finally {
                                 setIsSyncing(false);
                             }
@@ -472,11 +499,11 @@ export function FrogDetail() {
                                       duration: 3600
                                     });
                                     if (response.success) {
-                                      alert(`🐸🐸 ${frog.name} 和 ${companion.name} 一起出发啦！`);
+                                      toast.success(`${frog.name} 和 ${companion.name} 一起出发啦！`);
                                       fetchData();
                                     }
                                   } catch (error: any) {
-                                    alert(error?.message || '发起结伴旅行失败');
+                                    toast.error(error?.message || '发起结伴旅行失败');
                                   }
                                 }}
                               />
@@ -485,11 +512,12 @@ export function FrogDetail() {
                                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                     <div className="flex items-center gap-3">
                                         <h1 className="text-3xl font-bold text-gray-800">{frog.name}</h1>
-                                        {isOwner && (
-                                            <span className="px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full shadow-sm">
-                                                我的小青蛙 🐸
-                                            </span>
-                                        )}
+                                        {/* 🌙 冬眠状态徽章 */}
+                                        <HibernationBadge 
+                                            status={hibernation.status} 
+                                            onClick={() => hibernation.isSleeping && setShowReviveModal(true)}
+                                        />
+
                                     </div>
                                     {isOwner && (
                                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full sm:w-auto">
@@ -501,33 +529,43 @@ export function FrogDetail() {
                                                     }
                                                 }}
                                                 disabled={isSyncing}
+                                                aria-label="刷新数据"
                                                 className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center justify-center gap-1 disabled:opacity-50 text-sm font-medium whitespace-nowrap"
                                             >
-                                                {isSyncing ? '🔄' : '🔄'} <span className="hidden sm:inline">刷新</span>
+                                                <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+                                                <span className="hidden sm:inline">刷新</span>
                                             </button>
                                             <button
                                                 onClick={() => window.location.href = '/garden'}
+                                                aria-label="进入家园"
                                                 className="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center justify-center gap-1 text-sm font-medium whitespace-nowrap"
                                             >
-                                                🏠 <span className="hidden sm:inline">家园</span>
+                                                <Home size={16} />
+                                                <span className="hidden sm:inline">家园</span>
                                             </button>
                                             <button
                                                 onClick={() => window.location.href = '/badges'}
+                                                aria-label="兑换徽章"
                                                 className="px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 flex items-center justify-center gap-1 text-sm font-medium whitespace-nowrap"
                                             >
-                                                🏆 <span className="hidden sm:inline">兑换</span>
+                                                <Trophy size={16} />
+                                                <span className="hidden sm:inline">兑换</span>
                                             </button>
                                             <button
                                                 onClick={() => window.location.href = '/souvenirs'}
+                                                aria-label="查看纪念品"
                                                 className="px-3 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 flex items-center justify-center gap-1 text-sm font-medium whitespace-nowrap"
                                             >
-                                                🎁 <span className="hidden sm:inline">纪念品</span>
+                                                <Gift size={16} />
+                                                <span className="hidden sm:inline">纪念品</span>
                                             </button>
                                             <button
                                                 onClick={() => window.location.href = '/friends'}
+                                                aria-label="好友系统"
                                                 className="px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm font-medium whitespace-nowrap col-span-2 sm:col-span-1"
                                             >
-                                                👥 <span className="hidden sm:inline">好友系统</span>
+                                                <Users size={16} />
+                                                <span className="hidden sm:inline">好友系统</span>
                                             </button>
                                         </div>
                                     )}
@@ -547,8 +585,53 @@ export function FrogDetail() {
                         </div>
                     </motion.div>
 
+                    {/* 🐸 主 Tab 切换器 - 养成 / 旅行 */}
+                    {isOwner && frog.status !== 'Traveling' && (
+                        <div className="mb-6">
+                            <AnimatedTabs
+                                tabs={[
+                                    { id: 'nurture', label: '养成照顾', icon: <Heart size={16} /> },
+                                    { id: 'travel', label: '出门旅行', icon: <Plane size={16} /> },
+                                ]}
+                                activeTab={mainTab}
+                                onTabChange={(id) => setMainTab(id as 'nurture' | 'travel')}
+                            />
+                        </div>
+                    )}
+
+                    {/* 养成面板 */}
+                    {isOwner && mainTab === 'nurture' && frog.status !== 'Traveling' && (
+                        <div className="mb-6">
+                            <NurturePanel 
+                                frogId={frog.id} 
+                                ownerAddress={frog.ownerAddress} 
+                            />
+                        </div>
+                    )}
+
+                    {/* 旅行前置检查弹窗 */}
+                    {showTravelCheck && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                        >
+                            <div className="w-full max-w-md">
+                                <TravelCheck
+                                    frogId={frog.id}
+                                    frogName={frog.name}
+                                    onConfirm={() => {
+                                        setShowTravelCheck(false);
+                                        setMainTab('travel');
+                                    }}
+                                    onCancel={() => setShowTravelCheck(false)}
+                                />
+                            </div>
+                        </motion.div>
+                    )}
+
                     {/* 主要内容区域 */}
-                    <div className="grid md:grid-cols-2 gap-6">
+                    <div className={`grid md:grid-cols-2 gap-6 ${isOwner && mainTab === 'nurture' && frog.status !== 'Traveling' ? 'hidden' : ''}`}>
                         {/* 左侧: 旅行状态或表单/访客信息 */}
                         <div>
                             {isOwner ? (
@@ -591,6 +674,7 @@ export function FrogDetail() {
                                                 frogName={frog.name}
                                                 onSelectLocalExploration={() => setActiveMode('local')}
                                                 onSelectCrossChain={() => setActiveMode('crosschain')}
+                                                onSelectGroupTravel={() => setShowGroupTravelModal(true)}
                                             />
                                         )}
 
@@ -737,6 +821,37 @@ export function FrogDetail() {
                     onInteractionComplete={() => {
                         setShowInteractionModal(false);
                         // 可以添加成功提示
+                    }}
+                />
+            )}
+
+            {/* 结伴旅行弹窗 */}
+            {frog && (
+                <GroupTravelModal
+                    isOpen={showGroupTravelModal}
+                    onClose={() => setShowGroupTravelModal(false)}
+                    frogId={frog.id}
+                    frogName={frog.name}
+                    tokenId={tokenId}
+                    onSuccess={(travelId) => {
+                        setShowGroupTravelModal(false);
+                        // 跳转到旅行详情页
+                        window.location.href = `/travel/${travelId}`;
+                    }}
+                />
+            )}
+            
+            {/* 🌙 唤醒弹窗 */}
+            {frog && (
+                <ReviveModal
+                    isOpen={showReviveModal}
+                    onClose={() => setShowReviveModal(false)}
+                    frogId={frog.id}
+                    frogName={frog.name}
+                    ownerAddress={frog.ownerAddress}
+                    onSuccess={() => {
+                        hibernation.refresh();
+                        fetchData();
                     }}
                 />
             )}

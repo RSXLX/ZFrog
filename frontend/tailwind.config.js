@@ -20,6 +20,10 @@ export default {
           900: '#14532d',
         },
       },
+      fontFamily: {
+        orbitron: ['"Orbitron"', 'sans-serif'],
+        exo: ['"Exo 2"', 'sans-serif'],
+      },
       animation: {
         'bounce-slow': 'bounce 2s infinite',
         'pulse-slow': 'pulse 3s infinite',

@@ -24,10 +24,24 @@ const TRAVEL_DESTINATIONS = [
 export function Desktop() {
   const { isConnected, address } = useWallet();
   const { whaleAlert, priceChange, clearAlerts } = useChainMonitor();
-  const { travel } = useFrogInteraction();
   const { frog: activeFrog, loading } = useFrogData(address);
   
-  const [inventory, setInventory] = useState({
+  // 使用服务器同步的互动 hook
+  const { 
+    travel, 
+    feed,
+    inventory: serverInventory,
+    serverStatus,
+    loadInventory,
+    refresh: refreshInteraction,
+  } = useFrogInteraction({
+    tokenId: activeFrog?.tokenId,
+    ownerAddress: address,
+    autoSync: !!activeFrog,
+  });
+  
+  // 本地库存状态 (未连接服务器时的 fallback)
+  const [localInventory, setLocalInventory] = useState({
     fly: 10,
     worm: 5,
     cricket: 3,
@@ -35,6 +49,9 @@ export function Desktop() {
     dragonfly: 1,
     golden_fly: 0,
   });
+  
+  // 使用服务器库存或本地库存
+  const inventory = Object.keys(serverInventory).length > 0 ? serverInventory : localInventory;
   
   const [balance, setBalance] = useState(500);
   const [showTravelDialog, setShowTravelDialog] = useState(false);
@@ -58,18 +75,29 @@ export function Desktop() {
     return () => clearTimeout(timer);
   }, []);
   
-  // 处理喂食
-const handleFeed = (food: FoodItem) => {
-    if ((inventory[food.id as keyof typeof inventory] || 0) <= 0) return;
+  // 处理喂食 (异步，同步到服务器)
+  const handleFeed = async (food: FoodItem) => {
+    if ((inventory[food.id] || 0) <= 0) return;
     
-    setInventory(prev => ({
-        ...prev,
-        [food.id]: (prev[food.id as keyof typeof prev] || 0) - 1
-      }));
+    // 本地立即更新 (乐观更新)
+    setLocalInventory(prev => ({
+      ...prev,
+      [food.id]: Math.max(0, (prev[food.id as keyof typeof prev] || 0) - 1)
+    }));
     
-    if (activeFrog) {
-      // 这里应该调用青蛙的喂食方法
-      console.log(`喂食 ${food.name} 给 ${activeFrog.name}`);
+    if (activeFrog && address) {
+      // 调用服务器 API
+      const result = await feed(food.id);
+      if (result.success) {
+        console.log(`喂食成功: ${food.name} 给 ${activeFrog.name}, 能量+${result.energy}, 快乐+${result.happiness}`);
+      } else {
+        console.error('喂食失败:', result.error);
+        // 回滚本地状态
+        setLocalInventory(prev => ({
+          ...prev,
+          [food.id]: (prev[food.id as keyof typeof prev] || 0) + 1
+        }));
+      }
     }
   };
   
@@ -88,7 +116,7 @@ const handleFeed = (food: FoodItem) => {
       const rewardFood = FOOD_ITEMS[Math.floor(Math.random() * FOOD_ITEMS.length)];
       const rewardCount = Math.floor(Math.random() * 3) + 1;
       
-      setInventory(prev => ({
+      setLocalInventory(prev => ({
         ...prev,
         [rewardFood.id]: (prev[rewardFood.id as keyof typeof prev] || 0) + rewardCount,
       }));
@@ -115,7 +143,7 @@ const handleFeed = (food: FoodItem) => {
     const totalPrice = foodPrices[food.rarity] * count;
     
     setBalance(prev => prev - totalPrice);
-    setInventory(prev => ({
+    setLocalInventory(prev => ({
       ...prev,
       [food.id]: (prev[food.id as keyof typeof prev] || 0) + count,
     }));
@@ -242,7 +270,6 @@ const handleFeed = (food: FoodItem) => {
               <FrogScene
                 frogId={activeFrog.tokenId}
                 frogName={activeFrog.name}
-                frogDbId={activeFrog.id}
                 isOwner={true}
                 showVisitorControls={true}
                 onGroupTravel={(companion) => {

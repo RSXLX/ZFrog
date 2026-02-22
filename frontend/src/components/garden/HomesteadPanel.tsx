@@ -133,7 +133,12 @@ export const HomesteadPanel: React.FC<HomesteadPanelProps> = ({
       {/* 弹窗组件 */}
       <AnimatePresence>
         {activePanel === 'messages' && (
-          <MessageBoard frogId={frogId} isOwner={isOwner} onClose={closePanel} />
+          <MessageBoard 
+            frogId={frogId} 
+            currentFrogId={frogId} 
+            isOwner={isOwner} 
+            onClose={closePanel} 
+          />
         )}
         {activePanel === 'gifts' && (
           <GiftBox frogId={frogId} isOwner={isOwner} onClose={closePanel} />

@@ -23,6 +23,18 @@ export function parsePositiveInt(value: any): number | null {
 }
 
 /**
+ * Safely parse non-negative integer (including 0)
+ * Returns null if value is not a valid non-negative integer
+ * Use this for NFT tokenId validation where 0 is a valid value
+ */
+export function parseNonNegativeInt(value: any): number | null {
+    if (value === undefined || value === null) return null;
+    const parsed = parseInt(value, 10);
+    if (isNaN(parsed) || parsed < 0) return null;
+    return parsed;
+}
+
+/**
  * Validate ethereum address format
  */
 export function isValidAddress(address: any): boolean {

@@ -4,6 +4,21 @@ import { motion } from 'framer-motion';
 import { Button } from '../components/common/Button';
 import { apiService } from '../services/api';
 import { ExplorationList } from '../components/travel/ExplorationList';
+import { 
+    ArrowLeft, 
+    MapPin, 
+    Calendar, 
+    Clock, 
+    Hash, 
+    Globe, 
+    BookOpen, 
+    Award, 
+    Share2, 
+    Sparkles, 
+    Zap,
+    Search
+} from 'lucide-react';
+import clsx from 'clsx';
 
 interface TravelDetail {
     id: number;
@@ -168,39 +183,44 @@ export function TravelDetailPage() {
                 <motion.div
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="mb-6"
+                    className="mb-8 relative z-10"
                 >
-                    <Button
-                        variant="outline"
+                    <button
                         onClick={() => navigate('/travel-history')}
-                        className="flex items-center space-x-2"
+                        className="flex items-center gap-2 text-gray-700 hover:text-green-600 transition-colors group bg-white/40 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/40 shadow-sm"
                     >
-                        <span>←</span>
-                        <span>返回旅行历史</span>
-                    </Button>
+                        <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                        <span className="font-exo font-semibold">Back to History</span>
+                    </button>
                 </motion.div>
 
                 {/* 旅行标题 */}
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-8"
+                    className="text-center mb-10 relative"
                 >
-                    <h1 className="text-4xl font-bold text-green-600 mb-2">
-                        {travel.journal?.title || '旅行详情'}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-32 bg-green-300/20 rounded-full blur-[60px] -z-10" />
+                    <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-teal-500 mb-4 drop-shadow-sm">
+                        {travel.journal?.title || 'Adventure Log'}
                     </h1>
-                    <div className="flex items-center justify-center space-x-4 text-gray-700">
-                        <span className="flex items-center space-x-1">
+                    
+                    <div className="flex flex-wrap items-center justify-center gap-3 text-gray-700">
+                        <span className="flex items-center gap-2 bg-white/50 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/40 shadow-sm">
                             <span className="text-2xl">{chain.icon}</span>
-                            <span>{chain.name}</span>
+                            <span className="font-exo font-bold">{chain.name}</span>
                         </span>
+                        
                         {travel.frog && (
-                            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
-                                {travel.frog.name} (#{travel.frog.tokenId})
+                            <span className="flex items-center gap-2 bg-green-100/80 backdrop-blur-md px-4 py-1.5 rounded-full border border-green-200 shadow-sm text-green-800">
+                                <span className="font-bold">{travel.frog.name}</span>
+                                <span className="text-xs bg-green-200 px-1.5 py-0.5 rounded-md font-mono">#{travel.frog.tokenId}</span>
                             </span>
                         )}
+                        
                         {travel.completedAt && (
-                            <span className="text-sm text-gray-600">
+                            <span className="flex items-center gap-2 bg-white/50 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/40 shadow-sm text-gray-600 font-exo text-sm">
+                                <Calendar size={14} />
                                 {new Date(travel.completedAt).toLocaleString()}
                             </span>
                         )}
@@ -208,7 +228,7 @@ export function TravelDetailPage() {
                 </motion.div>
 
                 {/* 主要内容 */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* 左侧：旅行日记 */}
                     <motion.div
                         initial={{ opacity: 0, x: -20 }}
@@ -216,37 +236,52 @@ export function TravelDetailPage() {
                         transition={{ delay: 0.2 }}
                         className="lg:col-span-2"
                     >
-                        <div className="bg-white/50 backdrop-blur rounded-xl p-6 border border-white/20">
-                            <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
-                                <span className="text-3xl mr-3">📖</span>
-                                旅行日记
+                        <div className="bg-white/60 backdrop-blur-md rounded-3xl p-8 border border-white/40 shadow-xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-6 opacity-5">
+                                <BookOpen size={120} />
+                            </div>
+                            
+                            <h2 className="text-2xl font-orbitron font-bold text-gray-800 mb-6 flex items-center gap-3 relative z-10">
+                                <BookOpen className="text-indigo-500" />
+                                Travel Journal
                             </h2>
                             
                             {travel.journal ? (
                                 <>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <span className="text-2xl">
-                                            {moodEmojis[travel.journal.mood.toLowerCase()] || '😊'}
-                                        </span>
-                                        <span className="text-sm text-gray-600 capitalize">
-                                            心情: {travel.journal.mood}
-                                        </span>
+                                    <div className="flex items-center justify-between mb-6 bg-white/40 p-4 rounded-2xl border border-white/20">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-4xl filter drop-shadow-md animate-bounce-slow">
+                                                {moodEmojis[travel.journal.mood.toLowerCase()] || '😊'}
+                                            </span>
+                                            <div className="flex flex-col">
+                                                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Frog's Mood</span>
+                                                <span className="text-lg font-exo font-bold text-gray-800 capitalize">
+                                                    {travel.journal.mood}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button className="text-gray-400 hover:text-indigo-500 transition-colors">
+                                            <Share2 size={20} />
+                                        </button>
                                     </div>
                                     
-                                    <div className="prose prose-sm max-w-none">
-                                        <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                                    <div className="prose prose-lg max-w-none mb-8">
+                                        <p className="text-gray-700 whitespace-pre-wrap leading-relaxed font-exo">
                                             {travel.journal.content}
                                         </p>
                                     </div>
 
                                     {travel.journal.highlights && travel.journal.highlights.length > 0 && (
-                                        <div className="mt-6">
-                                            <h3 className="text-lg font-semibold text-gray-800 mb-3">✨ 精彩瞬间</h3>
-                                            <ul className="space-y-2">
+                                        <div className="mt-8 bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-2xl border border-yellow-100">
+                                            <h3 className="text-lg font-bold text-amber-700 mb-4 flex items-center gap-2">
+                                                <Sparkles className="text-amber-500" size={20} />
+                                                Highlights
+                                            </h3>
+                                            <ul className="space-y-3">
                                                 {travel.journal.highlights.map((highlight, index) => (
-                                                    <li key={index} className="flex items-start space-x-2">
-                                                        <span className="text-green-500 mt-1">•</span>
-                                                        <span className="text-gray-700">{highlight}</span>
+                                                    <li key={index} className="flex items-start gap-3">
+                                                        <span className="mt-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full flex-shrink-0" />
+                                                        <span className="text-gray-700 font-medium">{highlight}</span>
                                                     </li>
                                                 ))}
                                             </ul>
@@ -254,15 +289,23 @@ export function TravelDetailPage() {
                                     )}
                                 </>
                             ) : (
-                                <p className="text-gray-500 italic">这次旅行没有留下日记...</p>
+                                <div className="text-center py-12">
+                                    <p className="text-gray-500 italic">No journal entry found for this adventure...</p>
+                                </div>
                             )}
                         </div>
 
                         {/* 链上探索记录 */}
-                        <ExplorationList 
-                            travelId={parseInt(travelId || '0')} 
-                            className="mt-6"
-                        />
+                        <div className="mt-8">
+                             <h3 className="text-xl font-orbitron font-bold text-gray-800 mb-4 flex items-center gap-2 px-2">
+                                <Zap className="text-yellow-500" />
+                                On-Chain Activity
+                            </h3>
+                            <ExplorationList 
+                                travelId={parseInt(travelId || '0')} 
+                                className="bg-white/40 backdrop-blur-md rounded-2xl border border-white/30"
+                            />
+                        </div>
                     </motion.div>
 
                     {/* 右侧：信息面板 */}
@@ -273,29 +316,41 @@ export function TravelDetailPage() {
                         className="space-y-6"
                     >
                         {/* 旅行信息 */}
-                        <div className="bg-white/50 backdrop-blur rounded-xl p-6 border border-white/20">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-4">📍 旅行信息</h3>
-                            <div className="space-y-3">
-                                <div className="flex justify-between">
-                                    <span className="text-gray-600">目标钱包:</span>
-                                    <span className="text-sm font-mono text-gray-800">
+                        <div className="bg-white/60 backdrop-blur-md rounded-2xl p-6 border border-white/40 shadow-sm hover:shadow-md transition-shadow">
+                            <h3 className="text-lg font-orbitron font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <Globe size={20} className="text-blue-500" />
+                                Details
+                            </h3>
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center pb-3 border-b border-gray-100/50">
+                                    <div className="flex items-center gap-2 text-gray-600">
+                                        <MapPin size={16} />
+                                        <span className="font-exo text-sm">Target</span>
+                                    </div>
+                                    <span className="text-sm font-mono font-bold text-gray-800 bg-gray-100/80 px-2 py-1 rounded-md">
                                         {travel.targetWallet.slice(0, 6)}...{travel.targetWallet.slice(-4)}
                                     </span>
                                 </div>
                                 {travel.exploredBlock && (
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">探索区块:</span>
-                                        <span className="text-gray-800">#{travel.exploredBlock}</span>
+                                    <div className="flex justify-between items-center pb-3 border-b border-gray-100/50">
+                                        <div className="flex items-center gap-2 text-gray-600">
+                                            <Hash size={16} />
+                                            <span className="font-exo text-sm">Block</span>
+                                        </div>
+                                        <span className="text-sm font-mono text-gray-700">#{travel.exploredBlock}</span>
                                     </div>
                                 )}
-                                <div className="flex justify-between">
-                                    <span className="text-gray-600">状态:</span>
-                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-2 text-gray-600">
+                                        <Award size={16} />
+                                        <span className="font-exo text-sm">Status</span>
+                                    </div>
+                                    <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
                                         travel.status === 'Completed' 
-                                            ? 'bg-green-100 text-green-700'
-                                            : 'bg-yellow-100 text-yellow-700'
+                                            ? 'bg-green-100 text-green-700 border border-green-200'
+                                            : 'bg-yellow-100 text-yellow-700 border border-yellow-200'
                                     }`}>
-                                        {travel.status === 'Completed' ? '已完成' : '进行中'}
+                                        {travel.status === 'Completed' ? 'COMPLETED' : 'IN PROGRESS'}
                                     </span>
                                 </div>
                             </div>
@@ -303,20 +358,28 @@ export function TravelDetailPage() {
 
                         {/* 纪念品 */}
                         {travel.souvenir && (
-                            <div className="bg-white/50 backdrop-blur rounded-xl p-6 border border-white/20">
-                                <h3 className="text-lg font-semibold text-gray-800 mb-4">🎁 纪念品</h3>
-                                <div className={`rounded-lg border-2 p-4 ${rarityColors[travel.souvenir.rarity as keyof typeof rarityColors]} overflow-hidden`}>
+                            <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 backdrop-blur-md rounded-2xl p-6 border border-purple-100/50 shadow-sm relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                    <Award size={80} className="text-purple-600" />
+                                </div>
+                                <h3 className="text-lg font-orbitron font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                    <Award size={20} className="text-purple-500" />
+                                    Souvenir
+                                </h3>
+                                <div className={`rounded-xl border p-4 ${rarityColors[travel.souvenir.rarity as keyof typeof rarityColors]} bg-opacity-60 transition-transform group-hover:scale-[1.02]`}>
                                     {souvenirImageUrl && (
-                                        <div className="aspect-square w-full rounded-lg bg-white mb-3 overflow-hidden shadow-inner border border-gray-100 flex items-center justify-center">
+                                        <div className="aspect-square w-full rounded-lg bg-white mb-3 overflow-hidden shadow-sm border border-white/50 flex items-center justify-center">
                                             <img src={souvenirImageUrl} alt={travel.souvenir.name} className="w-full h-full object-cover" />
                                         </div>
                                     )}
-                                    <h4 className="font-bold text-gray-800 mb-2">{travel.souvenir.name}</h4>
-                                    <p className="text-sm text-gray-600 mb-2">
-                                        稀有度: {travel.souvenir.rarity}
-                                    </p>
+                                    <h4 className="font-bold text-gray-800 mb-1 text-lg">{travel.souvenir.name}</h4>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <span className="text-[10px] uppercase font-bold tracking-widest bg-white/50 px-2 py-0.5 rounded-full text-gray-600">
+                                            {travel.souvenir.rarity}
+                                        </span>
+                                    </div>
                                     {travel.souvenir.description && (
-                                        <p className="text-sm text-gray-700 italic border-l-2 border-gray-200 pl-2">
+                                        <p className="text-sm text-gray-700 italic border-l-2 border-gray-400/30 pl-3 leading-relaxed">
                                             "{travel.souvenir.description}"
                                         </p>
                                     )}
@@ -326,16 +389,19 @@ export function TravelDetailPage() {
 
                         {/* 发现 */}
                         {travel.discoveries && travel.discoveries.length > 0 && (
-                            <div className="bg-white/50 backdrop-blur rounded-xl p-6 border border-white/20">
-                                <h3 className="text-lg font-semibold text-gray-800 mb-4">🔍 发现</h3>
-                                <div className="space-y-3">
+                            <div className="bg-white/60 backdrop-blur-md rounded-2xl p-6 border border-white/40 shadow-sm">
+                                <h3 className="text-lg font-orbitron font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                    <Search size={20} className="text-orange-500" />
+                                    Discoveries
+                                </h3>
+                                <div className="space-y-4">
                                     {travel.discoveries.map((discovery, index) => (
-                                        <div key={index} className="border-l-4 border-green-400 pl-3">
-                                            <h4 className="font-medium text-gray-800">{discovery.title}</h4>
-                                            <p className="text-sm text-gray-600">{discovery.description}</p>
-                                            <div className="flex items-center space-x-2 mt-1">
-                                                <span className="text-xs text-gray-500">类型: {discovery.type}</span>
-                                                <span className="text-xs text-gray-500">稀有度: {'⭐'.repeat(discovery.rarity)}</span>
+                                        <div key={index} className="pl-4 border-l-2 border-green-400 hover:bg-white/50 p-2 rounded-r-lg transition-colors">
+                                            <h4 className="font-bold text-gray-800 text-sm">{discovery.title}</h4>
+                                            <p className="text-xs text-gray-600 mt-1 leading-snug">{discovery.description}</p>
+                                            <div className="flex items-center gap-3 mt-2">
+                                                <span className="text-[10px] text-gray-500 font-mono bg-gray-100 px-1.5 rounded uppercase">{discovery.type}</span>
+                                                <span className="text-xs text-yellow-500 tracking-[-2px]">{'⭐'.repeat(discovery.rarity)}</span>
                                             </div>
                                         </div>
                                     ))}

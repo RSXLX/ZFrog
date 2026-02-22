@@ -1,77 +1,55 @@
 /**
- * Upgrade OmniTravelUpgradeable Contract
- * 
- * This script upgrades the OmniTravel implementation while keeping the SAME proxy address.
- * Users and config files do NOT need to update any addresses after this upgrade.
- * 
- * Usage:
- *   npx hardhat run scripts/upgrade-omnitravel.js --network zetaAthens
- * 动态更新合约
+ * 升级 OmniTravel 代理到新实现
+ * UUPS 升级模式
  */
 const { ethers, upgrades } = require("hardhat");
-const fs = require("fs");
-const path = require("path");
-
-const ADDRESSES_FILE = path.join(__dirname, "../deployed-addresses.json");
-
-function loadAddresses() {
-    if (fs.existsSync(ADDRESSES_FILE)) {
-        return JSON.parse(fs.readFileSync(ADDRESSES_FILE, "utf8"));
-    }
-    throw new Error("No deployed-addresses.json found!");
-}
 
 async function main() {
     const [deployer] = await ethers.getSigners();
-    const addresses = loadAddresses();
+    console.log("\n⬆️ Upgrading OmniTravel Implementation");
+    console.log("========================================");
+    console.log(`Deployer: ${deployer.address}`);
     
-    // Get the current proxy address (must already be deployed)
-    const PROXY_ADDRESS = addresses.zetaAthens?.omniTravel;
-    if (!PROXY_ADDRESS) {
-        throw new Error("OmniTravel proxy address not found in deployed-addresses.json");
-    }
+    const PROXY_ADDRESS = "0x20A08bc1deFC1be2273636Af3ba3ef8cA6EaD2C8";
     
-    console.log(`\n🔄 Upgrading OmniTravelUpgradeable`);
-    console.log(`   Proxy Address (unchanged): ${PROXY_ADDRESS}`);
-    console.log(`   Deployer: ${deployer.address}\n`);
+    console.log(`\n📦 Current Proxy: ${PROXY_ADDRESS}`);
     
-    // Get current version before upgrade
-    const currentContract = await ethers.getContractAt("OmniTravelUpgradeable", PROXY_ADDRESS);
-    const currentVersion = await currentContract.version();
-    console.log(`   Current Version: ${currentVersion}`);
+    // Get current implementation
+    const implSlot = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
+    const currentImpl = await ethers.provider.getStorage(PROXY_ADDRESS, implSlot);
+    console.log(`   Current Implementation: ${ethers.getAddress('0x' + currentImpl.slice(26))}`);
     
-    // Get current implementation address
-    const currentImpl = await upgrades.erc1967.getImplementationAddress(PROXY_ADDRESS);
-    console.log(`   Current Implementation: ${currentImpl}\n`);
+    // Deploy new implementation
+    console.log(`\n🔧 Deploying new OmniTravel implementation...`);
+    const OmniTravel = await ethers.getContractFactory("OmniTravelUpgradeable");
     
-    // Deploy new implementation and upgrade proxy
-    console.log("📦 Deploying new implementation...");
-    const OmniTravelV2 = await ethers.getContractFactory("OmniTravelUpgradeable");
+    console.log(`   Upgrading proxy...`);
+    const upgraded = await upgrades.upgradeProxy(PROXY_ADDRESS, OmniTravel, {
+        kind: 'uups',
+        unsafeAllow: ['constructor', 'state-variable-immutable']
+    });
     
-    // Upgrade the proxy to the new implementation
-    const upgraded = await upgrades.upgradeProxy(PROXY_ADDRESS, OmniTravelV2);
     await upgraded.waitForDeployment();
     
-    // Get new implementation address
-    const newImpl = await upgrades.erc1967.getImplementationAddress(PROXY_ADDRESS);
-    const newVersion = await upgraded.version();
+    // Get new implementation
+    const newImpl = await ethers.provider.getStorage(PROXY_ADDRESS, implSlot);
+    console.log(`   New Implementation: ${ethers.getAddress('0x' + newImpl.slice(26))}`);
     
-    console.log(`\n✅ Upgrade Successful!`);
-    console.log(`   Proxy (unchanged): ${PROXY_ADDRESS}`);
-    console.log(`   Old Implementation: ${currentImpl}`);
-    console.log(`   New Implementation: ${newImpl}`);
-    console.log(`   New Version: ${newVersion}`);
+    // Verify new function exists
+    console.log(`\n🔍 Verifying new functions...`);
+    try {
+        const provisions = await upgraded.calculateGroupProvisions(1);
+        console.log(`   calculateGroupProvisions(1): ${ethers.formatEther(provisions)} ZETA ✅`);
+    } catch (e) {
+        console.log(`   calculateGroupProvisions: Error - ${e.message}`);
+    }
     
-    // Update addresses file with new implementation (proxy stays the same)
-    addresses.zetaAthens.omniTravelImpl = newImpl;
-    addresses.zetaAthens.lastUpgrade = new Date().toISOString();
-    fs.writeFileSync(ADDRESSES_FILE, JSON.stringify(addresses, null, 2));
-    
-    console.log(`\n📝 Updated deployed-addresses.json with new implementation address`);
-    console.log(`\n⚠️  No config changes needed! Proxy address remains: ${PROXY_ADDRESS}`);
+    console.log("\n🎉 Upgrade Complete!");
 }
 
-main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-});
+main()
+    .then(() => process.exit(0))
+    .catch((error) => {
+        console.error("Error:", error);
+        process.exit(1);
+    });

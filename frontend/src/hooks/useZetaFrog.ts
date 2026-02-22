@@ -63,7 +63,7 @@ export function useActiveTravel(tokenId: number) {
         },
     });
 
-    // 正确解析合约返回数据
+    // Correctly parse contract response
     const travel = (data && Array.isArray(data)) ? {
         startTime: new Date(Number(data[0]) * 1000),
         endTime: new Date(Number(data[1]) * 1000),

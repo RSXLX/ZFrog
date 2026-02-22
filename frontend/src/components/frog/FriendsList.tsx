@@ -3,6 +3,8 @@ import { Frog, FriendInteraction } from '../../types';
 import { useFriendWebSocket } from '../../hooks/useFriendWebSocket';
 import { apiService } from '../../services/api';
 import { FriendCardSkeleton } from '../common/Skeleton';
+import { EmptyFriends } from '../common/EmptyState';
+import { PulseIndicator } from '../common/MicroInteractions';
 
 interface FriendsListProps {
   frogId: number;
@@ -125,19 +127,7 @@ const FriendsList: React.FC<FriendsListProps> = ({
 
   if (friends.length === 0) {
     return (
-      <div className="friend-empty-state">
-        <div className="empty-illustration">🐸</div>
-        <h2 className="empty-text">还没有好友</h2>
-        <p className="empty-subtext">去发现其他玩家并添加好友吧!</p>
-        <div className="action-buttons">
-          <button className="friend-btn friend-btn-primary" onClick={onAddFriendClick}>
-            🔗 链上地址添加
-          </button>
-          <button className="friend-btn friend-btn-outline" onClick={onSearchClick}>
-            🔍 搜索添加
-          </button>
-        </div>
-      </div>
+      <EmptyFriends onAddFriend={onAddFriendClick} />
     );
   }
 
@@ -163,14 +153,10 @@ const FriendsList: React.FC<FriendsListProps> = ({
             <div className="friend-name">{friend.name}</div>
             <div className={`friend-status ${getStatusClass(friend.status)}`}>
               {friend.isOnline !== undefined && (
-                <span 
-                  style={{ 
-                    width: '8px', 
-                    height: '8px', 
-                    borderRadius: '50%', 
-                    backgroundColor: friend.isOnline ? '#22c55e' : '#9ca3af',
-                    display: 'inline-block'
-                  }} 
+                <PulseIndicator 
+                  active={friend.isOnline} 
+                  color={friend.isOnline ? 'green' : undefined}
+                  size="sm"
                 />
               )}
               {getStatusText(friend.status)}

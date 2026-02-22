@@ -31,6 +31,16 @@ export interface LayoutPatchItem {
   data?: PlacedItemInput;
 }
 
+// V2.0: 网格坐标输入
+export interface GridPlacedItemInput {
+  userDecorationId: string;
+  gridX: number;
+  gridY: number;
+  scale?: number;
+  rotation?: number;
+  zIndex?: number;
+}
+
 export interface GiftData {
   fromAddress: string;
   giftType: 'ITEM' | 'NFT' | 'TOKEN' | 'DECORATION';
@@ -194,6 +204,76 @@ class HomeApiService {
    */
   async restoreSnapshot(frogId: number, sceneType: string, snapshotId: string) {
     return apiService.post(`/homestead/${frogId}/layout/${sceneType}/restore/${snapshotId}`);
+  }
+
+  // ═══════════════════════════════════════════════
+  // V2.0 编辑锁模块
+  // ═══════════════════════════════════════════════
+
+  /**
+   * V2.0: 获取编辑锁
+   */
+  async acquireEditLock(frogId: number, sceneType: string, sessionId: string, ttlMs?: number) {
+    const res = await apiService.post<{ success: boolean; data: { locked: boolean; expiresAt: string } }>(
+      `/homestead/${frogId}/layout/${sceneType}/lock`,
+      { sessionId, ttlMs }
+    );
+    return res;
+  }
+
+  /**
+   * V2.0: 释放编辑锁
+   */
+  async releaseEditLock(frogId: number, sceneType: string, sessionId: string) {
+    // 使用 POST 模拟 DELETE，因为 apiService.delete 不支持 body
+    return apiService.post(`/homestead/${frogId}/layout/${sceneType}/lock/release`, {
+      sessionId
+    });
+  }
+
+  /**
+   * V2.0: 保存布局（带网格坐标）
+   */
+  async saveLayoutV2(
+    frogId: number, 
+    sceneType: string, 
+    items: GridPlacedItemInput[], 
+    options: {
+      createSnapshot?: boolean;
+      sessionId?: string;
+      validateGrid?: boolean;
+    } = {}
+  ) {
+    return apiService.post(`/homestead/${frogId}/layout/${sceneType}`, {
+      items,
+      createSnapshot: options.createSnapshot ?? true,
+      sessionId: options.sessionId,
+      validateGrid: options.validateGrid ?? true,
+    });
+  }
+
+  // ═══════════════════════════════════════════════
+  // V2.0 舒适度模块
+  // ═══════════════════════════════════════════════
+
+  /**
+   * V2.0: 获取舒适度和 Buff
+   */
+  async getComfort(frogId: number, sceneType = 'yard') {
+    return apiService.get<{
+      success: boolean;
+      data: {
+        comfortScore: number;
+        maxScore: number;
+        level: string;
+        activeBuffs: Array<{
+          code: string;
+          name: string;
+          value: number;
+          fromDecoration: string;
+        }>;
+      };
+    }>(`/homestead/${frogId}/comfort?sceneType=${sceneType}`);
   }
 
   // ═══════════════════════════════════════════════

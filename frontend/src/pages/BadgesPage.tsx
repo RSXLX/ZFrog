@@ -16,6 +16,8 @@ interface Badge {
   unlocked: boolean;
   unlockedAt?: string;
   unlockType?: string;
+  airdropAmount?: string;
+  airdropEnabled?: boolean;
 }
 
 // 徽章类别定义
@@ -115,6 +117,11 @@ export function BadgesPage() {
   const [filter, setFilter] = useState<'all' | 'unlocked' | 'locked'>('all');
   const [category, setCategory] = useState<string>('all');
   const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null);
+  
+  // 奖励领取状态
+  const [rewards, setRewards] = useState<any[]>([]);
+  const [claiming, setClaiming] = useState(false);
+  const [claimResult, setClaimResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -125,8 +132,12 @@ export function BadgesPage() {
 
       try {
         setLoading(true);
-        const badgesData = await apiService.getBadges(frog.tokenId);
+        const [badgesData, rewardsData] = await Promise.all([
+          apiService.getBadges(frog.tokenId),
+          apiService.getPendingRewards(frog.ownerAddress),
+        ]);
         setBadges(badgesData || []);
+        setRewards(rewardsData || []);
       } catch (error) {
         console.error('Failed to fetch badges:', error);
       } finally {
@@ -138,6 +149,38 @@ export function BadgesPage() {
       fetchData();
     }
   }, [frog, frogLoading]);
+
+  // 计算待领取奖励总额
+  const totalRewardAmount = rewards.reduce((sum, r) => sum + BigInt(r.amount || '0'), BigInt(0));
+  const formattedReward = totalRewardAmount > 0 
+    ? (Number(totalRewardAmount) / 1e18).toFixed(4) 
+    : '0';
+
+  // 领取所有奖励
+  const handleClaimAll = async () => {
+    if (!frog || rewards.length === 0) return;
+    
+    setClaiming(true);
+    setClaimResult(null);
+    
+    try {
+      const result = await apiService.claimAllRewards(frog.ownerAddress);
+      setClaimResult({
+        success: true,
+        message: `成功领取 ${result.successCount} 份奖励！`,
+      });
+      // 刷新奖励列表
+      const newRewards = await apiService.getPendingRewards(frog.ownerAddress);
+      setRewards(newRewards || []);
+    } catch (error: any) {
+      setClaimResult({
+        success: false,
+        message: error.message || '领取失败，请稍后重试',
+      });
+    } finally {
+      setClaiming(false);
+    }
+  };
 
   // 筛选逻辑
   const filteredBadges = badges.filter((badge) => {
@@ -274,6 +317,54 @@ export function BadgesPage() {
               />
             </div>
           </div>
+
+          {/* 奖励领取卡片 */}
+          {rewards.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mt-4 inline-flex flex-col items-center bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-300 rounded-2xl px-8 py-4 shadow-lg"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-3xl">🎁</span>
+                <span className="text-lg font-bold text-amber-800">
+                  {rewards.length} 份待领取奖励
+                </span>
+              </div>
+              <div className="text-2xl font-bold text-amber-600 mb-3">
+                {formattedReward} ZETA
+              </div>
+              <button
+                onClick={handleClaimAll}
+                disabled={claiming}
+                className={`px-6 py-2.5 rounded-xl font-bold text-white transition-all ${
+                  claiming
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 shadow-lg hover:shadow-xl'
+                }`}
+              >
+                {claiming ? '⏳ 领取中...' : '🎉 一键领取'}
+              </button>
+            </motion.div>
+          )}
+
+          {/* 领取结果提示 */}
+          <AnimatePresence>
+            {claimResult && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className={`mt-4 px-6 py-3 rounded-xl ${
+                  claimResult.success
+                    ? 'bg-green-100 text-green-700 border border-green-300'
+                    : 'bg-red-100 text-red-700 border border-red-300'
+                }`}
+              >
+                {claimResult.success ? '✅' : '❌'} {claimResult.message}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* 类别筛选标签 */}
@@ -480,6 +571,15 @@ export function BadgesPage() {
                   {RARITY_CONFIG[selectedBadge.rarity]?.stars || '⭐'}
                 </span>
               </div>
+
+              {/* 空投奖励 */}
+              {selectedBadge.airdropEnabled && selectedBadge.airdropAmount && (
+                <div className="mb-4 px-4 py-2 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl">
+                  <span className="text-amber-700 font-medium">
+                    🎁 解锁奖励: {Number(BigInt(selectedBadge.airdropAmount)) / 1e18} ZETA
+                  </span>
+                </div>
+              )}
 
               {/* 解锁时间 */}
               {selectedBadge.unlocked && selectedBadge.unlockedAt && (
