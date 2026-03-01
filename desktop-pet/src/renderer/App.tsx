@@ -10,6 +10,7 @@ import TravelDialog from './components/Dialogs/TravelDialog';
 import SettingsDialog from './components/Dialogs/SettingsDialog';
 import ChainMonitorPanel from './components/Dialogs/ChainMonitorPanel';
 import HomeDialog from './components/Dialogs/HomeDialog';
+import BagDialog from './components/Dialogs/BagDialog';
 import { useFrogState } from './hooks/useFrogState';
 import { useLifeCycle } from './hooks/useLifeCycle';
 import { useChainMonitor } from './hooks/useChainMonitor';
@@ -39,9 +40,11 @@ function App() {
     badges: false,
     travel: false,
     home: false,
+    bag: false,
     settings: false,
     chainMonitor: false,
     home: false,
+    bag: false,
   });
   
   // Mock wallet address
@@ -244,6 +247,10 @@ function App() {
         tokenId={tokenId}
         visible={dialogs.home}
         onClose={() => closeDialog('home')}
+      />
+      <BagDialog
+        visible={dialogs.bag}
+        onClose={() => closeDialog('bag')}
       />
       <ChainMonitorPanel 
         visible={dialogs.chainMonitor}
