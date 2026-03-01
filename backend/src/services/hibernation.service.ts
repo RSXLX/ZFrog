@@ -9,6 +9,7 @@
 
 import { PrismaClient, HibernationStatus } from '@prisma/client';
 import { logger } from '../utils/logger';
+import * as notificationService from './notification.service';
 
 const prisma = new PrismaClient();
 
@@ -59,9 +60,9 @@ export async function checkHibernationStatus(frogId: number): Promise<Hibernatio
     
     // TODO: Send notification when entering DROWSY or SLEEPING
     if (newStatus === 'DROWSY') {
-      // notificationService.send(frog.id, 'DROWSY_WARNING', '你的青蛙开始困倦了，快来互动吧！');
+      notificationService.sendStatusWarning(frog.id, frog.name, 'drowsy');
     } else if (newStatus === 'SLEEPING') {
-      // notificationService.send(frog.id, 'SLEEPING', '你的青蛙已进入冬眠...');
+      notificationService.sendStatusWarning(frog.id, frog.name, 'sleeping');
     }
   }
   

@@ -21,6 +21,8 @@ export const NotificationType = {
   INTIMACY_LEVEL_UP: 'intimacy_level_up',
   TASK_COMPLETE: 'task_complete',
   DEATH_WARNING: 'death_warning',
+  DROWSY_WARNING: 'drowsy_warning',
+  SLEEPING_WARNING: 'sleeping_warning',
 } as const;
 
 // 优先级枚举
@@ -265,13 +267,15 @@ export async function cleanOldNotifications(daysOld: number = 30) {
 export async function sendStatusWarning(
   frogId: number,
   frogName: string,
-  warningType: 'hunger' | 'clean' | 'sick' | 'death'
+  warningType: 'hunger' | 'clean' | 'sick' | 'death' | 'drowsy' | 'sleeping'
 ) {
   const typeMap = {
     hunger: NotificationType.HUNGER_WARNING,
     clean: NotificationType.CLEAN_WARNING,
     sick: NotificationType.SICK_WARNING,
     death: NotificationType.DEATH_WARNING,
+    drowsy: NotificationType.DROWSY_WARNING,
+    sleeping: NotificationType.SLEEPING_WARNING,
   };
 
   // 检查是否最近1小时内已发送过相同警告
@@ -297,11 +301,13 @@ export async function sendStatusWarning(
         select: { tokenId: true, hunger: true, cleanliness: true, health: true } 
       });
       if (frog) {
-        const valueMap = {
+        const valueMap: Record<string, number> = {
           hunger: frog.hunger,
           clean: frog.cleanliness,
           sick: frog.health,
           death: Math.min(frog.hunger, frog.health),
+          drowsy: 0,  // Not tracked, using 0 as placeholder
+          sleeping: 0,
         };
         notifyStatusWarning(frog.tokenId, {
           type: `${warningType}_warning` as any,
