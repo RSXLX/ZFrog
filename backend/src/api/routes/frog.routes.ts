@@ -4,6 +4,7 @@ import { createPublicClient, http } from 'viem';
 import { config } from '../../config';
 import { ZETAFROG_ABI } from '../../config/contracts';
 import { omniTravelService } from '../../services/omni-travel.service';
+import { appearanceService } from '../../services/appearance.service';
 import { logger } from '../../utils/logger';
 
 // 递归处理 BigInt 序列化问题
@@ -447,6 +448,10 @@ router.get('/:tokenId', async (req, res) => {
                         }
                         
                         // 使用 upsert 处理可能的并发情况
+                        // 获取铸造前的外观参数
+                        const pendingAppearance = appearanceService.getPendingParams(ownerLower);
+                        const appearanceParamsJson = pendingAppearance as any;
+                        
                         await prisma.frog.upsert({
                             where: { tokenId },
                             update: {
@@ -454,6 +459,7 @@ router.get('/:tokenId', async (req, res) => {
                                 ownerAddress: ownerLower,
                                 totalTravels: Number(totalTravels),
                                 status: statusEnum as any,
+                                appearanceParams: appearanceParamsJson || undefined,
                             },
                             create: {
                                 tokenId,
@@ -462,6 +468,7 @@ router.get('/:tokenId', async (req, res) => {
                                 birthday: new Date(Number(birthday) * 1000),
                                 totalTravels: Number(totalTravels),
                                 status: statusEnum as any,
+                                appearanceParams: appearanceParamsJson || undefined,
                             },
                         });
                         
