@@ -92,3 +92,18 @@ echo ""
 echo "======================================"
 echo "✅ 功能验证测试完成"
 echo "======================================"
+
+# Test 8: New hooks
+echo ""
+echo "【功能测试 8】新增 Hook 检查"
+if [ -f "src/renderer/hooks/usePetStats.ts" ]; then
+    echo "✅ usePetStats 存在"
+else
+    echo "❌ usePetStats 缺失"
+fi
+
+if [ -f "src/renderer/hooks/usePetActions.ts" ]; then
+    echo "✅ usePetActions 存在"
+else
+    echo "❌ usePetActions 缺失"
+fi
