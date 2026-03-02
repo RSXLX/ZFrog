@@ -2,95 +2,102 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ProfileDialogProps {
-  tokenId: number;
-  name: string;
-  level: number;
-  xp: number;
   visible: boolean;
   onClose: () => void;
+  petData: {
+    name: string;
+    level: number;
+    exp: number;
+    expToNext: number;
+    health: number;
+    hunger: number;
+    energy: number;
+    happiness: number;
+    charm: number;
+    intelligence: number;
+  };
 }
 
-const ProfileDialog: React.FC<ProfileDialogProps> = ({ tokenId, name, level, xp, visible, onClose }) => {
-  if (!visible) return null;
+const ProfileDialog: React.FC<ProfileDialogProps> = ({ visible, onClose, petData }) => {
+  const getStatColor = (value: number) => {
+    if (value > 70) return '#4ADE80';
+    if (value > 40) return '#FCD34D';
+    return '#F87171';
+  };
 
-  const xpForNext = level * 1000;
-  const progress = (xp / xpForNext) * 100;
+  const StatBar: React.FC<{ label: string; value: number; icon: string }> = ({ label, value, icon }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+      <span style={{ fontSize: 16 }}>{icon}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontSize: 13, color: '#666' }}>{label}</span>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{value}/100</span>
+        </div>
+        <div style={{ height: 6, background: '#eee', borderRadius: 3, overflow: 'hidden' }}>
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${value}%` }}
+            style={{ height: '100%', background: getStatColor(value), borderRadius: 3 }}
+          />
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.7)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', zIndex: 100,
-        }}
-      >
+      {visible && (
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.8, opacity: 0 }}
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            background: 'white', borderRadius: 16, padding: 20, width: 320,
-          }}
+          className="dialog-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h2 style={{ margin: 0, color: '#11998e' }}>🐸 青蛙资料</h2>
-            <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer' }}>✕</button>
-          </div>
+          <motion.div
+            className="dialog-content"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            onClick={e => e.stopPropagation()}
+            style={{ position: 'relative', maxWidth: 340 }}
+          >
+            <button className="dialog-close" onClick={onClose}>×</button>
+            
+            <h2 className="dialog-title">🐸 {petData.name} 的资料</h2>
+            
+            {/* Level */}
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <div style={{ 
+                width: 80, height: 80, borderRadius: '50%', 
+                background: 'linear-gradient(135deg, #4ADE80, #22C55E)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 10px', fontSize: 32, color: 'white',
+                boxShadow: '0 4px 12px rgba(74, 222, 128, 0.4)'
+              }}>
+                Lv.{petData.level}
+              </div>
+              <div style={{ fontSize: 12, color: '#888' }}>
+                经验: {petData.exp}/{petData.expToNext}
+              </div>
+              <div style={{ height: 4, background: '#eee', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(petData.exp / petData.expToNext) * 100}%` }}
+                  style={{ height: '100%', background: 'linear-gradient(90deg, #4ADE80, #22C55E)', borderRadius: 2 }}
+                />
+              </div>
+            </div>
 
-          {/* Avatar */}
-          <div style={{ textAlign: 'center', marginBottom: 20 }}>
-            <motion.div
-              animate={{ y: [0, -5, 0] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              style={{ fontSize: 64 }}
-            >
-              🐸
-            </motion.div>
-            <div style={{ fontSize: 18, fontWeight: 'bold', marginTop: 10 }}>{name}</div>
-            <div style={{ fontSize: 12, color: '#666' }}>ID: #{tokenId}</div>
-          </div>
-
-          {/* Level */}
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 14, fontWeight: 'bold' }}>等级 Lv.{level}</span>
-              <span style={{ fontSize: 12, color: '#666' }}>{xp} / {xpForNext} XP</span>
-            </div>
-            <div style={{ height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                style={{ height: '100%', background: 'linear-gradient(90deg, #22c55e, #4ade80)' }}
-              />
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            <div style={{ textAlign: 'center', padding: 10, background: '#f8f9fa', borderRadius: 8 }}>
-              <div style={{ fontSize: 20 }}>🎒</div>
-              <div style={{ fontSize: 12, color: '#666' }}>旅行</div>
-              <div style={{ fontWeight: 'bold' }}>12</div>
-            </div>
-            <div style={{ textAlign: 'center', padding: 10, background: '#f8f9fa', borderRadius: 8 }}>
-              <div style={{ fontSize: 20 }}>🏅</div>
-              <div style={{ fontSize: 12, color: '#666' }}>徽章</div>
-              <div style={{ fontWeight: 'bold' }}>8</div>
-            </div>
-            <div style={{ textAlign: 'center', padding: 10, background: '#f8f9fa', borderRadius: 8 }}>
-              <div style={{ fontSize: 20 }}>👥</div>
-              <div style={{ fontSize: 12, color: '#666' }}>好友</div>
-              <div style={{ fontWeight: 'bold' }}>15</div>
-            </div>
-          </div>
+            <StatBar label="生命值" value={petData.health} icon="❤️" />
+            <StatBar label="饱食度" value={petData.hunger} icon="🍎" />
+            <StatBar label="精力" value={petData.energy} icon="⚡" />
+            <StatBar label="快乐度" value={petData.happiness} icon="💖" />
+            <StatBar label="魅力" value={petData.charm} icon="✨" />
+            <StatBar label="智力" value={petData.intelligence} icon="🧠" />
+          </motion.div>
         </motion.div>
-      </motion.div>
+      )}
     </AnimatePresence>
   );
 };
