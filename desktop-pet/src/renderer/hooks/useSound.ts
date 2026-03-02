@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 
 // Sound effect types
-type SoundType = 'pet' | 'poke' | 'eat' | 'happy' | 'sad' | 'excited' | 'bubble';
+type SoundType = 'pet' | 'poke' | 'eat' | 'happy' | 'sad' | 'excited' | 'bubble' | 'feed';
 
 // In production, these would be actual audio files
 // For now, we use Web Audio API to generate simple tones
