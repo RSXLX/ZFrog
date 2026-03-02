@@ -107,3 +107,56 @@ if [ -f "src/renderer/hooks/usePetActions.ts" ]; then
 else
     echo "❌ usePetActions 缺失"
 fi
+
+echo ""
+echo "【功能测试 9】新增组件"
+[ -f "src/renderer/components/M" ]
+test_checkiniGame.tsx "MiniGame 组件存在"
+
+[ -f "src/renderer/components/StartupAnimation.tsx" ]
+test_check "StartupAnimation 组件存在"
+
+echo ""
+echo "【功能测试 10】新增 Hooks"
+[ -f "src/renderer/hooks/useGlobalShortcuts.ts" ]
+test_check "useGlobalShortcuts 存在"
+
+[ -f "src/renderer/hooks/useWindowSnap.ts" ]
+test_check "useWindowSnap 存在"
+
+[ -f "src/renderer/hooks/usePetAvatar.ts" ]
+test_check "usePetAvatar 存在"
+
+echo ""
+echo "【功能测试 9】新增组件"
+if [ -f "src/renderer/components/MiniGame.tsx" ]; then
+    echo "✅ MiniGame 组件存在"
+else
+    echo "❌ MiniGame 组件缺失"
+fi
+
+if [ -f "src/renderer/components/StartupAnimation.tsx" ]; then
+    echo "✅ StartupAnimation 组件存在"
+else
+    echo "❌ StartupAnimation 组件缺失"
+fi
+
+echo ""
+echo "【功能测试 10】新增 Hooks"
+if [ -f "src/renderer/hooks/useGlobalShortcuts.ts" ]; then
+    echo "✅ useGlobalShortcuts 存在"
+else
+    echo "❌ useGlobalShortcuts 缺失"
+fi
+
+if [ -f "src/renderer/hooks/useWindowSnap.ts" ]; then
+    echo "✅ useWindowSnap 存在"
+else
+    echo "❌ useWindowSnap 缺失"
+fi
+
+if [ -f "src/renderer/hooks/usePetAvatar.ts" ]; then
+    echo "✅ usePetAvatar 存在"
+else
+    echo "❌ usePetAvatar 缺失"
+fi
