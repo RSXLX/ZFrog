@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import Frog from './components/Frog/Frog';
 import StatusBar from './components/Frog/StatusBar';
+import InteractionBubble from './components/Frog/InteractionBubble';
+import QuickMenu from './components/Frog/QuickMenu';
 import HaloMenu from './components/HaloMenu/HaloMenu';
 import TasksDialog from './components/Dialogs/TasksDialog';
 import FriendsDialog from './components/Dialogs/FriendsDialog';
@@ -14,6 +16,7 @@ import BagDialog from './components/Dialogs/BagDialog';
 import { useFrogState } from './hooks/useFrogState';
 import { useLifeCycle } from './hooks/useLifeCycle';
 import { useChainMonitor } from './hooks/useChainMonitor';
+import { useMemory } from './hooks/useMemory';
 import './styles/global.css';
 
 declare global {
@@ -37,6 +40,11 @@ function App() {
   const [lastInteractTime, setLastInteractTime] = useState(Date.now());
   const [isPatrolling, setIsPatrolling] = useState(false);
   
+  // Bubble and quick menu
+  const [bubbleMessage, setBubbleMessage] = useState('');
+  const [showBubble, setShowBubble] = useState(false);
+  const [quickMenu, setQuickMenu] = useState({ visible: false, x: 0, y: 0 });
+  
   const [dialogs, setDialogs] = useState({
     tasks: false, friends: false, badges: false, travel: false,
     home: false, bag: false, settings: false, chainMonitor: false,
@@ -48,11 +56,29 @@ function App() {
   const frogState = useFrogState();
   useLifeCycle(frogState);
   const chainMonitor = useChainMonitor(frogState);
+  const { remember } = useMemory();
+
+  // Show interaction bubble
+  const showInteractionBubble = useCallback((message: string) => {
+    setBubbleMessage(message);
+    setShowBubble(true);
+  }, []);
 
   useEffect(() => {
     if (window.electronAPI?.onMenuAction) {
       window.electronAPI.onMenuAction((action: string) => handleMenuAction(action));
     }
+  }, []);
+
+  // Context menu handler
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      setQuickMenu({ visible: true, x: e.clientX, y: e.clientY });
+    };
+    
+    document.addEventListener('contextmenu', handleContextMenu);
+    return () => document.removeEventListener('contextmenu', handleContextMenu);
   }, []);
 
   const handleMenuAction = useCallback((action: string) => {
@@ -72,14 +98,30 @@ function App() {
   const handleFrogClick = useCallback((area: string) => {
     if (pokeCount > 0 && Date.now() - lastInteractTime > 3000) setPokeCount(0);
     switch (area) {
-      case 'head': frogState.interact('pet'); break;
-      case 'body': setPokeCount(p => p + 1); frogState.interact('poke'); if (pokeCount >= 3) frogState.setAngry(); break;
-      case 'mouth': frogState.interact('feed'); break;
+      case 'head': 
+        frogState.interact('pet'); 
+        showInteractionBubble('好舒服呀～');
+        remember('interaction', 'pet', 0.7);
+        break;
+      case 'body': 
+        setPokeCount(p => p + 1); 
+        frogState.interact('poke'); 
+        showInteractionBubble('哎呀！');
+        if (pokeCount >= 3) {
+          frogState.setAngry();
+          showInteractionBubble('哼！');
+        }
+        break;
+      case 'mouth': 
+        frogState.interact('feed'); 
+        showInteractionBubble('好吃！');
+        remember('interaction', 'feed', 0.6);
+        break;
     }
-  }, [frogState, pokeCount, lastInteractTime]);
+  }, [frogState, pokeCount, lastInteractTime, showInteractionBubble, remember]);
 
   const handleDragEnd = useCallback((x: number, y: number) => {
-    frogState.setPosition({ x, y });
+    frogState.setPosition(x, y);
     window.electronAPI?.moveWindow(x, y);
   }, [frogState]);
 
@@ -87,23 +129,50 @@ function App() {
     if (isPatrolling) {
       frogState.stopPatrol();
       setIsPatrolling(false);
+      showInteractionBubble('巡逻结束');
     } else {
       frogState.startPatrol();
       setIsPatrolling(true);
+      showInteractionBubble('开始巡逻！');
     }
-  }, [isPatrolling, frogState]);
+  }, [isPatrolling, frogState, showInteractionBubble]);
 
   const handleMenuSelect = useCallback((item: string) => { 
     if (item === 'patrol') {
       handlePatrolToggle();
+    } else if (item === 'sleep') {
+      frogState.setCurrentState('sleeping');
+      showInteractionBubble('晚安～');
     } else {
       handleMenuAction(item); 
     }
     setShowMenu(false); 
-  }, [handlePatrolToggle, handleMenuAction]);
+  }, [handlePatrolToggle, handleMenuAction, frogState, showInteractionBubble]);
+
+  const handleQuickMenuSelect = useCallback((action: string) => {
+    switch (action) {
+      case 'pet': 
+        frogState.interact('pet'); 
+        showInteractionBubble('好舒服呀～');
+        break;
+      case 'feed': 
+        frogState.interact('feed'); 
+        showInteractionBubble('好吃！');
+        break;
+      case 'patrol': handlePatrolToggle(); break;
+      case 'travel': setDialogs(d => ({ ...d, travel: true })); break;
+      case 'sleep': 
+        frogState.setCurrentState('sleeping'); 
+        showInteractionBubble('晚安～');
+        break;
+    }
+  }, [frogState, handlePatrolToggle, showInteractionBubble]);
 
   const closeDialog = (name: string) => setDialogs(d => ({ ...d, [name]: false }));
-  const handleTravelStart = (chain: string, duration: number) => { frogState.setCurrentState('traveling'); };
+  const handleTravelStart = (chain: string, duration: number) => { 
+    frogState.setCurrentState('traveling'); 
+    showInteractionBubble('出发去旅行！');
+  };
 
   return (
     <div style={{ 
@@ -121,6 +190,22 @@ function App() {
         onClick={handleFrogClick} 
         onDragStart={() => {}} 
         onDragEnd={handleDragEnd} 
+      />
+      
+      {/* Interaction bubble */}
+      <InteractionBubble 
+        message={bubbleMessage} 
+        visible={showBubble} 
+        onHide={() => setShowBubble(false)} 
+      />
+      
+      {/* Quick menu (right click) */}
+      <QuickMenu 
+        visible={quickMenu.visible}
+        x={quickMenu.x}
+        y={quickMenu.y}
+        onSelect={handleQuickMenuSelect}
+        onClose={() => setQuickMenu({ ...quickMenu, visible: false })}
       />
       
       <HaloMenu visible={showMenu} onSelect={handleMenuSelect} onClose={() => setShowMenu(false)} />
