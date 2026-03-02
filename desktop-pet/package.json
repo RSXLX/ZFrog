@@ -13,11 +13,17 @@
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder"
   },
-  "keywords": ["desktop-pet", "electron", "react", "zfrog"],
+  "keywords": [
+    "desktop-pet",
+    "electron",
+    "react",
+    "zfrog"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "framer-motion": "^10.16.0",
+    "lottie-react": "^2.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

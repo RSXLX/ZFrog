@@ -35,6 +35,7 @@ function App() {
   const [showMenu, setShowMenu] = useState(false);
   const [pokeCount, setPokeCount] = useState(0);
   const [lastInteractTime, setLastInteractTime] = useState(Date.now());
+  const [isPatrolling, setIsPatrolling] = useState(false);
   
   const [dialogs, setDialogs] = useState({
     tasks: false, friends: false, badges: false, travel: false,
@@ -78,10 +79,29 @@ function App() {
   }, [frogState, pokeCount, lastInteractTime]);
 
   const handleDragEnd = useCallback((x: number, y: number) => {
+    frogState.setPosition({ x, y });
     window.electronAPI?.moveWindow(x, y);
-  }, []);
+  }, [frogState]);
 
-  const handleMenuSelect = useCallback((item: string) => { handleMenuAction(item); setShowMenu(false); }, [handleMenuAction]);
+  const handlePatrolToggle = useCallback(() => {
+    if (isPatrolling) {
+      frogState.stopPatrol();
+      setIsPatrolling(false);
+    } else {
+      frogState.startPatrol();
+      setIsPatrolling(true);
+    }
+  }, [isPatrolling, frogState]);
+
+  const handleMenuSelect = useCallback((item: string) => { 
+    if (item === 'patrol') {
+      handlePatrolToggle();
+    } else {
+      handleMenuAction(item); 
+    }
+    setShowMenu(false); 
+  }, [handlePatrolToggle, handleMenuAction]);
+
   const closeDialog = (name: string) => setDialogs(d => ({ ...d, [name]: false }));
   const handleTravelStart = (chain: string, duration: number) => { frogState.setCurrentState('traveling'); };
 
@@ -133,6 +153,8 @@ function App() {
         {frogState.currentState === 'yawning' && '😴'}
         {frogState.currentState === 'looking' && '👀'}
         {frogState.currentState === 'greeting' && '👋'}
+        {frogState.currentState === 'walking' && '🚶'}
+        {frogState.currentState === 'patrolling' && '🎯'}
       </motion.div>
 
       <TasksDialog walletAddress={walletAddress} visible={dialogs.tasks} onClose={() => closeDialog('tasks')} />

@@ -9,7 +9,8 @@ interface HaloMenuProps {
 
 const menuItems = [
   { id: 'travel', icon: '🐸', label: '旅行', angle: 0 },
-  { id: 'bag', icon: '🎒', label: '背包', angle: 45 },
+  { id: 'patrol', icon: '🎯', label: '巡逻', angle: 30 },
+  { id: 'bag', icon: '🎒', label: '背包', angle: 60 },
   { id: 'friends', icon: '👥', label: '好友', angle: 90 },
   { id: 'badges', icon: '🏅', label: '徽章', angle: 135 },
   { id: 'home', icon: '🏠', label: '家园', angle: 180 },
