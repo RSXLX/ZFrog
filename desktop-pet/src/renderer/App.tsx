@@ -14,11 +14,19 @@ import SettingsDialog from './components/Dialogs/SettingsDialog';
 import ChainMonitorPanel from './components/Dialogs/ChainMonitorPanel';
 import HomeDialog from './components/Dialogs/HomeDialog';
 import BagDialog from './components/Dialogs/BagDialog';
+import ProfileDialog from './components/Dialogs/ProfileDialog';
 import { useFrogState } from './hooks/useFrogState';
 import { useLifeCycle } from './hooks/useLifeCycle';
 import { useChainMonitor } from './hooks/useChainMonitor';
 import { useMemory } from './hooks/useMemory';
 import { useTimeSystem } from './hooks/useTimeSystem';
+import { useAchievements } from './hooks/useAchievements';
+import { useInventory } from './hooks/useInventory';
+import { useSocial } from './hooks/useSocial';
+import { useTravel } from './hooks/useTravel';
+import { usePetStats } from './hooks/usePetStats';
+import { useDailyTasks } from './hooks/useDailyTasks';
+import { useSound } from './hooks/useSound';
 import './styles/global.css';
 
 declare global {
@@ -49,23 +57,36 @@ function App() {
   
   const [dialogs, setDialogs] = useState({
     tasks: false, friends: false, badges: false, travel: false,
-    home: false, bag: false, settings: false, chainMonitor: false,
+    home: false, bag: false, settings: false, chainMonitor: false, profile: false,
   });
   
   const [walletAddress] = useState('0x1234567890abcdef1234567890abcdef12345678');
   const [tokenId] = useState(1);
   
+  // All integrated hooks
   const frogState = useFrogState();
   useLifeCycle(frogState);
   const chainMonitor = useChainMonitor(frogState);
   const { remember } = useMemory();
   const timeSystem = useTimeSystem();
+  const achievements = useAchievements();
+  const inventory = useInventory();
+  const social = useSocial();
+  const travel = useTravel();
+  const petStats = usePetStats();
+  const dailyTasks = useDailyTasks();
+  const { play: playSound } = useSound();
 
   // Show interaction bubble
   const showInteractionBubble = useCallback((message: string) => {
     setBubbleMessage(message);
     setShowBubble(true);
   }, []);
+
+  // Play sound on interaction
+  const handleInteraction = useCallback((type: 'pet' | 'poke' | 'feed') => {
+    playSound(type);
+  }, [playSound]);
 
   // Time-based greeting
   useEffect(() => {
@@ -98,6 +119,7 @@ function App() {
       case 'home': setDialogs(d => ({ ...d, home: true })); break;
       case 'settings': setDialogs(d => ({ ...d, settings: true })); break;
       case 'monitor': setDialogs(d => ({ ...d, chainMonitor: true })); break;
+      case 'profile': setDialogs(d => ({ ...d, profile: true })); break;
     }
   }, []);
 
@@ -108,12 +130,18 @@ function App() {
     switch (area) {
       case 'head': 
         frogState.interact('pet'); 
+        handleInteraction('pet');
         showInteractionBubble('好舒服呀～');
         remember('interaction', 'pet', 0.7);
+        petStats.addExp(5);
+        dailyTasks.completeTask('1');
+        achievements.incrementProgress('first_pet');
+        achievements.incrementProgress('pet_50');
         break;
       case 'body': 
         setPokeCount(p => p + 1); 
-        frogState.interact('poke'); 
+        frogState.interact('poke');
+        handleInteraction('poke');
         showInteractionBubble('哎呀！');
         if (pokeCount >= 3) {
           frogState.setAngry();
@@ -122,11 +150,16 @@ function App() {
         break;
       case 'mouth': 
         frogState.interact('feed'); 
+        handleInteraction('feed');
         showInteractionBubble('好吃！');
         remember('interaction', 'feed', 0.6);
+        petStats.increaseStat('hunger', 15);
+        petStats.addExp(3);
+        dailyTasks.completeTask('1');
+        achievements.incrementProgress('feed_10');
         break;
     }
-  }, [frogState, pokeCount, lastInteractTime, showInteractionBubble, remember]);
+  }, [frogState, pokeCount, lastInteractTime, showInteractionBubble, remember, petStats, dailyTasks, achievements, handleInteraction]);
 
   const handleDragEnd = useCallback((x: number, y: number) => {
     frogState.setPosition(x, y);
@@ -138,12 +171,13 @@ function App() {
       frogState.stopPatrol();
       setIsPatrolling(false);
       showInteractionBubble('巡逻结束');
+      dailyTasks.completeTask('3');
     } else {
       frogState.startPatrol();
       setIsPatrolling(true);
       showInteractionBubble('开始巡逻！');
     }
-  }, [isPatrolling, frogState, showInteractionBubble]);
+  }, [isPatrolling, frogState, showInteractionBubble, dailyTasks]);
 
   const handleMenuSelect = useCallback((item: string) => { 
     if (item === 'patrol') {
@@ -151,6 +185,8 @@ function App() {
     } else if (item === 'sleep') {
       frogState.setCurrentState('sleeping');
       showInteractionBubble('晚安～');
+    } else if (item === 'profile') {
+      setDialogs(d => ({ ...d, profile: true }));
     } else {
       handleMenuAction(item); 
     }
@@ -171,16 +207,18 @@ function App() {
   const handleTravelStart = (chain: string, duration: number) => { 
     frogState.setCurrentState('traveling'); 
     showInteractionBubble('出发去旅行！');
+    travel.startTravel(travel.destinations.find(d => d.chain === chain) || travel.destinations[0]);
+    dailyTasks.completeTask('4');
+    achievements.incrementProgress('travel_3');
   };
 
   return (
     <div style={{ width: '100%', height: '100%', background: 'transparent', position: 'relative' }}>
-      {/* Weather effect */}
       <WeatherEffect weather={timeSystem.weather} />
       
-      <StatusBar hunger={frogState.stats.hunger} energy={frogState.stats.energy} happiness={frogState.stats.happiness} />
+      <StatusBar hunger={petStats.stats.hunger} energy={petStats.stats.energy} happiness={petStats.stats.happiness} />
       
-      <Frog state={frogState.currentState} mood={frogState.mood} stats={frogState.stats} onClick={handleFrogClick} onDragStart={() => {}} onDragEnd={handleDragEnd} />
+      <Frog state={frogState.currentState} mood={frogState.mood} stats={petStats.stats} onClick={handleFrogClick} onDragStart={() => {}} onDragEnd={handleDragEnd} />
       
       <InteractionBubble message={bubbleMessage} visible={showBubble} onHide={() => setShowBubble(false)} />
       
@@ -194,7 +232,7 @@ function App() {
       </motion.div>
 
       <motion.div style={{ position: 'absolute', bottom: 8, left: 8, fontSize: 9, color: 'rgba(255,255,255,0.5)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} key={frogState.currentState}>
-        {frogState.currentState === 'idle' && '🐸'}
+        {frogState.currentState === 'idle' && '🐸 Lv.' + petStats.stats.level}
         {frogState.currentState === 'sleeping' && '😴'}
         {frogState.currentState === 'eating' && '🍽️'}
         {frogState.currentState === 'happy' && '😊'}
@@ -213,14 +251,15 @@ function App() {
         {frogState.currentState === 'patrolling' && '🎯'}
       </motion.div>
 
-      <TasksDialog walletAddress={walletAddress} visible={dialogs.tasks} onClose={() => closeDialog('tasks')} />
-      <FriendsDialog walletAddress={walletAddress} visible={dialogs.friends} onClose={() => closeDialog('friends')} />
-      <BadgesDialog tokenId={tokenId} visible={dialogs.badges} onClose={() => closeDialog('badges')} />
-      <TravelDialog tokenId={tokenId} visible={dialogs.travel} onClose={() => closeDialog('travel')} onTravelStart={handleTravelStart} />
+      <TasksDialog walletAddress={walletAddress} visible={dialogs.tasks} onClose={() => closeDialog('tasks')} tasks={dailyTasks.tasks} />
+      <FriendsDialog walletAddress={walletAddress} visible={dialogs.friends} onClose={() => closeDialog('friends')} friends={social.friends} />
+      <BadgesDialog tokenId={tokenId} visible={dialogs.badges} onClose={() => closeDialog('badges')} achievements={achievements.achievements} />
+      <TravelDialog tokenId={tokenId} visible={dialogs.travel} onClose={() => closeDialog('travel')} onTravelStart={handleTravelStart} travel={travel} />
       <SettingsDialog visible={dialogs.settings} onClose={() => closeDialog('settings')} />
       <ChainMonitorPanel visible={dialogs.chainMonitor} onClose={() => closeDialog('chainMonitor')} onSimulate={(e) => chainMonitor.simulateEvent(e as any)} />
       <HomeDialog tokenId={tokenId} visible={dialogs.home} onClose={() => closeDialog('home')} />
-      <BagDialog visible={dialogs.bag} onClose={() => closeDialog('bag')} />
+      <BagDialog visible={dialogs.bag} onClose={() => closeDialog('bag')} inventory={inventory} />
+      <ProfileDialog visible={dialogs.profile} onClose={() => closeDialog('profile')} petData={petStats.stats} />
     </div>
   );
 }
