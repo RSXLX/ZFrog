@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
-type FrogState = 'idle' | 'sleeping' | 'eating' | 'happy' | 'excited' | 'scared' | 'dancing' | 'crying' | 'traveling' | 'thinking' | 'angry' | 'greeting' | 'walking';
+type FrogState = 'idle' | 'sleeping' | 'eating' | 'happy' | 'excited' | 'scared' | 'dancing' | 'crying' | 'traveling' | 'thinking' | 'angry' | 'greeting' | 'stretching' | 'yawning' | 'looking' | 'walking' | 'wave';
 type FrogMood = 'very_happy' | 'happy' | 'neutral' | 'sad' | 'very_sad';
 
 export interface FrogStats {
@@ -14,7 +14,7 @@ interface UseFrogStateReturn {
   mood: FrogMood;
   stats: FrogStats;
   setStats: React.Dispatch<React.SetStateAction<FrogStats>>;
-  interact: (action: 'pet' | 'poke' | 'feed' | 'greet') => void;
+  interact: (action: 'pet' | 'poke' | 'feed' | 'greet' | 'stretch' | 'look') => void;
   setChainEvent: (event: 'large_buy' | 'large_sell' | 'price_up' | 'price_down') => void;
   setMood: React.Dispatch<React.SetStateAction<FrogMood>>;
   setCurrentState: React.Dispatch<React.SetStateAction<FrogState>>;
@@ -22,33 +22,112 @@ interface UseFrogStateReturn {
   setSleepy: () => void;
   setAngry: () => void;
   restore: () => void;
+  triggerAutoAction: () => void;
 }
 
 export function useFrogState(): UseFrogStateReturn {
   const [currentState, setCurrentState] = useState<FrogState>('idle');
   const [mood, setMood] = useState<FrogMood>('neutral');
   const [stats, setStats] = useState<FrogStats>({
-    hunger: 75,
-    energy: 85,
-    happiness: 65,
+    hunger: 70,
+    energy: 80,
+    happiness: 60,
   });
+  
+  const autoActionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastInteractionRef = useRef<number>(Date.now());
 
-  const interact = useCallback((action: 'pet' | 'poke' | 'feed' | 'greet') => {
+  // Random auto actions when idle
+  useEffect(() => {
+    const triggerRandomAction = () => {
+      const now = Date.now();
+      const idleTime = now - lastInteractionRef.current;
+      
+      // Only trigger if idle for a while and not in critical state
+      if (idleTime > 15000 && currentState === 'idle') {
+        const random = Math.random();
+        
+        // 30% chance to do something
+        if (random < 0.3) {
+          const actions: FrogState[] = ['looking', 'stretching', 'yawning', 'greeting'];
+          const action = actions[Math.floor(Math.random() * actions.length)];
+          
+          if (action === 'stretching') {
+            setCurrentState('stretching');
+            setTimeout(() => setCurrentState('idle'), 2500);
+          } else if (action === 'yawning') {
+            setCurrentState('yawning');
+            setTimeout(() => setCurrentState('idle'), 3500);
+          } else if (action === 'looking') {
+            setCurrentState('looking');
+            setTimeout(() => setCurrentState('idle'), 2500);
+          } else if (action === 'greeting') {
+            setCurrentState('greeting');
+            setMood('happy');
+            setTimeout(() => {
+              setCurrentState('idle');
+              setMood('neutral');
+            }, 2000);
+          }
+        }
+      }
+      
+      // Schedule next check
+      autoActionTimerRef.current = setTimeout(triggerRandomAction, 8000 + Math.random() * 12000);
+    };
+    
+    triggerRandomAction();
+    
+    return () => {
+      if (autoActionTimerRef.current) {
+        clearTimeout(autoActionTimerRef.current);
+      }
+    };
+  }, [currentState]);
+
+  const interact = useCallback((action: 'pet' | 'poke' | 'feed' | 'greet' | 'stretch' | 'look') => {
+    lastInteractionRef.current = Date.now();
     console.log('[FrogState] Interaction:', action);
     
     switch (action) {
       case 'greet':
-      case 'pet':
-        setCurrentState(action === 'greet' ? 'greeting' : 'happy');
+        setCurrentState('greeting');
         setMood('happy');
         setStats(prev => ({
           ...prev,
-          happiness: Math.min(100, prev.happiness + 12),
-          energy: Math.min(100, prev.energy + 3),
+          happiness: Math.min(100, prev.happiness + 8),
         }));
         setTimeout(() => {
           setCurrentState('idle');
-        }, action === 'greet' ? 2500 : 1500);
+          setMood('neutral');
+        }, 2500);
+        break;
+        
+      case 'stretch':
+        setCurrentState('stretching');
+        setStats(prev => ({
+          ...prev,
+          energy: Math.min(100, prev.energy + 5),
+        }));
+        setTimeout(() => setCurrentState('idle'), 2500);
+        break;
+        
+      case 'look':
+        setCurrentState('looking');
+        setTimeout(() => setCurrentState('idle'), 2500);
+        break;
+        
+      case 'pet':
+        setCurrentState('happy');
+        setMood('happy');
+        setStats(prev => ({
+          ...prev,
+          happiness: Math.min(100, prev.happiness + 10),
+          energy: Math.min(100, prev.energy + 2),
+        }));
+        setTimeout(() => {
+          setCurrentState('idle');
+        }, 1500);
         break;
         
       case 'poke':
@@ -56,7 +135,7 @@ export function useFrogState(): UseFrogStateReturn {
         setMood('sad');
         setStats(prev => ({
           ...prev,
-          happiness: Math.max(0, prev.happiness - 8),
+          happiness: Math.max(0, prev.happiness - 6),
         }));
         setTimeout(() => {
           setCurrentState('idle');
@@ -69,20 +148,19 @@ export function useFrogState(): UseFrogStateReturn {
         setMood('happy');
         setStats(prev => ({
           ...prev,
-          hunger: Math.min(100, prev.hunger + 25),
-          happiness: Math.min(100, prev.happiness + 5),
+          hunger: Math.min(100, prev.hunger + 20),
+          happiness: Math.min(100, prev.happiness + 3),
         }));
         setTimeout(() => {
           setCurrentState('happy');
-          setTimeout(() => {
-            setCurrentState('idle');
-          }, 1500);
+          setTimeout(() => setCurrentState('idle'), 1500);
         }, 1800);
         break;
     }
   }, []);
 
   const setChainEvent = useCallback((event: 'large_buy' | 'large_sell' | 'price_up' | 'price_down') => {
+    lastInteractionRef.current = Date.now();
     console.log('[FrogState] Chain event:', event);
     
     switch (event) {
@@ -121,7 +199,7 @@ export function useFrogState(): UseFrogStateReturn {
   const setHungry = useCallback(() => {
     setStats(prev => ({
       ...prev,
-      hunger: Math.max(0, prev.hunger - 25),
+      hunger: Math.max(0, prev.hunger - 20),
     }));
     if (currentState === 'idle') {
       setMood('sad');
@@ -131,10 +209,11 @@ export function useFrogState(): UseFrogStateReturn {
   const setSleepy = useCallback(() => {
     setStats(prev => ({
       ...prev,
-      energy: Math.max(0, prev.energy - 25),
+      energy: Math.max(0, prev.energy - 20),
     }));
     if (currentState === 'idle') {
-      setCurrentState('sleeping');
+      setCurrentState('yawning');
+      setTimeout(() => setCurrentState('sleeping'), 3500);
     }
   }, [currentState]);
 
@@ -143,16 +222,31 @@ export function useFrogState(): UseFrogStateReturn {
     setMood('sad');
     setStats(prev => ({
       ...prev,
-      happiness: Math.max(0, prev.happiness - 15),
+      happiness: Math.max(0, prev.happiness - 12),
     }));
-    setTimeout(() => {
-      setCurrentState('idle');
-    }, 3000);
+    setTimeout(() => setCurrentState('idle'), 3000);
   }, []);
 
   const restore = useCallback(() => {
     setCurrentState('idle');
     setMood('neutral');
+  }, []);
+
+  const triggerAutoAction = useCallback(() => {
+    lastInteractionRef.current = Date.now();
+    const actions: FrogState[] = ['looking', 'stretching', 'yawning'];
+    const action = actions[Math.floor(Math.random() * actions.length)];
+    
+    if (action === 'stretching') {
+      setCurrentState('stretching');
+      setTimeout(() => setCurrentState('idle'), 2500);
+    } else if (action === 'yawning') {
+      setCurrentState('yawning');
+      setTimeout(() => setCurrentState('idle'), 3500);
+    } else {
+      setCurrentState('looking');
+      setTimeout(() => setCurrentState('idle'), 2500);
+    }
   }, []);
 
   return {
@@ -168,5 +262,6 @@ export function useFrogState(): UseFrogStateReturn {
     setSleepy,
     setAngry,
     restore,
+    triggerAutoAction,
   };
 }
