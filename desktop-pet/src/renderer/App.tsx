@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import Frog from './components/Frog/Frog';
 import StatusBar from './components/Frog/StatusBar';
 import InteractionBubble from './components/Frog/InteractionBubble';
 import QuickMenu from './components/Frog/QuickMenu';
+import WeatherEffect from './components/WeatherEffect';
 import HaloMenu from './components/HaloMenu/HaloMenu';
 import TasksDialog from './components/Dialogs/TasksDialog';
 import FriendsDialog from './components/Dialogs/FriendsDialog';
@@ -17,6 +18,7 @@ import { useFrogState } from './hooks/useFrogState';
 import { useLifeCycle } from './hooks/useLifeCycle';
 import { useChainMonitor } from './hooks/useChainMonitor';
 import { useMemory } from './hooks/useMemory';
+import { useTimeSystem } from './hooks/useTimeSystem';
 import './styles/global.css';
 
 declare global {
@@ -40,7 +42,7 @@ function App() {
   const [lastInteractTime, setLastInteractTime] = useState(Date.now());
   const [isPatrolling, setIsPatrolling] = useState(false);
   
-  // Bubble and quick menu
+  // Bubble
   const [bubbleMessage, setBubbleMessage] = useState('');
   const [showBubble, setShowBubble] = useState(false);
   const [quickMenu, setQuickMenu] = useState({ visible: false, x: 0, y: 0 });
@@ -57,6 +59,7 @@ function App() {
   useLifeCycle(frogState);
   const chainMonitor = useChainMonitor(frogState);
   const { remember } = useMemory();
+  const timeSystem = useTimeSystem();
 
   // Show interaction bubble
   const showInteractionBubble = useCallback((message: string) => {
@@ -64,19 +67,24 @@ function App() {
     setShowBubble(true);
   }, []);
 
+  // Time-based greeting
+  useEffect(() => {
+    if (frogState.currentState === 'idle' && Math.random() > 0.7) {
+      showInteractionBubble(timeSystem.getGreeting());
+    }
+  }, [timeSystem.timeOfDay]);
+
   useEffect(() => {
     if (window.electronAPI?.onMenuAction) {
       window.electronAPI.onMenuAction((action: string) => handleMenuAction(action));
     }
   }, []);
 
-  // Context menu handler
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
       setQuickMenu({ visible: true, x: e.clientX, y: e.clientY });
     };
-    
     document.addEventListener('contextmenu', handleContextMenu);
     return () => document.removeEventListener('contextmenu', handleContextMenu);
   }, []);
@@ -151,20 +159,11 @@ function App() {
 
   const handleQuickMenuSelect = useCallback((action: string) => {
     switch (action) {
-      case 'pet': 
-        frogState.interact('pet'); 
-        showInteractionBubble('好舒服呀～');
-        break;
-      case 'feed': 
-        frogState.interact('feed'); 
-        showInteractionBubble('好吃！');
-        break;
+      case 'pet': frogState.interact('pet'); showInteractionBubble('好舒服呀～'); break;
+      case 'feed': frogState.interact('feed'); showInteractionBubble('好吃！'); break;
       case 'patrol': handlePatrolToggle(); break;
       case 'travel': setDialogs(d => ({ ...d, travel: true })); break;
-      case 'sleep': 
-        frogState.setCurrentState('sleeping'); 
-        showInteractionBubble('晚安～');
-        break;
+      case 'sleep': frogState.setCurrentState('sleeping'); showInteractionBubble('晚安～'); break;
     }
   }, [frogState, handlePatrolToggle, showInteractionBubble]);
 
@@ -175,54 +174,26 @@ function App() {
   };
 
   return (
-    <div style={{ 
-      width: '100%', 
-      height: '100%', 
-      background: 'transparent',
-      position: 'relative'
-    }}>
+    <div style={{ width: '100%', height: '100%', background: 'transparent', position: 'relative' }}>
+      {/* Weather effect */}
+      <WeatherEffect weather={timeSystem.weather} />
+      
       <StatusBar hunger={frogState.stats.hunger} energy={frogState.stats.energy} happiness={frogState.stats.happiness} />
       
-      <Frog 
-        state={frogState.currentState} 
-        mood={frogState.mood} 
-        stats={frogState.stats} 
-        onClick={handleFrogClick} 
-        onDragStart={() => {}} 
-        onDragEnd={handleDragEnd} 
-      />
+      <Frog state={frogState.currentState} mood={frogState.mood} stats={frogState.stats} onClick={handleFrogClick} onDragStart={() => {}} onDragEnd={handleDragEnd} />
       
-      {/* Interaction bubble */}
-      <InteractionBubble 
-        message={bubbleMessage} 
-        visible={showBubble} 
-        onHide={() => setShowBubble(false)} 
-      />
+      <InteractionBubble message={bubbleMessage} visible={showBubble} onHide={() => setShowBubble(false)} />
       
-      {/* Quick menu (right click) */}
-      <QuickMenu 
-        visible={quickMenu.visible}
-        x={quickMenu.x}
-        y={quickMenu.y}
-        onSelect={handleQuickMenuSelect}
-        onClose={() => setQuickMenu({ ...quickMenu, visible: false })}
-      />
+      <QuickMenu visible={quickMenu.visible} x={quickMenu.x} y={quickMenu.y} onSelect={handleQuickMenuSelect} onClose={() => setQuickMenu({ ...quickMenu, visible: false })} />
       
       <HaloMenu visible={showMenu} onSelect={handleMenuSelect} onClose={() => setShowMenu(false)} />
       
-      <motion.div
-        style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 10, opacity: 0.5, color: 'white', cursor: 'pointer', textAlign: 'center' }}
-        whileHover={{ scale: 1.1 }}
-        onClick={() => setShowMenu(!showMenu)}
-      >
+      <motion.div style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 10, opacity: 0.5, color: 'white', cursor: 'pointer', textAlign: 'center' }} whileHover={{ scale: 1.1 }} onClick={() => setShowMenu(!showMenu)}>
         <div>🐸</div>
         <div>{showMenu ? '关闭' : '菜单'}</div>
       </motion.div>
 
-      <motion.div
-        style={{ position: 'absolute', bottom: 8, left: 8, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} key={frogState.currentState}
-      >
+      <motion.div style={{ position: 'absolute', bottom: 8, left: 8, fontSize: 9, color: 'rgba(255,255,255,0.5)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} key={frogState.currentState}>
         {frogState.currentState === 'idle' && '🐸'}
         {frogState.currentState === 'sleeping' && '😴'}
         {frogState.currentState === 'eating' && '🍽️'}
