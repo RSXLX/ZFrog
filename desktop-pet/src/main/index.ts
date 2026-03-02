@@ -1,9 +1,8 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, desktopCapturer } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } from 'electron';
 import * as path from 'path';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
-let isClickThrough = false;
 
 const isDev = process.env.NODE_ENV !== 'production' || !app.isPackaged;
 
@@ -32,10 +31,9 @@ function createWindow() {
     },
   });
 
-  // Enable click-through mode initially
+  // Enable click-through by default
   if (mainWindow) {
     mainWindow.setIgnoreMouseEvents(true, { forward: true });
-    isClickThrough = true;
   }
 
   if (isDev) {
@@ -48,7 +46,7 @@ function createWindow() {
     mainWindow = null;
   });
 
-  console.log('[ZetaFrog] Window created with click-through');
+  console.log('[ZetaFrog] Window created');
 }
 
 function createTray() {
@@ -89,24 +87,25 @@ function createTray() {
   console.log('[ZetaFrog] Tray created');
 }
 
+// IPC handlers
 ipcMain.handle('get-window-position', () => mainWindow?.getPosition() || null);
 ipcMain.handle('set-window-position', (_, x: number, y: number) => mainWindow?.setPosition(x, y));
 ipcMain.handle('minimize-window', () => mainWindow?.minimize());
 ipcMain.handle('close-window', () => mainWindow?.hide());
 
-// Enable/disable click through
+// Click-through control (key feature!)
 ipcMain.handle('set-click-through', (_, enabled: boolean) => {
   if (mainWindow) {
     mainWindow.setIgnoreMouseEvents(enabled, { forward: true });
-    isClickThrough = enabled;
     console.log(`[ZetaFrog] Click-through: ${enabled}`);
   }
 });
 
-// Move window
+// Move window (key feature!)
 ipcMain.handle('move-window', (_, x: number, y: number) => {
   if (mainWindow) {
     mainWindow.setPosition(Math.round(x), Math.round(y));
+    console.log(`[ZetaFrog] Window moved to: ${x}, ${y}`);
   }
 });
 
