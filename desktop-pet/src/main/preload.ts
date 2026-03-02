@@ -1,7 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-// Expose protected methods that allow the renderer process to use
-// the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
   // Window controls
   getWindowPosition: () => ipcRenderer.invoke('get-window-position'),
@@ -9,13 +7,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
   closeWindow: () => ipcRenderer.invoke('close-window'),
   
+  // Click-through control (key feature!)
+  setClickThrough: (enabled: boolean) => ipcRenderer.invoke('set-click-through', enabled),
+  
+  // Move window
+  moveWindow: (x: number, y: number) => ipcRenderer.invoke('move-window', x, y),
+  
   // Menu actions
   onMenuAction: (callback: (action: string) => void) => {
     ipcRenderer.on('menu-action', (_, action) => callback(action));
   },
   
-  // App info
   platform: process.platform,
 });
-
-console.log('[Preload] API exposed');

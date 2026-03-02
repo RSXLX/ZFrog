@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 type FrogState = 'idle' | 'sleeping' | 'eating' | 'happy' | 'excited' | 'scared' | 'dancing' | 'crying' | 'traveling' | 'thinking' | 'angry' | 'greeting' | 'stretching' | 'yawning' | 'looking' | 'walking';
@@ -13,7 +13,15 @@ interface FrogProps {
   onDragEnd: (x: number, y: number) => void;
 }
 
-// Extended animation variants - more natural movements
+// Frog hitbox area (relative to the 200x200 SVG)
+const FROG_HITBOX = {
+  x: 30,
+  y: 50,
+  width: 140,
+  height: 140,
+};
+
+// Extended animation variants
 const stateVariants: Record<FrogState, any> = {
   idle: {
     y: [0, 3, 0],
@@ -98,84 +106,13 @@ const stateVariants: Record<FrogState, any> = {
   }
 };
 
-// Status effect overlays
-const StatusEffects: React.FC<{ state: FrogState; mood: FrogMood }> = ({ state, mood }) => {
-  const effects: Record<FrogState, React.ReactNode> = {
-    sleeping: (
-      <g>
-        <motion.text x="148" y="48" initial={{ opacity: 0, y: 0 }} animate={{ opacity: [0.7, 0.3, 0.7], y: [0, -12, -20] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }} fill="#3b82f6" fontSize="22" fontWeight="bold">Z</motion.text>
-        <motion.text x="162" y="42" initial={{ opacity: 0, y: 0 }} animate={{ opacity: [0.5, 0.2, 0.5], y: [0, -10, -16] }} transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut", delay: 0.25 }} fill="#3b82f6" fontSize="16" fontWeight="bold">z</motion.text>
-        <motion.text x="174" y="50" initial={{ opacity: 0, y: 0 }} animate={{ opacity: [0.3, 0.1, 0.3], y: [0, -6, -12] }} transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut", delay: 0.5 }} fill="#3b82f6" fontSize="10" fontWeight="bold">z</motion.text>
-      </g>
-    ),
-    yawning: (
-      <g>
-        <motion.text x="100" y="35" initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 1.2, 1], opacity: [0, 1, 0] }} transition={{ duration: 2.5 }} fontSize="20">😴</motion.text>
-      </g>
-    ),
-    excited: (
-      <g>
-        <motion.text x="12" y="22" initial={{ scale: 0, rotate: -180 }} animate={{ scale: [0, 1.1, 1], rotate: [0, -12, 0] }} transition={{ duration: 0.4 }} fontSize="20">💰</motion.text>
-        <motion.text x="35" y="18" initial={{ scale: 0 }} animate={{ scale: [0, 1, 0.9, 1] }} transition={{ duration: 0.35, delay: 0.15 }} fontSize="14">🚀</motion.text>
-        <motion.text x="55" y="25" initial={{ scale: 0 }} animate={{ scale: [0, 0.9, 0.7, 0.9] }} transition={{ duration: 0.3, delay: 0.3 }} fontSize="12">✨</motion.text>
-      </g>
-    ),
-    dancing: (
-      <g>
-        <motion.text x="8" y="22" animate={{ y: [0, -8, 0], rotate: [0, 12, -12, 0] }} transition={{ duration: 0.45, repeat: Infinity }} fontSize="18">🎵</motion.text>
-        <motion.text x="32" y="32" animate={{ y: [0, -6, 0], rotate: [0, -8, 8, 0] }} transition={{ duration: 0.55, repeat: Infinity, delay: 0.15 }} fontSize="14">🎶</motion.text>
-      </g>
-    ),
-    crying: (
-      <g>
-        <motion.circle cx="55" cy="80" r="4" fill="#3b82f6" opacity="0.75" animate={{ cy: [80, 92, 80], opacity: [0.75, 0.25, 0.75] }} transition={{ duration: 1.8, repeat: Infinity }} />
-        <motion.circle cx="145" cy="80" r="4" fill="#3b82f6" opacity="0.75" animate={{ cy: [80, 92, 80], opacity: [0.75, 0.25, 0.75] }} transition={{ duration: 1.8, repeat: Infinity, delay: 0.15 }} />
-      </g>
-    ),
-    traveling: (
-      <g transform="translate(3, 3)">
-        <motion.rect x="0" y="0" width="32" height="26" rx="3" fill="#f97316" stroke="#ea580c" strokeWidth="1" animate={{ x: [-1, 1, -1] }} transition={{ duration: 0.45, repeat: Infinity }} />
-        <motion.text x="16" y="17" textAnchor="middle" fill="white" fontSize="13">🎒</motion.text>
-      </g>
-    ),
-    thinking: (
-      <g>
-        <motion.text x="158" y="28" animate={{ scale: [0.8, 1.1, 0.9, 1], opacity: [0.5, 1, 0.7, 1] }} transition={{ duration: 1.8, repeat: Infinity }} fontSize="16">💭</motion.text>
-        <motion.text x="175" y="42" animate={{ opacity: [0.3, 0.7, 0.3] }} transition={{ duration: 1.4, repeat: Infinity }} fill="#555" fontSize="12">?</motion.text>
-      </g>
-    ),
-    angry: (
-      <g>
-        <motion.text x="48" y="38" animate={{ scale: [1, 1.2, 1], opacity: [0.7, 1, 0.7] }} transition={{ duration: 0.4, repeat: Infinity }} fontSize="14">💢</motion.text>
-        <motion.text x="142" y="38" animate={{ scale: [1, 1.2, 1], opacity: [0.7, 1, 0.7] }} transition={{ duration: 0.4, repeat: Infinity, delay: 0.08 }} fontSize="14">💢</motion.text>
-      </g>
-    ),
-    greeting: (
-      <motion.text x="78" y="38" initial={{ scale: 0, y: 8 }} animate={{ scale: [0, 1.1, 1], y: [8, 0, 0] }} transition={{ duration: 0.8, repeat: 2 }} fontSize="18">👋</motion.text>
-    ),
-    happy: (
-      <g>
-        <motion.text x="42" y="32" initial={{ scale: 0, y: 8 }} animate={{ scale: [0, 1.1, 1], y: [8, 0, 0] }} transition={{ duration: 0.4 }} fontSize="12">💕</motion.text>
-        <motion.text x="148" y="32" initial={{ scale: 0, y: 8 }} animate={{ scale: [0, 1.1, 1], y: [8, 0, 0] }} transition={{ duration: 0.4, delay: 0.08 }} fontSize="12">💕</motion.text>
-      </g>
-    ),
-    scared: (
-      <motion.text x="12" y="22" animate={{ rotate: [0, -8, 8, 0], scale: [1, 1.1, 1] }} transition={{ duration: 0.25, repeat: Infinity }} fontSize="16">😱</motion.text>
-    ),
-    looking: (
-      <motion.text x="100" y="35" animate={{ scale: [0.8, 1, 0.8], opacity: [0.6, 1, 0.6] }} transition={{ duration: 1.5, repeat: Infinity }} fontSize="14">👀</motion.text>
-    ),
-    idle: null,
-    eating: null,
-    stretching: null,
-    walking: null,
-  };
-  return <>{effects[state]}</>;
-};
-
 const Frog: React.FC<FrogProps> = ({ state, mood, stats, onClick, onDragStart, onDragEnd }) => {
   const [isBlinking, setIsBlinking] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const frogRef = useRef<HTMLDivElement>(null);
+  const isClickThroughRef = useRef(true);
   
   // Random blinking
   useEffect(() => {
@@ -188,6 +125,25 @@ const Frog: React.FC<FrogProps> = ({ state, mood, stats, onClick, onDragStart, o
     return () => clearInterval(blinkInterval);
   }, [state]);
 
+  // Mouse enter/leave handling for click-through
+  const handleMouseEnter = useCallback(() => {
+    setIsHovered(true);
+    // Disable click-through when mouse enters frog area
+    if (window.electronAPI?.setClickThrough) {
+      window.electronAPI.setClickThrough(false);
+      isClickThroughRef.current = false;
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovered(false);
+    // Re-enable click-through when mouse leaves frog area
+    if (!isDragging && window.electronAPI?.setClickThrough) {
+      window.electronAPI.setClickThrough(true);
+      isClickThroughRef.current = true;
+    }
+  }, [isDragging]);
+
   // Get stat-based appearance
   const getStatEffects = () => {
     if (stats.hunger < 15) return { scale: 0.86, filter: 'brightness(0.65) saturate(0.4)' };
@@ -198,8 +154,33 @@ const Frog: React.FC<FrogProps> = ({ state, mood, stats, onClick, onDragStart, o
 
   const statEffects = getStatEffects();
 
+  // Handle drag
+  const handleDragStart = useCallback((e: any) => {
+    setIsDragging(true);
+    onDragStart();
+    if (window.electronAPI?.setClickThrough) {
+      window.electronAPI.setClickThrough(false);
+    }
+  }, [onDragStart]);
+
+  const handleDragEnd = useCallback((e: any, info: any) => {
+    setIsDragging(false);
+    // Get window position and calculate new position
+    const windowX = info.point.x - 110;
+    const windowY = info.point.y - 120;
+    onDragEnd(windowX, windowY);
+    
+    // Re-enable click-through after drag ends
+    setTimeout(() => {
+      if (window.electronAPI?.setClickThrough) {
+        window.electronAPI.setClickThrough(true);
+      }
+    }, 500);
+  }, [onDragEnd]);
+
   return (
     <motion.div
+      ref={containerRef}
       className="frog-svg"
       variants={stateVariants}
       animate={state}
@@ -210,14 +191,19 @@ const Frog: React.FC<FrogProps> = ({ state, mood, stats, onClick, onDragStart, o
       }}
       whileHover={{ scale: 1.03 }}
       whileTap={{ scale: 0.95 }}
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       drag={!isHovered}
       dragMomentum={false}
-      onDragStart={onDragStart}
-      onDragEnd={(e: any) => onDragEnd(e.clientX, e.clientY)}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
     >
-      <svg viewBox="0 0 200 200" width="200" height="200">
+      <svg 
+        viewBox="0 0 200 200" 
+        width="200" 
+        height="200"
+        style={{ overflow: 'visible' }}
+      >
         <defs>
           <linearGradient id="skinGradient" x1="100" y1="0" x2="100" y2="200" gradientUnits="userSpaceOnUse">
             <stop offset="0.4" stopColor="#4ADE80" />
@@ -282,7 +268,6 @@ const Frog: React.FC<FrogProps> = ({ state, mood, stats, onClick, onDragStart, o
               <path d="M 87 114 Q 100 124 113 114" fill="none" stroke="#166534" strokeWidth="2.5" strokeLinecap="round"/>
             )}
             
-            {/* Eating particles */}
             {state === 'eating' && (
               <g>
                 <motion.circle cx="92" cy="112" r="3.5" fill="#f97316" animate={{ cy: [112, 98, 112], opacity: [1, 0.4, 0] }} transition={{ duration: 0.45, repeat: 4 }} />
@@ -299,7 +284,6 @@ const Frog: React.FC<FrogProps> = ({ state, mood, stats, onClick, onDragStart, o
             </>
           )}
           
-          {/* Sad cheeks */}
           {(mood === 'sad' || mood === 'very_sad' || state === 'crying') && (
             <g opacity="0.35">
               <circle cx="46" cy="100" r="5" fill="#94a3b8"/>
@@ -308,14 +292,11 @@ const Frog: React.FC<FrogProps> = ({ state, mood, stats, onClick, onDragStart, o
           )}
         </motion.g>
         
-        {/* Status Effects */}
-        <StatusEffects state={state} mood={mood} />
-        
-        {/* Hover hint */}
-        {state === 'idle' && isHovered && (
-          <motion.g initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <text x="100" y="148" textAnchor="middle" fill="white" fontSize="9" fontWeight="bold" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.6)' }}>
-              👆 点击互动
+        {/* Hover indicator */}
+        {isHovered && (
+          <motion.g initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <text x="100" y="145" textAnchor="middle" fill="white" fontSize="10" fontWeight="bold" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.6)' }}>
+              🐸 点击互动
             </text>
           </motion.g>
         )}

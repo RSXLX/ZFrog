@@ -1,8 +1,9 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, desktopCapturer } from 'electron';
 import * as path from 'path';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let isClickThrough = false;
 
 const isDev = process.env.NODE_ENV !== 'production' || !app.isPackaged;
 
@@ -10,18 +11,18 @@ function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
   
-  const windowWidth = 280;
-  const windowHeight = 280;
+  const windowWidth = 220;
+  const windowHeight = 240;
   
   mainWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
-    x: screenWidth - windowWidth - 20,
-    y: screenHeight - windowHeight - 60,
+    x: screenWidth - windowWidth - 30,
+    y: screenHeight - windowHeight - 80,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
-    skipTaskbar: true,
+    skipTaskbar: false,
     resizable: false,
     hasShadow: false,
     webPreferences: {
@@ -31,8 +32,14 @@ function createWindow() {
     },
   });
 
+  // Enable click-through mode initially
+  if (mainWindow) {
+    mainWindow.setIgnoreMouseEvents(true, { forward: true });
+    isClickThrough = true;
+  }
+
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL('http://localhost:5180');
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
@@ -41,29 +48,33 @@ function createWindow() {
     mainWindow = null;
   });
 
-  console.log('[ZetaFrog] Window created');
+  console.log('[ZetaFrog] Window created with click-through');
 }
 
 function createTray() {
-  // Create simple 16x16 frog icon
   const size = 16;
   const iconBuffer = Buffer.alloc(size * size * 4);
-  
-  // Fill with green color (RGBA)
   for (let i = 0; i < size * size; i++) {
-    iconBuffer[i * 4] = 74;     // R
-    iconBuffer[i * 4 + 1] = 222; // G  
-    iconBuffer[i * 4 + 2] = 128; // B
-    iconBuffer[i * 4 + 3] = 255; // A
+    iconBuffer[i * 4] = 74;
+    iconBuffer[i * 4 + 1] = 222;
+    iconBuffer[i * 4 + 2] = 128;
+    iconBuffer[i * 4 + 3] = 255;
   }
   
   const trayIcon = nativeImage.createFromBuffer(iconBuffer, { width: size, height: size });
-  
   tray = new Tray(trayIcon);
   tray.setToolTip('ZetaFrog 🐸');
   
   const contextMenu = Menu.buildFromTemplate([
-    { label: '显示', click: () => mainWindow?.show() },
+    { label: '显示', click: () => { mainWindow?.show(); mainWindow?.setIgnoreMouseEvents(false); }},
+    { type: 'separator' },
+    { label: '互动模式', type: 'checkbox', checked: false, click: (menuItem) => {
+      if (menuItem.checked) {
+        mainWindow?.setIgnoreMouseEvents(false);
+      } else {
+        mainWindow?.setIgnoreMouseEvents(true, { forward: true });
+      }
+    }},
     { type: 'separator' },
     { label: '旅行', click: () => { mainWindow?.webContents.send('menu-action', 'travel'); mainWindow?.show(); }},
     { label: '背包', click: () => { mainWindow?.webContents.send('menu-action', 'bag'); mainWindow?.show(); }},
@@ -73,18 +84,32 @@ function createTray() {
   ]);
   
   tray.setContextMenu(contextMenu);
-  tray.on('click', () => mainWindow?.show());
+  tray.on('click', () => { mainWindow?.show(); mainWindow?.setIgnoreMouseEvents(false); });
   
   console.log('[ZetaFrog] Tray created');
 }
 
-// IPC handlers
 ipcMain.handle('get-window-position', () => mainWindow?.getPosition() || null);
 ipcMain.handle('set-window-position', (_, x: number, y: number) => mainWindow?.setPosition(x, y));
 ipcMain.handle('minimize-window', () => mainWindow?.minimize());
 ipcMain.handle('close-window', () => mainWindow?.hide());
 
-// App lifecycle
+// Enable/disable click through
+ipcMain.handle('set-click-through', (_, enabled: boolean) => {
+  if (mainWindow) {
+    mainWindow.setIgnoreMouseEvents(enabled, { forward: true });
+    isClickThrough = enabled;
+    console.log(`[ZetaFrog] Click-through: ${enabled}`);
+  }
+});
+
+// Move window
+ipcMain.handle('move-window', (_, x: number, y: number) => {
+  if (mainWindow) {
+    mainWindow.setPosition(Math.round(x), Math.round(y));
+  }
+});
+
 app.whenReady().then(() => {
   createWindow();
   createTray();

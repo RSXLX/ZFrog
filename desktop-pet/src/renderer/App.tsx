@@ -14,6 +14,7 @@ import BagDialog from './components/Dialogs/BagDialog';
 import { useFrogState } from './hooks/useFrogState';
 import { useLifeCycle } from './hooks/useLifeCycle';
 import { useChainMonitor } from './hooks/useChainMonitor';
+import './styles/global.css';
 
 declare global {
   interface Window {
@@ -22,6 +23,8 @@ declare global {
       setWindowPosition: (x: number, y: number) => Promise<void>;
       minimizeWindow: () => Promise<void>;
       closeWindow: () => Promise<void>;
+      setClickThrough: (enabled: boolean) => Promise<void>;
+      moveWindow: (x: number, y: number) => Promise<void>;
       onMenuAction: (callback: (action: string) => void) => void;
       platform: string;
     };
@@ -34,14 +37,8 @@ function App() {
   const [lastInteractTime, setLastInteractTime] = useState(Date.now());
   
   const [dialogs, setDialogs] = useState({
-    tasks: false,
-    friends: false,
-    badges: false,
-    travel: false,
-    home: false,
-    bag: false,
-    settings: false,
-    chainMonitor: false,
+    tasks: false, friends: false, badges: false, travel: false,
+    home: false, bag: false, settings: false, chainMonitor: false,
   });
   
   const [walletAddress] = useState('0x1234567890abcdef1234567890abcdef12345678');
@@ -53,9 +50,7 @@ function App() {
 
   useEffect(() => {
     if (window.electronAPI?.onMenuAction) {
-      window.electronAPI.onMenuAction((action: string) => {
-        handleMenuAction(action);
-      });
+      window.electronAPI.onMenuAction((action: string) => handleMenuAction(action));
     }
   }, []);
 
@@ -71,69 +66,73 @@ function App() {
     }
   }, []);
 
-  useEffect(() => {
-    setLastInteractTime(Date.now());
-  }, [frogState.currentState]);
+  useEffect(() => setLastInteractTime(Date.now()), [frogState.currentState]);
 
   const handleFrogClick = useCallback((area: string) => {
-    if (pokeCount > 0 && Date.now() - lastInteractTime > 3000) {
-      setPokeCount(0);
-    }
+    if (pokeCount > 0 && Date.now() - lastInteractTime > 3000) setPokeCount(0);
     switch (area) {
-      case 'head':
-        frogState.interact('pet');
-        break;
-      case 'body':
-        setPokeCount(p => p + 1);
-        frogState.interact('poke');
-        if (pokeCount >= 3) frogState.setAngry();
-        break;
-      case 'mouth':
-        frogState.interact('feed');
-        break;
+      case 'head': frogState.interact('pet'); break;
+      case 'body': setPokeCount(p => p + 1); frogState.interact('poke'); if (pokeCount >= 3) frogState.setAngry(); break;
+      case 'mouth': frogState.interact('feed'); break;
     }
   }, [frogState, pokeCount, lastInteractTime]);
 
   const handleDragEnd = useCallback((x: number, y: number) => {
-    window.electronAPI?.setWindowPosition(x - 150, y - 150);
+    window.electronAPI?.moveWindow(x, y);
   }, []);
 
-  const handleMenuSelect = useCallback((item: string) => {
-    handleMenuAction(item);
-    setShowMenu(false);
-  }, [handleMenuAction]);
-
-  const closeDialog = (name: string) => {
-    setDialogs(d => ({ ...d, [name]: false }));
-  };
-
-  const handleTravelStart = (chain: string, duration: number) => {
-    frogState.setCurrentState('traveling');
-  };
+  const handleMenuSelect = useCallback((item: string) => { handleMenuAction(item); setShowMenu(false); }, [handleMenuAction]);
+  const closeDialog = (name: string) => setDialogs(d => ({ ...d, [name]: false }));
+  const handleTravelStart = (chain: string, duration: number) => { frogState.setCurrentState('traveling'); };
 
   return (
-    <div className="frog-container">
+    <div style={{ 
+      width: '100%', 
+      height: '100%', 
+      background: 'transparent',
+      position: 'relative'
+    }}>
       <StatusBar hunger={frogState.stats.hunger} energy={frogState.stats.energy} happiness={frogState.stats.happiness} />
-      <Frog state={frogState.currentState} mood={frogState.mood} stats={frogState.stats} onClick={handleFrogClick} onDragStart={() => {}} onDragEnd={handleDragEnd} />
+      
+      <Frog 
+        state={frogState.currentState} 
+        mood={frogState.mood} 
+        stats={frogState.stats} 
+        onClick={handleFrogClick} 
+        onDragStart={() => {}} 
+        onDragEnd={handleDragEnd} 
+      />
+      
       <HaloMenu visible={showMenu} onSelect={handleMenuSelect} onClose={() => setShowMenu(false)} />
       
-      <motion.div style={{ position: 'absolute', bottom: 10, right: 15, fontSize: 11, opacity: 0.6, color: 'white', cursor: 'pointer', textAlign: 'center' }} whileHover={{ scale: 1.1 }} onClick={() => setShowMenu(!showMenu)}>
+      <motion.div
+        style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 10, opacity: 0.5, color: 'white', cursor: 'pointer', textAlign: 'center' }}
+        whileHover={{ scale: 1.1 }}
+        onClick={() => setShowMenu(!showMenu)}
+      >
         <div>🐸</div>
         <div>{showMenu ? '关闭' : '菜单'}</div>
       </motion.div>
 
-      <motion.div style={{ position: 'absolute', bottom: 10, left: 15, fontSize: 10, color: 'rgba(255,255,255,0.6)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} key={frogState.currentState}>
-        {frogState.currentState === 'idle' && '🐸 等待中...'}
-        {frogState.currentState === 'sleeping' && '😴 睡觉中'}
-        {frogState.currentState === 'eating' && '🍽️ 吃东西'}
-        {frogState.currentState === 'happy' && '😊 开心'}
-        {frogState.currentState === 'excited' && '🎉 兴奋！'}
-        {frogState.currentState === 'scared' && '😨 害怕'}
-        {frogState.currentState === 'dancing' && '💃 跳舞中'}
-        {frogState.currentState === 'crying' && '😭 哭泣中'}
-        {frogState.currentState === 'traveling' && '🎒 旅行中'}
-        {frogState.currentState === 'thinking' && '💭 思考中'}
-        {frogState.currentState === 'angry' && '😠 生气中'}
+      <motion.div
+        style={{ position: 'absolute', bottom: 8, left: 8, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} key={frogState.currentState}
+      >
+        {frogState.currentState === 'idle' && '🐸'}
+        {frogState.currentState === 'sleeping' && '😴'}
+        {frogState.currentState === 'eating' && '🍽️'}
+        {frogState.currentState === 'happy' && '😊'}
+        {frogState.currentState === 'excited' && '🎉'}
+        {frogState.currentState === 'scared' && '😨'}
+        {frogState.currentState === 'dancing' && '💃'}
+        {frogState.currentState === 'crying' && '😭'}
+        {frogState.currentState === 'traveling' && '🎒'}
+        {frogState.currentState === 'thinking' && '💭'}
+        {frogState.currentState === 'angry' && '😠'}
+        {frogState.currentState === 'stretching' && '🧘'}
+        {frogState.currentState === 'yawning' && '😴'}
+        {frogState.currentState === 'looking' && '👀'}
+        {frogState.currentState === 'greeting' && '👋'}
       </motion.div>
 
       <TasksDialog walletAddress={walletAddress} visible={dialogs.tasks} onClose={() => closeDialog('tasks')} />
