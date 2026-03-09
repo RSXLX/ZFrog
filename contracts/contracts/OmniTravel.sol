@@ -230,19 +230,6 @@ contract OmniTravel is ReentrancyGuard, Pausable, Ownable {
 
 // ============ 接口定义 ============
 
-interface IZetaFrogNFT {
-    enum FrogStatus {
-        Idle,
-        Traveling,
-        Exploring,
-        Resting
-    }
-    
-    function ownerOf(uint256 tokenId) external view returns (address);
-    function setFrogStatus(uint256 tokenId, FrogStatus status) external;
-    function addExperience(uint256 tokenId, uint256 xp) external;
-}
-
 interface IZetaGateway {
     function call(
         address receiver,
@@ -251,15 +238,4 @@ interface IZetaGateway {
         CallOptions calldata callOptions,
         RevertOptions calldata revertOptions
     ) external;
-}
-
-struct CallOptions {
-    uint256 gasLimit;
-    bool isArbitraryCall;
-}
-
-struct RevertOptions {
-    address revertAddress;
-    bool callOnRevert;
-    bytes abortFlag;
 }
