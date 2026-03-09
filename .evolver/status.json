@@ -1,0 +1,42 @@
+{
+  "project": "ZFrog",
+  "evolverVersion": "1.0.0",
+  "lastUpdate": "2026-03-09T03:20:00Z",
+  "status": "active",
+  "metrics": {
+    "totalContracts": 15,
+    "totalContractLines": 6831,
+    "totalTsFiles": 3472,
+    "zetaChainContracts": 3,
+    "todoCount": 0,
+    "fixmeCount": 0
+  },
+  "optimizationQueue": [
+    {
+      "id": "opt-001",
+      "type": "gas",
+      "target": "TravelRouter",
+      "priority": "high",
+      "status": "pending"
+    },
+    {
+      "id": "opt-002",
+      "type": "security",
+      "target": "All Contracts",
+      "priority": "high",
+      "status": "pending"
+    },
+    {
+      "id": "opt-003",
+      "type": "performance",
+      "target": "Frontend",
+      "priority": "medium",
+      "status": "pending"
+    }
+  ],
+  "heartbeat": {
+    "enabled": true,
+    "interval": "30m",
+    "lastCheck": null
+  }
+}

@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
+
+// Components
 import Frog from './components/Frog/Frog';
 import StatusBar from './components/Frog/StatusBar';
 import InteractionBubble from './components/Frog/InteractionBubble';
 import QuickMenu from './components/Frog/QuickMenu';
 import WeatherEffect from './components/WeatherEffect';
 import HaloMenu from './components/HaloMenu/HaloMenu';
+
+// Dialogs
 import TasksDialog from './components/Dialogs/TasksDialog';
 import FriendsDialog from './components/Dialogs/FriendsDialog';
 import BadgesDialog from './components/Dialogs/BadgesDialog';
@@ -15,6 +19,9 @@ import ChainMonitorPanel from './components/Dialogs/ChainMonitorPanel';
 import HomeDialog from './components/Dialogs/HomeDialog';
 import BagDialog from './components/Dialogs/BagDialog';
 import ProfileDialog from './components/Dialogs/ProfileDialog';
+import QuietModePanel from '../components/QuietModePanel';
+
+// Hooks
 import { useFrogState } from './hooks/useFrogState';
 import { useLifeCycle } from './hooks/useLifeCycle';
 import { useChainMonitor } from './hooks/useChainMonitor';
@@ -27,6 +34,9 @@ import { useTravel } from './hooks/useTravel';
 import { usePetStats } from './hooks/usePetStats';
 import { useDailyTasks } from './hooks/useDailyTasks';
 import { useSound } from './hooks/useSound';
+import { useQuietMode } from './hooks/useQuietMode';
+
+// Styles
 import './styles/global.css';
 
 declare global {
@@ -45,25 +55,36 @@ declare global {
 }
 
 function App() {
+  // State
   const [showMenu, setShowMenu] = useState(false);
   const [pokeCount, setPokeCount] = useState(0);
   const [lastInteractTime, setLastInteractTime] = useState(Date.now());
   const [isPatrolling, setIsPatrolling] = useState(false);
   
-  // Bubble
+  // UI State
   const [bubbleMessage, setBubbleMessage] = useState('');
   const [showBubble, setShowBubble] = useState(false);
   const [quickMenu, setQuickMenu] = useState({ visible: false, x: 0, y: 0 });
   
+  // Dialogs State
   const [dialogs, setDialogs] = useState({
-    tasks: false, friends: false, badges: false, travel: false,
-    home: false, bag: false, settings: false, chainMonitor: false, profile: false,
+    tasks: false,
+    friends: false,
+    badges: false,
+    travel: false,
+    home: false,
+    bag: false,
+    settings: false,
+    chainMonitor: false,
+    profile: false,
+    quietMode: false,
   });
   
+  // Mock Data
   const [walletAddress] = useState('0x1234567890abcdef1234567890abcdef12345678');
   const [tokenId] = useState(1);
   
-  // All integrated hooks
+  // Hooks
   const frogState = useFrogState();
   useLifeCycle(frogState);
   const chainMonitor = useChainMonitor(frogState);
@@ -76,6 +97,18 @@ function App() {
   const petStats = usePetStats();
   const dailyTasks = useDailyTasks();
   const { play: playSound } = useSound();
+  const quietMode = useQuietMode();
+
+  // Quiet Mode Effect
+  useEffect(() => {
+    if (quietMode.behavior.frogState === 'sleeping') {
+      frogState.setCurrentState('sleeping');
+    } else if (quietMode.behavior.frogState === 'hidden') {
+      // Handle hidden state
+    } else if (frogState.currentState === 'sleeping' && quietMode.behavior.frogState !== 'sleeping') {
+      frogState.setCurrentState('idle');
+    }
+  }, [quietMode.behavior.frogState, frogState]);
 
   // Show interaction bubble
   const showInteractionBubble = useCallback((message: string) => {
@@ -85,22 +118,26 @@ function App() {
 
   // Play sound on interaction
   const handleInteraction = useCallback((type: 'pet' | 'poke' | 'feed') => {
-    playSound(type);
-  }, [playSound]);
+    if (quietMode.behavior.playSounds) {
+      playSound(type);
+    }
+  }, [playSound, quietMode.behavior.playSounds]);
 
   // Time-based greeting
   useEffect(() => {
-    if (frogState.currentState === 'idle' && Math.random() > 0.7) {
+    if (frogState.currentState === 'idle' && Math.random() > 0.7 && quietMode.behavior.showAnimations) {
       showInteractionBubble(timeSystem.getGreeting());
     }
-  }, [timeSystem.timeOfDay]);
+  }, [timeSystem.timeOfDay, frogState.currentState, quietMode.behavior.showAnimations, showInteractionBubble, timeSystem]);
 
+  // Electron API setup
   useEffect(() => {
     if (window.electronAPI?.onMenuAction) {
       window.electronAPI.onMenuAction((action: string) => handleMenuAction(action));
     }
   }, []);
 
+  // Context menu setup
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
@@ -110,6 +147,7 @@ function App() {
     return () => document.removeEventListener('contextmenu', handleContextMenu);
   }, []);
 
+  // Menu action handler
   const handleMenuAction = useCallback((action: string) => {
     switch (action) {
       case 'travel': setDialogs(d => ({ ...d, travel: true })); break;
@@ -120,16 +158,22 @@ function App() {
       case 'settings': setDialogs(d => ({ ...d, settings: true })); break;
       case 'monitor': setDialogs(d => ({ ...d, chainMonitor: true })); break;
       case 'profile': setDialogs(d => ({ ...d, profile: true })); break;
+      case 'quiet': setDialogs(d => ({ ...d, quietMode: true })); break;
     }
   }, []);
 
+  // Update last interact time
   useEffect(() => setLastInteractTime(Date.now()), [frogState.currentState]);
 
+  // Handle frog click
   const handleFrogClick = useCallback((area: string) => {
+    if (!quietMode.behavior.allowInteraction) return;
+    
     if (pokeCount > 0 && Date.now() - lastInteractTime > 3000) setPokeCount(0);
+    
     switch (area) {
-      case 'head': 
-        frogState.interact('pet'); 
+      case 'head':
+        frogState.interact('pet');
         handleInteraction('pet');
         showInteractionBubble('好舒服呀～');
         remember('interaction', 'pet', 0.7);
@@ -138,8 +182,8 @@ function App() {
         achievements.incrementProgress('first_pet');
         achievements.incrementProgress('pet_50');
         break;
-      case 'body': 
-        setPokeCount(p => p + 1); 
+      case 'body':
+        setPokeCount(p => p + 1);
         frogState.interact('poke');
         handleInteraction('poke');
         showInteractionBubble('哎呀！');
@@ -148,8 +192,8 @@ function App() {
           showInteractionBubble('哼！');
         }
         break;
-      case 'mouth': 
-        frogState.interact('feed'); 
+      case 'mouth':
+        frogState.interact('feed');
         handleInteraction('feed');
         showInteractionBubble('好吃！');
         remember('interaction', 'feed', 0.6);
@@ -159,13 +203,15 @@ function App() {
         achievements.incrementProgress('feed_10');
         break;
     }
-  }, [frogState, pokeCount, lastInteractTime, showInteractionBubble, remember, petStats, dailyTasks, achievements, handleInteraction]);
+  }, [frogState, pokeCount, lastInteractTime, quietMode.behavior.allowInteraction, handleInteraction, showInteractionBubble, remember, petStats, dailyTasks, achievements]);
 
+  // Handle drag end
   const handleDragEnd = useCallback((x: number, y: number) => {
     frogState.setPosition(x, y);
     window.electronAPI?.moveWindow(x, y);
   }, [frogState]);
 
+  // Handle patrol toggle
   const handlePatrolToggle = useCallback(() => {
     if (isPatrolling) {
       frogState.stopPatrol();
@@ -179,7 +225,8 @@ function App() {
     }
   }, [isPatrolling, frogState, showInteractionBubble, dailyTasks]);
 
-  const handleMenuSelect = useCallback((item: string) => { 
+  // Handle menu select
+  const handleMenuSelect = useCallback((item: string) => {
     if (item === 'patrol') {
       handlePatrolToggle();
     } else if (item === 'sleep') {
@@ -188,24 +235,41 @@ function App() {
     } else if (item === 'profile') {
       setDialogs(d => ({ ...d, profile: true }));
     } else {
-      handleMenuAction(item); 
+      handleMenuAction(item);
     }
-    setShowMenu(false); 
+    setShowMenu(false);
   }, [handlePatrolToggle, handleMenuAction, frogState, showInteractionBubble]);
 
+  // Handle quick menu select
   const handleQuickMenuSelect = useCallback((action: string) => {
     switch (action) {
-      case 'pet': frogState.interact('pet'); showInteractionBubble('好舒服呀～'); break;
-      case 'feed': frogState.interact('feed'); showInteractionBubble('好吃！'); break;
-      case 'patrol': handlePatrolToggle(); break;
-      case 'travel': setDialogs(d => ({ ...d, travel: true })); break;
-      case 'sleep': frogState.setCurrentState('sleeping'); showInteractionBubble('晚安～'); break;
+      case 'pet':
+        frogState.interact('pet');
+        showInteractionBubble('好舒服呀～');
+        break;
+      case 'feed':
+        frogState.interact('feed');
+        showInteractionBubble('好吃！');
+        break;
+      case 'patrol':
+        handlePatrolToggle();
+        break;
+      case 'travel':
+        setDialogs(d => ({ ...d, travel: true }));
+        break;
+      case 'sleep':
+        frogState.setCurrentState('sleeping');
+        showInteractionBubble('晚安～');
+        break;
     }
   }, [frogState, handlePatrolToggle, showInteractionBubble]);
 
+  // Close dialog helper
   const closeDialog = (name: string) => setDialogs(d => ({ ...d, [name]: false }));
-  const handleTravelStart = (chain: string, duration: number) => { 
-    frogState.setCurrentState('traveling'); 
+
+  // Handle travel start
+  const handleTravelStart = (chain: string, duration: number) => {
+    frogState.setCurrentState('traveling');
     showInteractionBubble('出发去旅行！');
     travel.startTravel(travel.destinations.find(d => d.chain === chain) || travel.destinations[0]);
     dailyTasks.completeTask('4');
@@ -214,23 +278,31 @@ function App() {
 
   return (
     <div style={{ width: '100%', height: '100%', background: 'transparent', position: 'relative' }}>
+      {/* Weather Effect */}
       <WeatherEffect weather={timeSystem.weather} />
-      
+
+      {/* Status Bar */}
       <StatusBar hunger={petStats.stats.hunger} energy={petStats.stats.energy} happiness={petStats.stats.happiness} />
-      
+
+      {/* Frog */}
       <Frog state={frogState.currentState} mood={frogState.mood} stats={petStats.stats} onClick={handleFrogClick} onDragStart={() => {}} onDragEnd={handleDragEnd} />
-      
+
+      {/* Interaction Bubble */}
       <InteractionBubble message={bubbleMessage} visible={showBubble} onHide={() => setShowBubble(false)} />
-      
+
+      {/* Quick Menu */}
       <QuickMenu visible={quickMenu.visible} x={quickMenu.x} y={quickMenu.y} onSelect={handleQuickMenuSelect} onClose={() => setQuickMenu({ ...quickMenu, visible: false })} />
-      
+
+      {/* Halo Menu */}
       <HaloMenu visible={showMenu} onSelect={handleMenuSelect} onClose={() => setShowMenu(false)} />
-      
+
+      {/* Menu Button */}
       <motion.div style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 10, opacity: 0.5, color: 'white', cursor: 'pointer', textAlign: 'center' }} whileHover={{ scale: 1.1 }} onClick={() => setShowMenu(!showMenu)}>
         <div>🐸</div>
         <div>{showMenu ? '关闭' : '菜单'}</div>
       </motion.div>
 
+      {/* Status Indicator */}
       <motion.div style={{ position: 'absolute', bottom: 8, left: 8, fontSize: 9, color: 'rgba(255,255,255,0.5)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} key={frogState.currentState}>
         {frogState.currentState === 'idle' && '🐸 Lv.' + petStats.stats.level}
         {frogState.currentState === 'sleeping' && '😴'}
@@ -251,6 +323,7 @@ function App() {
         {frogState.currentState === 'patrolling' && '🎯'}
       </motion.div>
 
+      {/* Dialogs */}
       <TasksDialog walletAddress={walletAddress} visible={dialogs.tasks} onClose={() => closeDialog('tasks')} tasks={dailyTasks.tasks} />
       <FriendsDialog walletAddress={walletAddress} visible={dialogs.friends} onClose={() => closeDialog('friends')} friends={social.friends} />
       <BadgesDialog tokenId={tokenId} visible={dialogs.badges} onClose={() => closeDialog('badges')} achievements={achievements.achievements} />
@@ -260,6 +333,7 @@ function App() {
       <HomeDialog tokenId={tokenId} visible={dialogs.home} onClose={() => closeDialog('home')} />
       <BagDialog visible={dialogs.bag} onClose={() => closeDialog('bag')} inventory={inventory} />
       <ProfileDialog visible={dialogs.profile} onClose={() => closeDialog('profile')} petData={petStats.stats} />
+      <QuietModePanel visible={dialogs.quietMode} onClose={() => closeDialog('quietMode')} />
     </div>
   );
 }
