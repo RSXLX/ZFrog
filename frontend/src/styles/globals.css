@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import design system */
+@import './design-system.css';
+
 /* 青蛙点击动画 */
 @keyframes bounce {
   0%, 100% { transform: translateY(0); }
