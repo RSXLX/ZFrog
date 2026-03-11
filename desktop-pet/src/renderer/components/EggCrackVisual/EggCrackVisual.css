@@ -1,0 +1,96 @@
+/**
+ * EggCrackVisual - 蛋壳裂纹可视化样式
+ */
+
+.egg-crack-visual {
+  position: relative;
+  display: inline-block;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.egg-crack-visual .egg-svg {
+  display: block;
+  overflow: visible;
+}
+
+/* 裂纹动画 */
+.crack-pattern path {
+  vector-effect: non-scaling-stroke;
+  paint-order: stroke fill;
+}
+
+/* 裂纹发光效果 */
+.crack-glow {
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+/* 孵化进度条 */
+.egg-crack-visual .progress-bar {
+  transition: width 0.3s ease-out;
+}
+
+/* 不同孵化阶段的样式 */
+.egg-crack-visual[data-stage="intact"] .crack-pattern {
+  opacity: 0;
+}
+
+.egg-crack-visual[data-stage="hairline"] .crack-pattern {
+  opacity: 0.3;
+}
+
+.egg-crack-visual[data-stage="cracked"] .crack-pattern {
+  opacity: 0.6;
+}
+
+.egg-crack-visual[data-stage="breaking"] .crack-pattern {
+  opacity: 0.9;
+}
+
+.egg-crack-visual[data-stage="hatching"] .crack-pattern {
+  opacity: 1;
+  filter: drop-shadow(0 0 8px rgba(255, 200, 100, 0.5));
+}
+
+/* 悬停效果 */
+.egg-crack-visual:hover .egg-svg {
+  filter: brightness(1.05);
+}
+
+/* 点击反馈 */
+.egg-crack-visual:active .egg-svg {
+  transform: scale(0.98);
+  transition: transform 0.1s;
+}
+
+/* 裂纹抖动动画 */
+@keyframes crack-shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-1px, 0); }
+  75% { transform: translate(1px, 0); }
+}
+
+.egg-crack-visual[data-shaking="true"] .crack-pattern {
+  animation: crack-shake 0.2s ease-in-out;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .egg-crack-visual {
+    transform: scale(0.85);
+  }
+}
+
+@media (max-width: 480px) {
+  .egg-crack-visual {
+    transform: scale(0.7);
+  }
+}
+
+/* 暗色模式适配 */
+@media (prefers-color-scheme: dark) {
+  .egg-crack-visual .egg-svg {
+    filter: brightness(0.95);
+  }
+}
