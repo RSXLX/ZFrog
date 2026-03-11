@@ -1,0 +1,224 @@
+/**
+ * PetEgg Component Styles
+ * 宠物蛋组件样式 - 基于ZFrog桌面宠物框架
+ */
+
+.pet-egg-container {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+/* 空状态 */
+.pet-egg-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: white;
+}
+
+.egg-placeholder {
+  font-size: 5rem;
+  margin-bottom: 20px;
+}
+
+/* 宠物展示区 */
+.pet-display {
+  text-align: center;
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.pet-emoji {
+  font-size: 5rem;
+  display: inline-block;
+  position: relative;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+.sleep-indicator {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  font-size: 2rem;
+  animation: float 2s ease-in-out infinite;
+}
+
+.sick-indicator {
+  position: absolute;
+  bottom: -10px;
+  left: -10px;
+  font-size: 2rem;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.pet-info {
+  margin-top: 15px;
+}
+
+.pet-name {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: white;
+  margin-bottom: 10px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.pet-badges {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.stage-badge {
+  padding: 5px 12px;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: white;
+  text-transform: uppercase;
+}
+
+.mood-badge {
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* 属性面板 */
+.attributes-panel {
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.attributes-panel h3 {
+  color: white;
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.attribute-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.attr-icon {
+  font-size: 1.2rem;
+  width: 24px;
+  text-align: center;
+}
+
+.attr-label {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.85rem;
+  width: 50px;
+}
+
+.attr-progress {
+  flex: 1;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.attr-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.5s ease, background-color 0.3s;
+}
+
+.attr-value {
+  color: white;
+  font-size: 0.85rem;
+  font-weight: bold;
+  width: 35px;
+  text-align: right;
+}
+
+.poop-warning {
+  background: rgba(255, 152, 0, 0.2);
+  border: 1px solid rgba(255, 152, 0, 0.5);
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 10px;
+  text-align: center;
+  color: #ff9800;
+  font-size: 0.9rem;
+}
+
+/* 操作按钮 */
+.action-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 20px 0 10px;
+}
+
+.action-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 12px 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.action-btn:disabled:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-icon {
+  font-size: 1.5rem;
+}
+
+.btn-label {
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* 响应式 */
+@media (max-width: 400px) {
+  .pet-egg-container {
+    padding: 15px;
+  }
+  
+  .pet-emoji {
+    font-size: 4rem;
+  }
+  
+  .action-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

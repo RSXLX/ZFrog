@@ -1,0 +1,112 @@
+{
+  "taskName": "pet-egg-evolution",
+  "displayName": "宠物蛋进化功能开发",
+  "scheme": "B+C",
+  "description": "基于ZFrog框架的宠物蛋进化系统，实现蛋→蝌蚪→幼蛙→成蛙的完整进化链，并支持繁殖机制",
+  "status": "in_progress",
+  "progress": {
+    "phase": "Phase 1",
+    "percentage": 60,
+    "currentTask": "核心架构搭建",
+    "completedTasks": [
+      "usePetEgg hook 基础架构",
+      "PetEgg UI组件",
+      "进化阶段定义",
+      "属性系统设计"
+    ],
+    "pendingTasks": [
+      "EvolutionContext 完整实现",
+      "与青蛙系统深度整合",
+      "繁殖机制开发",
+      "链上NFT集成",
+      "完整测试覆盖"
+    ]
+  },
+  "schedule": {
+    "startDate": "2026-03-11",
+    "estimatedEndDate": "2026-03-25",
+    "dailyCheckTime": "09:00",
+    "checkTimezone": "Asia/Shanghai",
+    "weekendWork": false
+  },
+  "heartbeat": {
+    "enabled": true,
+    "interval": "1d",
+    "autoContinue": true,
+    "maxRetries": 3,
+    "notifyOnComplete": true
+  },
+  "checklist": {
+    "P0": {
+      "description": "关键安全与稳定性",
+      "items": [
+        { "id": "p0-1", "text": "智能合约安全审计", "status": "pending", "priority": "high" },
+        { "id": "p0-2", "text": "本地存储加密", "status": "pending", "priority": "high" },
+        { "id": "p0-3", "text": "输入验证加强", "status": "pending", "priority": "medium" }
+      ]
+    },
+    "P1": {
+      "description": "性能与优化",
+      "items": [
+        { "id": "p1-1", "text": "性能监控集成", "status": "pending", "priority": "high" },
+        { "id": "p1-2", "text": "错误边界处理", "status": "pending", "priority": "medium" },
+        { "id": "p1-3", "text": "加载优化", "status": "pending", "priority": "medium" }
+      ]
+    },
+    "P2": {
+      "description": "功能与体验",
+      "items": [
+        { "id": "p2-1", "text": "EvolutionContext 完整实现", "status": "in_progress", "priority": "high" },
+        { "id": "p2-2", "text": "与青蛙系统整合", "status": "in_progress", "priority": "high" },
+        { "id": "p2-3", "text": "用户测试反馈", "status": "pending", "priority": "medium" }
+      ]
+    },
+    "P3": {
+      "description": "生态与扩展",
+      "items": [
+        { "id": "p3-1", "text": "繁殖机制开发", "status": "pending", "priority": "medium" },
+        { "id": "p3-2", "text": "链上NFT集成", "status": "pending", "priority": "medium" },
+        { "id": "p3-3", "text": "社区功能开发", "status": "pending", "priority": "low" }
+      ]
+    }
+  },
+  "resources": {
+    "documentation": [
+      "/PET_EGG_INTEGRATION_GUIDE.md",
+      "/EVOLUTION_TASKS.md",
+      "/src/renderer/hooks/usePetEgg.ts",
+      "/src/renderer/components/PetEgg/PetEgg.tsx"
+    ],
+    "relatedSystems": [
+      "useFrogState - 青蛙状态管理",
+      "useLifeCycle - 生命周期管理",
+      "useChainMonitor - 链上监控",
+      "EvolutionContext - 进化上下文"
+    ],
+    "team": {
+      "lead": "AI Assistant (Claude)",
+      "reviewer": "System Monitor",
+      "status": "Active Development"
+    }
+  },
+  "notes": {
+    "important": [
+      "必须使用正确的项目路径: /Users/sxlx/.gemini/antigravity/ZFrog/desktop-pet/",
+      "必须与青蛙进化系统深度整合",
+      "必须遵循B+C方案 (进化+繁殖)",
+      "必须完成所有P0和P1任务才能发布"
+    ],
+    "risks": [
+      "本地存储可能超过限额",
+      "与青蛙系统的状态同步可能复杂",
+      "链上NFT集成可能需要额外时间",
+      "用户可能不理解进化机制"
+    ],
+    "mitigations": [
+      "实现存储清理机制",
+      "使用EventEmitter进行状态同步",
+      "准备离线模式作为备选",
+      "添加详细的教程和提示"
+    ]
+  }
+}

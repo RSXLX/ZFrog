@@ -324,8 +324,5 @@ export type {
   BehaviorConfig,
 };
 
-// 导出枚举
-export { QuietModeType };
-
 // 默认导出
 export default quietModeManager;
