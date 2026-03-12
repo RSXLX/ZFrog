@@ -1,0 +1,324 @@
+/**
+ * TadpoleView Styles
+ * Phase 2: 蝌蚪视图样式
+ */
+
+/* ==================== 主容器 ==================== */
+
+.tadpole-view {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  gap: 20px;
+}
+
+.tadpole-view-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 16px;
+  color: #999;
+}
+
+/* ==================== 蝌蚪展示区 ==================== */
+
+.tadpole-display {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  border-radius: 20px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ==================== 控制面板 ==================== */
+
+.tadpole-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+/* ==================== 健康状态 ==================== */
+
+.health-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 15px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.health-status.healthy {
+  background: linear-gradient(135deg, #c8e6c9, #a5d6a7);
+  color: #2e7d32;
+}
+
+.health-status.stressed {
+  background: linear-gradient(135deg, #fff9c4, #fff59d);
+  color: #f57f17;
+}
+
+.health-status.critical {
+  background: linear-gradient(135deg, #ffcdd2, #ef9a9a);
+  color: #c62828;
+}
+
+.status-icon {
+  font-size: 18px;
+}
+
+.status-text {
+  flex: 1;
+}
+
+/* ==================== 成长速率 ==================== */
+
+.growth-rate {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background: rgba(33, 150, 243, 0.1);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.growth-rate .rate-label {
+  color: #666;
+}
+
+.growth-rate .rate-value {
+  font-weight: 700;
+  color: #1976d2;
+  font-size: 16px;
+}
+
+/* ==================== 喂食按钮 ==================== */
+
+.feed-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.feed-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 15px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 13px;
+  background: #f5f5f5;
+}
+
+.feed-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.feed-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.feed-btn.algae {
+  background: linear-gradient(135deg, #c8e6c9, #a5d6a7);
+}
+
+.feed-btn.plankton {
+  background: linear-gradient(135deg, #bbdefb, #90caf9);
+}
+
+.feed-btn .btn-icon {
+  font-size: 24px;
+}
+
+.feed-btn .btn-label {
+  font-weight: 600;
+  color: #333;
+}
+
+.feed-btn .btn-effect {
+  font-size: 11px;
+  color: #666;
+}
+
+/* ==================== 互动按钮 ==================== */
+
+.interaction-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.interact-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+}
+
+.interact-btn:hover:not(:disabled) {
+  border-color: #2196f3;
+  background: #e3f2fd;
+}
+
+.interact-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.interact-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.interact-btn .btn-icon {
+  font-size: 20px;
+}
+
+.interact-btn .btn-label {
+  font-weight: 500;
+}
+
+/* ==================== 环境控制开关 ==================== */
+
+.env-control-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: #f5f5f5;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.env-control-toggle:hover {
+  background: #eeeeee;
+}
+
+/* ==================== 环境控制面板 ==================== */
+
+.env-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 15px;
+  background: rgba(33, 150, 243, 0.05);
+  border-radius: 15px;
+  border: 1px solid rgba(33, 150, 243, 0.2);
+}
+
+.env-control-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.env-control-group label {
+  flex: 0 0 60px;
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.env-control-group input[type="range"] {
+  flex: 1;
+  height: 6px;
+  cursor: pointer;
+}
+
+.env-control-group span {
+  flex: 0 0 50px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* ==================== 进化按钮 ==================== */
+
+.evolve-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #4caf50, #8bc34a);
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+  transition: all 0.3s ease;
+}
+
+.evolve-btn:hover {
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
+}
+
+.evolve-btn .btn-icon {
+  font-size: 32px;
+}
+
+.evolve-btn .btn-label {
+  font-size: 16px;
+}
+
+.evolve-btn .btn-hint {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+/* ==================== 响应式适配 ==================== */
+
+@media (max-width: 600px) {
+  .tadpole-controls {
+    padding: 15px;
+  }
+  
+  .feed-buttons {
+    gap: 8px;
+  }
+  
+  .feed-btn-btn {
+    padding: 12px;
+  }
+  
+  .interaction-buttons {
+    gap: 8px;
+  }
+  
+  .interact-btn {
+    padding: 10px;
+  }
+}
