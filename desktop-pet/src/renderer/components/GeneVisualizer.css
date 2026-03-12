@@ -1,0 +1,128 @@
+/* GeneVisualizer.css - 基因可视化组件样式 */
+
+.gene-visualizer {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 16px;
+  padding: 20px;
+  color: #fff;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.gene-visualizer h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  text-align: center;
+  background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gene-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.gene-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.gene-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.gene-label {
+  display: block;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gene-value {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.color-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.special-traits {
+  background: rgba(255, 215, 0, 0.1);
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 215, 0, 0.2);
+}
+
+.special-traits h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: #ffd700;
+  text-align: center;
+}
+
+.traits-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.trait-badge {
+  background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+  color: #1a1a2e;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+}
+
+/* 动画效果 */
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(79, 172, 254, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(79, 172, 254, 0.6);
+  }
+}
+
+.gene-visualizer {
+  animation: glow 3s ease-in-out infinite;
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+  .gene-visualizer {
+    padding: 16px;
+    margin: 0 10px;
+  }
+  
+  .gene-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .gene-visualizer h3 {
+    font-size: 16px;
+  }
+}
