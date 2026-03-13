@@ -1,0 +1,66 @@
+.environment-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1; /* Place above background but below pet */
+  overflow: hidden;
+}
+
+/* 基础背景色，可与外部图层结合使用 */
+.env-pond { background: rgba(0, 150, 255, 0.1); }
+.env-forest { background: rgba(34, 139, 34, 0.1); }
+.env-desert { background: rgba(237, 201, 175, 0.15); }
+.env-snow { background: rgba(255, 255, 255, 0.2); }
+.env-indoor { background: rgba(200, 200, 200, 0.05); }
+
+.day-night-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transition: background-color 2s ease;
+  pointer-events: none;
+}
+
+/* 简单的 CSS 动画粒子占位（实际可以扩展为复杂的 Canvas/CSS 动画） */
+.effect-bubbles,
+.effect-leaves,
+.effect-snowflakes,
+.effect-sand {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.effect-bubbles::after {
+  content: '°o O ° o O';
+  position: absolute;
+  bottom: 10%;
+  left: 50%;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 20px;
+  animation: floatUp 4s infinite linear;
+}
+
+.effect-snowflakes::after {
+  content: '❄ ❄ ❄';
+  position: absolute;
+  top: -10%;
+  left: 40%;
+  color: white;
+  animation: fallDown 5s infinite linear;
+}
+
+@keyframes floatUp {
+  0% { transform: translateY(0) scale(1); opacity: 0.8; }
+  100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
+}
+
+@keyframes fallDown {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0.8; }
+  100% { transform: translateY(200px) rotate(360deg); opacity: 0; }
+}

@@ -1,0 +1,245 @@
+.collection-book-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.collection-book-container {
+  background-color: #f4f1ea;
+  border-radius: 12px;
+  width: 90%;
+  height: 85%;
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  border: 4px solid #8b5a2b;
+  overflow: hidden;
+}
+
+.collection-header {
+  background-color: #8b5a2b;
+  color: #fff;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.collection-header h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.close-btn:hover {
+  transform: scale(1.2);
+}
+
+.collection-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.collection-sidebar {
+  width: 250px;
+  background-color: #e6dfd1;
+  border-right: 2px solid #ccc;
+  display: flex;
+  flex-direction: column;
+}
+
+.stats-panel {
+  padding: 20px;
+  border-bottom: 2px solid #ccc;
+}
+
+.stats-panel h3 {
+  margin-top: 0;
+  color: #5c3a21;
+}
+
+.achievements-panel {
+  padding: 20px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.achievements-panel h4 {
+  color: #5c3a21;
+  margin-top: 0;
+}
+
+.achievement-badge {
+  background-color: #ffd700;
+  color: #5c3a21;
+  padding: 5px 10px;
+  border-radius: 15px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: bold;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.species-grid {
+  flex: 1;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 15px;
+  overflow-y: auto;
+  align-content: start;
+}
+
+.species-card {
+  background-color: #fff;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.species-card:hover {
+  border-color: #8b5a2b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.species-card.locked {
+  background-color: #eee;
+  filter: grayscale(100%);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.species-card.locked:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: #ddd;
+}
+
+.species-image-placeholder {
+  width: 80px;
+  height: 80px;
+  background-color: #f0f0f0;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+
+.species-card img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  margin-bottom: 10px;
+}
+
+.species-name {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 5px;
+  color: #333;
+}
+
+.rarity-tag {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.rarity-starter { background-color: #ccc; color: #333; }
+.rarity-common { background-color: #a8e6cf; color: #2e8b57; }
+.rarity-uncommon { background-color: #87ceeb; color: #fff; }
+.rarity-rare { background-color: #6495ed; color: #fff; }
+.rarity-epic { background-color: #da70d6; color: #fff; }
+.rarity-legendary { background-color: #ffd700; color: #d2691e; }
+
+/* Detail Modal */
+.species-detail-modal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 110;
+}
+
+.detail-content {
+  background-color: #fff;
+  border-radius: 12px;
+  padding: 30px;
+  width: 80%;
+  max-width: 500px;
+  position: relative;
+  text-align: center;
+}
+
+.detail-content h3 {
+  margin-top: 0;
+  color: #5c3a21;
+  font-size: 28px;
+}
+
+.detail-image-large {
+  width: 150px;
+  height: 150px;
+  margin: 0 auto 20px;
+  background-color: #f0f0f0;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 64px;
+}
+
+.detail-desc {
+  margin-bottom: 20px;
+  line-height: 1.5;
+  color: #555;
+}
+
+.traits-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.trait-tag {
+  background-color: #eee;
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 14px;
+  color: #333;
+}

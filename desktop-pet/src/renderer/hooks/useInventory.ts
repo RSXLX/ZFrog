@@ -20,6 +20,9 @@ const defaultItems: InventoryItem[] = [
   { id: 'toy_ball', name: '皮球', type: 'toy', icon: '⚽', quantity: 1, description: '增加10点快乐度', effect: { happiness: 10 } },
   { id: 'medicine', name: '药水', type: 'medicine', icon: '🧪', quantity: 2, description: '恢复30点生命值', effect: { energy: 30 } },
   { id: 'flower', name: '花朵', type: 'decoration', icon: '🌸', quantity: 3, description: '装饰物品' },
+  { id: 'mushroom', name: '蘑菇', type: 'decoration', icon: '🍄', quantity: 2, description: '林间小蘑菇' },
+  { id: 'stone', name: '石头', type: 'decoration', icon: '🪨', quantity: 5, description: '普通的石头' },
+  { id: 'plant', name: '盆栽', type: 'decoration', icon: '🪴', quantity: 1, description: '绿色植物' },
   { id: 'gift_box', name: '礼盒', type: 'gift', icon: '🎁', quantity: 2, description: '可送给好友' },
 ];
 
