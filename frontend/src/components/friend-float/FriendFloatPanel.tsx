@@ -20,8 +20,8 @@ import { useMyFrog } from '../../hooks/useMyFrog';
 import '../../styles/friend-float.css';
 
 // 动画配置
-const springConfig = { type: 'spring', stiffness: 400, damping: 30 };
-const panelVariants = {
+const springConfig: Record<string, any> = { type: 'spring', stiffness: 400, damping: 30 };
+const panelVariants: Record<string, any> = {
   collapsed: {
     opacity: 0,
     scale: 0.8,
@@ -34,12 +34,12 @@ const panelVariants = {
   },
 };
 
-const maximizedOverlayVariants = {
+const maximizedOverlayVariants: Record<string, any> = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { duration: 0.2 } },
 };
 
-const maximizedPanelVariants = {
+const maximizedPanelVariants: Record<string, any> = {
   hidden: { scale: 0.9, opacity: 0 },
   visible: { 
     scale: 1, 

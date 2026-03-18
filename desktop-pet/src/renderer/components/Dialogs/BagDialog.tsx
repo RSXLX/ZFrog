@@ -1,36 +1,35 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-interface BagItem {
-  id: string;
-  name: string;
-  icon: string;
-  count: number;
-  type: 'food' | 'deco' | 'souvenir';
-}
+import type { InventoryItem } from '../../hooks/useInventory';
 
 interface BagDialogProps {
   visible: boolean;
   onClose: () => void;
+  inventory: {
+    items: InventoryItem[];
+  };
+  onUseItem?: (itemId: string) => void;
 }
 
-const INITIAL_ITEMS: BagItem[] = [
-  { id: '1', name: '昆虫大餐', icon: '🦗', count: 5, type: 'food' },
-  { id: '2', name: '水果拼盘', icon: '🍓', count: 3, type: 'food' },
-  { id: '3', name: '幸运草', icon: '🍀', count: 2, type: 'deco' },
-  { id: '4', name: '雅典纪念品', icon: '🏛️', count: 1, type: 'souvenir' },
-  { id: '5', name: '青蛙公仔', icon: '🐸', count: 1, type: 'souvenir' },
-];
+const sectionConfig: Record<InventoryItem['type'], { title: string; accent: string; actionLabel?: string }> = {
+  food: { title: '🍔 食物', accent: '#22c55e', actionLabel: '喂给青蛙' },
+  toy: { title: '🧸 玩具', accent: '#0ea5e9', actionLabel: '拿去玩' },
+  medicine: { title: '🧪 恢复', accent: '#ef4444', actionLabel: '立即使用' },
+  decoration: { title: '🎨 装饰', accent: '#f59e0b' },
+  gift: { title: '🎁 礼物', accent: '#8b5cf6' },
+};
 
-const BagDialog: React.FC<BagDialogProps> = ({ visible, onClose }) => {
-  const [items] = useState<BagItem[]>(INITIAL_ITEMS);
-  const [selectedItem, setSelectedItem] = useState<BagItem | null>(null);
+const BagDialog: React.FC<BagDialogProps> = ({ visible, onClose, inventory, onUseItem }) => {
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   if (!visible) return null;
 
-  const foodItems = items.filter(i => i.type === 'food');
-  const decoItems = items.filter(i => i.type === 'deco');
-  const souvenirItems = items.filter(i => i.type === 'souvenir');
+  const availableItems = inventory.items.filter(item => item.quantity > 0);
+  const groupedItems = Object.keys(sectionConfig).map(type => ({
+    type: type as InventoryItem['type'],
+    items: availableItems.filter(item => item.type === type),
+  }));
+  const selectedItem = availableItems.find(item => item.id === selectedItemId) || availableItems[0] || null;
 
   return (
     <AnimatePresence>
@@ -60,71 +59,98 @@ const BagDialog: React.FC<BagDialogProps> = ({ visible, onClose }) => {
             <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer' }}>✕</button>
           </div>
 
-          {foodItems.length > 0 && (
+          {availableItems.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#64748b', padding: '32px 12px' }}>
+              背包还是空的，去旅行或完成长期目标拿点新东西回来吧。
+            </div>
+          ) : (
             <>
-              <h3 style={{ fontSize: 14, color: '#666', marginBottom: 10 }}>🍔 食物</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
-                {foodItems.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setSelectedItem(item)}
-                    style={{
-                      textAlign: 'center', padding: 10, background: '#f8f9fa',
-                      borderRadius: 8, cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ fontSize: 24 }}>{item.icon}</div>
-                    <div style={{ fontSize: 10 }}>{item.name}</div>
-                    <div style={{ fontSize: 12, color: '#22c55e', fontWeight: 'bold' }}>x{item.count}</div>
-                  </motion.div>
-                ))}
-              </div>
-            </>
-          )}
+              {groupedItems.map(section => {
+                if (section.items.length === 0) return null;
 
-          {decoItems.length > 0 && (
-            <>
-              <h3 style={{ fontSize: 14, color: '#666', marginBottom: 10 }}>🎨 装饰</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
-                {decoItems.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    whileHover={{ scale: 1.05 }}
-                    style={{
-                      textAlign: 'center', padding: 10, background: '#f8f9fa',
-                      borderRadius: 8,
-                    }}
-                  >
-                    <div style={{ fontSize: 24 }}>{item.icon}</div>
-                    <div style={{ fontSize: 10 }}>{item.name}</div>
-                    <div style={{ fontSize: 12, color: '#22c55e', fontWeight: 'bold' }}>x{item.count}</div>
-                  </motion.div>
-                ))}
-              </div>
-            </>
-          )}
+                return (
+                  <div key={section.type} style={{ marginBottom: 16 }}>
+                    <h3 style={{ fontSize: 14, color: '#475569', marginBottom: 10 }}>
+                      {sectionConfig[section.type].title}
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                      {section.items.map((item) => (
+                        <motion.button
+                          key={item.id}
+                          type="button"
+                          whileHover={{ scale: 1.04 }}
+                          whileTap={{ scale: 0.96 }}
+                          onClick={() => setSelectedItemId(item.id)}
+                          style={{
+                            textAlign: 'center',
+                            padding: 10,
+                            background: selectedItem?.id === item.id ? `${sectionConfig[item.type].accent}16` : '#f8fafc',
+                            borderRadius: 10,
+                            cursor: 'pointer',
+                            border: `1px solid ${selectedItem?.id === item.id ? sectionConfig[item.type].accent : '#e2e8f0'}`,
+                          }}
+                        >
+                          <div style={{ fontSize: 24 }}>{item.icon}</div>
+                          <div style={{ fontSize: 10, color: '#0f172a', marginTop: 4 }}>{item.name}</div>
+                          <div style={{ fontSize: 12, color: sectionConfig[item.type].accent, fontWeight: 700 }}>x{item.quantity}</div>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
 
-          {souvenirItems.length > 0 && (
-            <>
-              <h3 style={{ fontSize: 14, color: '#666', marginBottom: 10 }}>🎁 纪念品</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                {souvenirItems.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    whileHover={{ scale: 1.05 }}
-                    style={{
-                      textAlign: 'center', padding: 10, background: '#fff3e0',
-                      borderRadius: 8, border: '1px solid #ffb74d',
-                    }}
-                  >
-                    <div style={{ fontSize: 24 }}>{item.icon}</div>
-                    <div style={{ fontSize: 10 }}>{item.name}</div>
-                    <div style={{ fontSize: 12, color: '#22c55e', fontWeight: 'bold' }}>x{item.count}</div>
-                  </motion.div>
-                ))}
-              </div>
+              {selectedItem ? (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: 14,
+                    background: '#f8fafc',
+                    borderRadius: 12,
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <span style={{ fontSize: 24 }}>{selectedItem.icon}</span>
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{selectedItem.name}</div>
+                      <div style={{ fontSize: 12, color: '#64748b' }}>{selectedItem.description}</div>
+                    </div>
+                  </div>
+
+                  {selectedItem.effect ? (
+                    <div style={{ fontSize: 12, color: '#475569', marginBottom: 10 }}>
+                      效果：
+                      {selectedItem.effect.hunger ? ` 饱食 +${selectedItem.effect.hunger}` : ''}
+                      {selectedItem.effect.happiness ? ` 快乐 +${selectedItem.effect.happiness}` : ''}
+                      {selectedItem.effect.energy ? ` 精力 +${selectedItem.effect.energy}` : ''}
+                    </div>
+                  ) : null}
+
+                  {sectionConfig[selectedItem.type].actionLabel ? (
+                    <button
+                      type="button"
+                      onClick={() => onUseItem?.(selectedItem.id)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: 10,
+                        border: 'none',
+                        background: `linear-gradient(135deg, ${sectionConfig[selectedItem.type].accent}, ${sectionConfig[selectedItem.type].accent}cc)`,
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {sectionConfig[selectedItem.type].actionLabel}
+                    </button>
+                  ) : (
+                    <div style={{ fontSize: 12, color: '#64748b' }}>
+                      这类道具更适合放进家园或送给好友，目前还不能直接使用。
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </>
           )}
         </motion.div>

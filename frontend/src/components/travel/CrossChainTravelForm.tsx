@@ -9,6 +9,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount, useReadContract, usePublicClient } from 'wagmi';
 import { motion } from 'framer-motion';
 import { OMNI_TRAVEL_ADDRESS, OMNI_TRAVEL_ABI, ZETAFROG_ABI } from '../../config/contracts';
@@ -39,6 +40,7 @@ const ALL_DURATION_OPTIONS = [
 ];
 
 export function CrossChainTravelForm({ frogId, tokenId, frogName, onSuccess }: CrossChainTravelFormProps) {
+  const navigate = useNavigate();
   const { address } = useAccount();
   const [supportedChains, setSupportedChains] = useState<any[]>([]);
   const [targetChainId, setTargetChainId] = useState<number>(97); // Default to BSC Testnet
@@ -295,7 +297,7 @@ export function CrossChainTravelForm({ frogId, tokenId, frogName, onSuccess }: C
              await notifyCrossChainTravelStarted(newTravelId, messageId, hash);
              
              // 【改进】直接跳转到旅行详情页，简化状态管理
-             window.location.href = `/travel/${newTravelId}`;
+             navigate(`/travel/${newTravelId}`);
          } catch(e) {
              console.error("Failed to create travel record post-transaction:", e);
              clearPendingTravel();
@@ -304,7 +306,7 @@ export function CrossChainTravelForm({ frogId, tokenId, frogName, onSuccess }: C
       };
       createAndNotify();
     }
-  }, [isSuccess, hash, travelId, createCrossChainTravel, notifyCrossChainTravelStarted, frogId, tokenId, targetChainId, duration, address, clearPendingTravel]);
+  }, [isSuccess, hash, travelId, createCrossChainTravel, notifyCrossChainTravelStarted, frogId, tokenId, targetChainId, duration, address, clearPendingTravel, navigate]);
 
   // Handle failed transaction (Revert)
   useEffect(() => {

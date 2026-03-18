@@ -99,6 +99,10 @@ const FriendsDialog: React.FC<FriendsDialogProps> = ({ walletAddress, visible, o
                 ))
               )}
             </div>
+
+            <div style={{ marginTop: 14, fontSize: 11, color: '#94a3b8' }}>
+              社交钱包：{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+            </div>
           </motion.div>
         </motion.div>
       )}

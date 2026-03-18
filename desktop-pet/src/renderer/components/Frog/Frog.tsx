@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 type FrogState = 'idle' | 'sleeping' | 'eating' | 'happy' | 'excited' | 'scared' | 'dancing' | 'crying' | 'traveling' | 'thinking' | 'angry' | 'greeting' | 'stretching' | 'yawning' | 'looking' | 'walking' | 'patrolling';
@@ -12,14 +12,6 @@ interface FrogProps {
   onDragStart: () => void;
   onDragEnd: (x: number, y: number) => void;
 }
-
-// Frog hitbox area (relative to the 200x200 SVG)
-const FROG_HITBOX = {
-  x: 30,
-  y: 50,
-  width: 140,
-  height: 140,
-};
 
 // Extended animation variants
 const stateVariants: Record<FrogState, any> = {
@@ -103,15 +95,19 @@ const stateVariants: Record<FrogState, any> = {
   walking: {
     y: [0, -3, 0],
     transition: { duration: 0.4, repeat: Infinity, ease: "linear" }
+  },
+  patrolling: {
+    x: [-2, 2, -2],
+    y: [0, -4, 0],
+    transition: { duration: 0.45, repeat: Infinity, ease: "linear" }
   }
 };
 
-const Frog: React.FC<FrogProps> = ({ state, mood, stats, onClick, onDragStart, onDragEnd }) => {
+const Frog = ({ state, mood, stats, onClick, onDragStart, onDragEnd }: FrogProps) => {
   const [isBlinking, setIsBlinking] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const frogRef = useRef<HTMLDivElement>(null);
   const isClickThroughRef = useRef(true);
   
   // Random blinking
@@ -155,7 +151,7 @@ const Frog: React.FC<FrogProps> = ({ state, mood, stats, onClick, onDragStart, o
   const statEffects = getStatEffects();
 
   // Handle drag
-  const handleDragStart = useCallback((e: any) => {
+  const handleDragStart = useCallback((_event: MouseEvent | TouchEvent | PointerEvent) => {
     setIsDragging(true);
     onDragStart();
     if (window.electronAPI?.setClickThrough) {
@@ -163,7 +159,7 @@ const Frog: React.FC<FrogProps> = ({ state, mood, stats, onClick, onDragStart, o
     }
   }, [onDragStart]);
 
-  const handleDragEnd = useCallback((e: any, info: any) => {
+  const handleDragEnd = useCallback((_event: MouseEvent | TouchEvent | PointerEvent, info: { point: { x: number; y: number } }) => {
     setIsDragging(false);
     // Get window position and calculate new position
     const windowX = info.point.x - 110;
@@ -271,7 +267,7 @@ const Frog: React.FC<FrogProps> = ({ state, mood, stats, onClick, onDragStart, o
             {state === 'eating' && (
               <g>
                 <motion.circle cx="92" cy="112" r="3.5" fill="#f97316" animate={{ cy: [112, 98, 112], opacity: [1, 0.4, 0] }} transition={{ duration: 0.45, repeat: 4 }} />
-                <motion.circle cx="108" cy="114" r="2.5" fill="#f97316" animate={{ cy: [114, 100, 114], opacity: [1, 0.4, 0], delay: 0.08 }} transition={{ duration: 0.45, repeat: 4 }} />
+                <motion.circle cx="108" cy="114" r="2.5" fill="#f97316" animate={{ cy: [114, 100, 114], opacity: [1, 0.4, 0] }} transition={{ duration: 0.45, repeat: 4, delay: 0.08 }} />
               </g>
             )}
           </g>

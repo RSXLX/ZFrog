@@ -16,7 +16,7 @@ const defaultAvatar: PetAvatar = {
   color: '#4ADE80',
 };
 
-const avatars: Record<string, Partial<PetAvatar>> = {
+const avatars: Record<string, Record<string, unknown>> = {
   // Body styles
   body: {
     default: { color: '#4ADE80' },

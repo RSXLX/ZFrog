@@ -42,7 +42,6 @@ export interface JournalMetadata {
 }
 
 class IPFSService {
-    private pinata: PinataClient | null = null;
     private isInitialized = false;
 
     constructor() {
@@ -51,18 +50,8 @@ class IPFSService {
 
     private async initialize(): Promise<void> {
         if (config.PINATA_API_KEY && config.PINATA_SECRET_KEY) {
-            try {
-                // 动态导入 Pinata SDK
-                const PinataSDK = (await import('@pinata/sdk')).default;
-                this.pinata = new PinataSDK({
-                    pinataApiKey: config.PINATA_API_KEY,
-                    pinataSecretApiKey: config.PINATA_SECRET_KEY,
-                }) as PinataClient;
-                this.isInitialized = true;
-                logger.info('IPFS service initialized with Pinata');
-            } catch (error) {
-                logger.warn('Failed to initialize Pinata:', error);
-            }
+            this.isInitialized = true;
+            logger.info('IPFS service initialized with direct API');
         } else {
             logger.warn('IPFS service running in mock mode - no Pinata credentials');
         }
@@ -75,6 +64,25 @@ class IPFSService {
         if (!this.isInitialized && config.PINATA_API_KEY && config.PINATA_SECRET_KEY) {
             await this.initialize();
         }
+    }
+
+    private async pinJSONToPinata(body: any, metadataName: string): Promise<string> {
+        const response = await axios.post(
+            'https://api.pinata.cloud/pinning/pinJSONToIPFS',
+            {
+                pinataContent: body,
+                pinataMetadata: { name: metadataName }
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    pinata_api_key: config.PINATA_API_KEY,
+                    pinata_secret_api_key: config.PINATA_SECRET_KEY,
+                },
+                timeout: 30000,
+            }
+        );
+        return response.data.IpfsHash;
     }
 
     /**
@@ -109,7 +117,7 @@ class IPFSService {
             },
         };
 
-        if (!this.isInitialized || !this.pinata) {
+        if (!this.isInitialized) {
             // Mock mode: return a fake hash
             const mockHash = `mock-${frogId}-${Date.now()}`;
             logger.info(`Mock IPFS upload: ${mockHash}`);
@@ -117,12 +125,7 @@ class IPFSService {
         }
 
         try {
-            const result = await this.pinata.pinJSONToIPFS(metadata, {
-                pinataMetadata: {
-                    name: `zetafrog-journal-${frogId}-${Date.now()}`,
-                },
-            });
-            const ipfsHash = result.IpfsHash;
+            const ipfsHash = await this.pinJSONToPinata(metadata, `zetafrog-journal-${frogId}-${Date.now()}`);
             logger.info(`Journal uploaded: ipfs://${ipfsHash}`);
             return `ipfs://${ipfsHash}`;
         } catch (error) {
@@ -155,18 +158,14 @@ class IPFSService {
             ],
         };
 
-        if (!this.isInitialized || !this.pinata) {
+        if (!this.isInitialized) {
             const mockHash = `souvenir-mock-${souvenirId}`;
             return `ipfs://${mockHash}`;
         }
 
         try {
-            const result = await this.pinata.pinJSONToIPFS(metadata, {
-                pinataMetadata: {
-                    name: `zetafrog-souvenir-${souvenirId}`,
-                },
-            });
-            return `ipfs://${result.IpfsHash}`;
+            const ipfsHash = await this.pinJSONToPinata(metadata, `zetafrog-souvenir-${souvenirId}`);
+            return `ipfs://${ipfsHash}`;
         } catch (error) {
             logger.error('Souvenir metadata upload failed:', error);
             return `ipfs://souvenir-fallback-${souvenirId}`;

@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FrogPet } from '../components/frog/FrogPet';
 import { FrogScene } from '../components/frog/FrogScene';
@@ -60,6 +60,7 @@ interface TravelDetail {
 // @ts-ignore
 export function FrogDetail() {
     const { tokenId: tokenIdParam } = useParams<{ tokenId: string }>();
+    const navigate = useNavigate();
     const tokenId = parseInt(tokenIdParam || '0');
 
     const [frog, setFrog] = useState<Frog | null>(null);
@@ -81,6 +82,7 @@ export function FrogDetail() {
     const [isFetching, setIsFetching] = useState(false); // 防止重复获取数据
     const [activeMode, setActiveMode] = useState<'select' | 'local' | 'crosschain'>('select'); // 旅行模式：select (选择), local (本地探索), crosschain (跨链)
     const activeTravelRetryRef = useRef(0); // 重试计数器，限制最多3次
+    const lastKnownTravelsRef = useRef<TravelDetail[]>([]);
     const [showGroupTravelModal, setShowGroupTravelModal] = useState(false); // 结伴旅行弹窗
     const [mainTab, setMainTab] = useState<'travel' | 'nurture'>('nurture'); // 主 Tab：旅行或养成
     const [showTravelCheck, setShowTravelCheck] = useState(false); // 旅行前置检查
@@ -103,18 +105,23 @@ export function FrogDetail() {
         }
     }, [frog, address]);
 
+    useEffect(() => {
+        lastKnownTravelsRef.current = [];
+    }, [tokenId]);
+
     // 【改进】如果青蛙正在旅行，自动跳转到旅行详情页
     useEffect(() => {
         if (frog?.status === 'Traveling' && activeTravel?.id && activeTravel.id > 0) {
             console.log('[FrogDetail] Frog is traveling, redirecting to travel page:', activeTravel.id);
-            window.location.href = `/travel/${activeTravel.id}`;
+            navigate(`/travel/${activeTravel.id}`);
         }
-    }, [frog?.status, activeTravel?.id]);
+    }, [frog?.status, activeTravel?.id, navigate]);
 
 
     const fetchData = async () => {
         // 防止重复调用
         if (isFetching) return;
+        const previousTravels = lastKnownTravelsRef.current;
         
         try {
             setIsFetching(true);
@@ -126,6 +133,10 @@ export function FrogDetail() {
             setError(null);
             
             const frogData = await apiService.getFrogDetail(tokenId, address);
+            const currentTravels = frogData?.travels || [];
+            if (currentTravels.length > 0) {
+                lastKnownTravelsRef.current = currentTravels;
+            }
 
             // Check for status transition: Traveling -> Idle
             if (prevStatus === 'Traveling' && frogData?.status === 'Idle') {
@@ -135,8 +146,9 @@ export function FrogDetail() {
                     setShowCelebration(true);
                     setTimeout(() => {
                         setShowCelebration(false);
-                        if (travels.length > 0) {
-                            window.location.href = `/travel/${travels[0].id}`;
+                        const travelToOpen = currentTravels[0]?.id || previousTravels[0]?.id;
+                        if (travelToOpen) {
+                            navigate(`/travel/${travelToOpen}`);
                         }
                     }, 3000);
                 }
@@ -159,9 +171,7 @@ export function FrogDetail() {
             if (frogData) setCurrentFrog(frogData);
 
             // 直接从青蛙数据中提取已完成的旅行历史（后端已只返回 Completed）
-            if (frogData?.travels) {
-                setTravels(frogData.travels);
-            }
+            setTravels(currentTravels);
 
             // 获取活跃旅行逻辑
             if (frogData?.status === 'Traveling') {
@@ -280,12 +290,13 @@ export function FrogDetail() {
                         setShowCelebration(false);
                         // 跳转到旅行详情页面
                         if (travelEvent.data.travelId) {
-                            window.location.href = `/travel/${travelEvent.data.travelId}`;
+                            navigate(`/travel/${travelEvent.data.travelId}`);
                         } else {
                             //在这个fallback情况，重新拉取数据看看有没有最新旅行
-                            fetchData().then(() => {
-                                if (travels.length > 0) {
-                                    window.location.href = `/travel/${travels[0].id}`;
+                            void fetchData().then(() => {
+                                const travelToOpen = lastKnownTravelsRef.current[0]?.id;
+                                if (travelToOpen) {
+                                    navigate(`/travel/${travelToOpen}`);
                                 }
                             });
                         }
@@ -293,7 +304,7 @@ export function FrogDetail() {
                     break;
             }
         }
-    }, [travelEvent]);
+    }, [travelEvent, navigate]);
 
     // Ref to track locally initiated travel that might not be synced yet
     const pendingTravelRef = useRef(false);
@@ -536,7 +547,7 @@ export function FrogDetail() {
                                                 <span className="hidden sm:inline">刷新</span>
                                             </button>
                                             <button
-                                                onClick={() => window.location.href = '/garden'}
+                                                onClick={() => navigate('/garden')}
                                                 aria-label="进入家园"
                                                 className="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center justify-center gap-1 text-sm font-medium whitespace-nowrap"
                                             >
@@ -544,7 +555,7 @@ export function FrogDetail() {
                                                 <span className="hidden sm:inline">家园</span>
                                             </button>
                                             <button
-                                                onClick={() => window.location.href = '/badges'}
+                                                onClick={() => navigate('/badges')}
                                                 aria-label="兑换徽章"
                                                 className="px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 flex items-center justify-center gap-1 text-sm font-medium whitespace-nowrap"
                                             >
@@ -552,7 +563,7 @@ export function FrogDetail() {
                                                 <span className="hidden sm:inline">兑换</span>
                                             </button>
                                             <button
-                                                onClick={() => window.location.href = '/souvenirs'}
+                                                onClick={() => navigate('/souvenirs')}
                                                 aria-label="查看纪念品"
                                                 className="px-3 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 flex items-center justify-center gap-1 text-sm font-medium whitespace-nowrap"
                                             >
@@ -560,7 +571,7 @@ export function FrogDetail() {
                                                 <span className="hidden sm:inline">纪念品</span>
                                             </button>
                                             <button
-                                                onClick={() => window.location.href = '/friends'}
+                                                onClick={() => navigate('/friends')}
                                                 aria-label="好友系统"
                                                 className="px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm font-medium whitespace-nowrap col-span-2 sm:col-span-1"
                                             >
@@ -604,6 +615,7 @@ export function FrogDetail() {
                         <div className="mb-6">
                             <NurturePanel 
                                 frogId={frog.id} 
+                                frogTokenId={frog.tokenId}
                                 ownerAddress={frog.ownerAddress} 
                             />
                         </div>
@@ -779,7 +791,7 @@ export function FrogDetail() {
                                                 <>
                                                     <p className="text-xs text-gray-400 text-center">你可以让你的青蛙和 {frog.name} 交朋友</p>
                                                     <button 
-                                                        onClick={() => window.location.href = '/friends'}
+                                                        onClick={() => navigate('/friends')}
                                                         className="w-full py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
                                                     >
                                                         🤝 发起好友请求
@@ -836,7 +848,7 @@ export function FrogDetail() {
                     onSuccess={(travelId) => {
                         setShowGroupTravelModal(false);
                         // 跳转到旅行详情页
-                        window.location.href = `/travel/${travelId}`;
+                        navigate(`/travel/${travelId}`);
                     }}
                 />
             )}

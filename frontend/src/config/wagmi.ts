@@ -3,6 +3,11 @@ import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors';
 import { zetachainAthens, sepolia, bscTestnet, polygonAmoy, supportedChains } from './chains';
 
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
+const runtimeAppUrl =
+  typeof window !== 'undefined' ? window.location.origin : undefined;
+const appUrl = import.meta.env.DEV
+  ? runtimeAppUrl || import.meta.env.VITE_APP_URL || 'https://zetafrog.xyz'
+  : import.meta.env.VITE_APP_URL || runtimeAppUrl || 'https://zetafrog.xyz';
 
 if (!projectId) {
   throw new Error('VITE_WALLETCONNECT_PROJECT_ID is required');
@@ -12,7 +17,7 @@ if (!projectId) {
 const metadata = {
   name: import.meta.env.VITE_APP_NAME || 'ZetaFrog',
   description: import.meta.env.VITE_APP_DESCRIPTION || 'Your Cross-chain Desktop Pet',
-  url: import.meta.env.VITE_APP_URL || 'https://zetafrog.xyz',
+  url: appUrl,
   icons: [import.meta.env.VITE_APP_ICON || 'https://zetafrog.xyz/icon.png'],
 };
 

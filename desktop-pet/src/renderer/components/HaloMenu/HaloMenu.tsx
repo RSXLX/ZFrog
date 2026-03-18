@@ -8,18 +8,21 @@ interface HaloMenuProps {
 }
 
 const menuItems = [
-  { id: 'travel', icon: '🐸', label: '旅行', angle: 0 },
-  { id: 'patrol', icon: '🎯', label: '巡逻', angle: 30 },
-  { id: 'bag', icon: '🎒', label: '背包', angle: 60 },
-  { id: 'friends', icon: '👥', label: '好友', angle: 90 },
-  { id: 'badges', icon: '🏅', label: '徽章', angle: 135 },
-  { id: 'home', icon: '🏠', label: '家园', angle: 180 },
-  { id: 'monitor', icon: '⛓️', label: '监控', angle: 225 },
-  { id: 'settings', icon: '⚙️', label: '设置', angle: 270 },
+  { id: 'travel', icon: '✈️', label: '旅行' },
+  { id: 'patrol', icon: '🎯', label: '巡逻' },
+  { id: 'tasks', icon: '📋', label: '任务' },
+  { id: 'bag', icon: '🎒', label: '背包' },
+  { id: 'collection', icon: '📚', label: '图鉴' },
+  { id: 'friends', icon: '👥', label: '好友' },
+  { id: 'badges', icon: '🏅', label: '徽章' },
+  { id: 'home', icon: '🏠', label: '家园' },
+  { id: 'profile', icon: '🪪', label: '资料' },
+  { id: 'monitor', icon: '⛓️', label: '监控' },
+  { id: 'settings', icon: '⚙️', label: '设置' },
 ];
 
 const HaloMenu: React.FC<HaloMenuProps> = ({ visible, onSelect, onClose }) => {
-  const radius = 80;
+  const radius = 92;
 
   return (
     <AnimatePresence>
@@ -46,7 +49,7 @@ const HaloMenu: React.FC<HaloMenuProps> = ({ visible, onSelect, onClose }) => {
           
           {/* Menu items in circle */}
           {menuItems.map((item, index) => {
-            const angle = (item.angle - 90) * (Math.PI / 180);
+            const angle = ((index * (360 / menuItems.length)) - 90) * (Math.PI / 180);
             const x = Math.cos(angle) * radius;
             const y = Math.sin(angle) * radius;
             

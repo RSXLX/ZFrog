@@ -81,7 +81,7 @@ export const PRODUCTION_LIFECYCLE_CONFIG: LifeCycleConfig = {
 };
 
 // 测试环境配置 - 加速衰减便于测试
-export const TEST_LIFECYCLE_CONFIG: LifeCycle_CONFIG = {
+export const TEST_LIFECYCLE_CONFIG: LifeCycleConfig = {
   ...PRODUCTION_LIFECYCLE_CONFIG,
   decay: {
     hunger: { value: 1, interval: 10 * 1000 },    // 10秒衰减1点
@@ -93,6 +93,3 @@ export const TEST_LIFECYCLE_CONFIG: LifeCycle_CONFIG = {
 
 // 默认导出生产配置
 export const LIFECYCLE_CONFIG = PRODUCTION_LIFECYCLE_CONFIG;
-
-// 类型导出
-export type { LifeCycleConfig };

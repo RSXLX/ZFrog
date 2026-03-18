@@ -146,7 +146,7 @@ const ShopDialog: React.FC<ShopDialogProps> = ({ visible, onClose, shop }) => {
                       style={{
                         position: 'absolute',
                         inset: 0,
-                        background: purchaseStatus.success ? 'rgba(34,197,94,0.9)' : 'rgba(239,68,68,0.9)',
+                        background: purchaseStatus && purchaseStatus.success ? 'rgba(34,197,94,0.9)' : 'rgba(239,68,68,0.9)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -155,7 +155,7 @@ const ShopDialog: React.FC<ShopDialogProps> = ({ visible, onClose, shop }) => {
                         fontWeight: 'bold',
                       }}
                     >
-                      {purchaseStatus.success ? '购买成功!' : '金币不足!'}
+                      {purchaseStatus && purchaseStatus.success ? '购买成功!' : '金币不足!'}
                     </motion.div>
                   )}
                 </motion.div>

@@ -14,7 +14,7 @@ import { ipfsService } from '../ipfs.service';
 import { multiLevelCache } from '../cache/MultiLevelCache';
 import { config } from '../../config';
 import { logger } from '../../utils/logger';
-import { ZETAFROG_ABI, SOUVENIR_ABI } from '../../config/contracts';
+import { SOUVENIR_ABI, TRAVEL_ABI } from '../../config/contracts';
 import { ChainKey, CHAIN_ID_TO_KEY, getChainConfig } from '../../config/chains';
 import { travelP0Service } from './travel-p0.service';
 import { NFTImageOrchestratorService } from '../nft-image-orchestrator.service';
@@ -346,42 +346,10 @@ export class BatchProcessor {
     }
 
     try {
-      // 准备批量数据
-      const frogIds = completions.map(c => BigInt(c.frogId));
-      const journalHashes = completions.map(c => c.journalHash);
-      const souvenirIds = completions.map(c => BigInt(c.souvenirId));
-
-      // 调用批量完成合约方法
-      const { request } = await this.publicClient.simulateContract({
-        address: config.TRAVEL_CONTRACT_ADDRESS as `0x${string}`,
-        abi: ZETAFROG_ABI,
-        functionName: 'batchCompleteTravels',
-        args: [frogIds, journalHashes, souvenirIds],
-        account: this.account,
-      });
-
-      const hash = await this.walletClient.writeContract(request);
-      logger.info(`[BatchProcessor] Batch complete tx: ${hash}`);
-
-      const receipt = await this.publicClient.waitForTransactionReceipt({
-        hash,
-        timeout: 120_000
-      });
-
-      if (receipt.status !== 'success') {
-        throw new Error('Batch completion failed');
+      for (const completion of completions) {
+        await this.individualCompleteOnChain(completion);
       }
-
-      // 计算Gas节省
-      const gasUsed = receipt.gasUsed;
-      const estimatedIndividualGas = BigInt(completions.length * 150000); // 预估单独交易的Gas
-      const savedGas = estimatedIndividualGas - gasUsed;
-      const savingsPercent = Number(savedGas * BigInt(100)) / Number(estimatedIndividualGas);
-
-      logger.info(
-        `[BatchProcessor] Batch completed ${completions.length} travels. ` +
-        `Gas: ${gasUsed}, Saved: ${savedGas} (${savingsPercent.toFixed(1)}%)`
-      );
+      logger.info(`[BatchProcessor] Completed ${completions.length} travels sequentially on-chain`);
     } catch (error) {
       logger.error('[BatchProcessor] Batch completion failed:', error);
       // 批量失败时，回退到逐个处理
@@ -409,7 +377,7 @@ export class BatchProcessor {
     try {
       const { request } = await this.publicClient.simulateContract({
         address: config.TRAVEL_CONTRACT_ADDRESS as `0x${string}`,
-        abi: ZETAFROG_ABI,
+        abi: TRAVEL_ABI,
         functionName: 'completeTravel',
         args: [
           BigInt(completion.frogId),

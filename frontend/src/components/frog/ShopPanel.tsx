@@ -57,10 +57,10 @@ export function ShopPanel({ ownerAddress, onPurchase }: ShopPanelProps) {
         params.category = selectedCategory;
       }
       const response = await apiService.get('/shop/items', { params });
-      if (response.data.success) {
-        setItems(response.data.data.items);
+      if (response.success) {
+        setItems(response.data.items);
         if (categories.length === 0) {
-          setCategories(response.data.data.categories);
+          setCategories(response.data.categories);
         }
       }
     } catch (err) {
@@ -88,10 +88,10 @@ export function ShopPanel({ ownerAddress, onPurchase }: ShopPanelProps) {
         itemId,
       });
 
-      if (response.data.success) {
+      if (response.success) {
         setMessage({
           type: 'success',
-          text: `成功购买 ${response.data.item.name}！`,
+          text: `成功购买 ${response.item.name}！`,
         });
         // 刷新数据
         await fetchItems();
@@ -100,7 +100,7 @@ export function ShopPanel({ ownerAddress, onPurchase }: ShopPanelProps) {
       } else {
         setMessage({
           type: 'error',
-          text: response.data.error || '购买失败',
+          text: response.error || '购买失败',
         });
       }
     } catch (err: any) {

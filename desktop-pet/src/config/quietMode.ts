@@ -148,8 +148,7 @@ export const PREDEFINED_QUIET_MODES: Record<QuietModeType, QuietModeConfig> = {
 
 // 安静模式管理器类
 export class QuietModeManager {
-  private currentMode: QuietModeConfig = PREDEFINED_QUIET_MODES[NORMAL];
-  private customModes: Map<string, QuietModeConfig> = new Map();
+  private currentMode: QuietModeConfig = PREDEFINED_QUIET_MODES[QuietModeType.NORMAL];
   private focusTimer: NodeJS.Timeout | null = null;
   private listeners: Set<(mode: QuietModeConfig) => void> = new Set();
   
@@ -316,13 +315,6 @@ export class QuietModeManager {
 
 // 导出单例实例
 export const quietModeManager = new QuietModeManager();
-
-// 导出类型
-export type {
-  QuietModeConfig,
-  TimeRange,
-  BehaviorConfig,
-};
 
 // 默认导出
 export default quietModeManager;

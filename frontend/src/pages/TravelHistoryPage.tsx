@@ -1,28 +1,26 @@
 // frontend/src/pages/TravelHistoryPage.tsx
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '../components/common/Button';
+import { FeatureGateState } from '../components/common/FeatureGateState';
 import { TravelResult } from '../components/travel/TravelResult';
 import { EmptyTravels } from '../components/common/EmptyState';
 import { AnimatedNumber } from '../components/common/MicroInteractions';
-import { apiService } from '../services/api';
-import { useAccount } from 'wagmi';
+import { apiService, type Frog as OwnedFrog } from '../services/api';
+import { useMyFrog } from '../hooks/useMyFrog';
 import { 
     Clock, 
     MapPin, 
     BookOpen, 
     Trophy, 
     Compass, 
-    Calendar, 
     ArrowLeft, 
-    Search,
     Filter,
     ChevronLeft,
     ChevronRight,
     Map
 } from 'lucide-react';
-import clsx from 'clsx';
 
 interface Travel {
     id: number;
@@ -84,45 +82,38 @@ const moodEmojis: Record<string, string> = {
     SLEEPY: '😴',
 };
 
-interface Frog {
-    id: number;
-    tokenId: number;
-    name: string;
-}
-
 export function TravelHistoryPage() {
     const navigate = useNavigate();
-    const { address } = useAccount();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const { address, frog, loading: frogLoading, isConnected, hasFrog } = useMyFrog();
     const [travels, setTravels] = useState<Travel[]>([]);
     const [stats, setStats] = useState<TravelStats | null>(null);
-    const [frogs, setFrogs] = useState<Frog[]>([]);
-    const [selectedFrogId, setSelectedFrogId] = useState<string>('all');
     const [loading, setLoading] = useState(true);
     const [selectedTravel, setSelectedTravel] = useState<Travel | null>(null);
     const [souvenirImages, setSouvenirImages] = useState<Record<string, string>>({});
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const pageSize = 10;
+    const frogs: OwnedFrog[] = frog ? [frog] : [];
+    const selectedFrogId = searchParams.get('frogId') || 'all';
+    const activeFrogId = selectedFrogId === 'all' ? null : selectedFrogId;
 
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const fId = params.get('frogId') || 'all';
-        setSelectedFrogId(fId);
-        if (address) {
-            fetchFrogs();
-            fetchData(fId === 'all' ? null : fId);
+        if (frogLoading) {
+            return;
         }
-    }, [page, address, selectedFrogId]);
 
-    const fetchFrogs = async () => {
-        if (!address) return;
-        try {
-            const frog = await apiService.getMyFrog(address);
-            setFrogs(frog ? [frog] : []);
-        } catch (error) {
-            console.error('Failed to fetch frogs:', error);
+        if (!isConnected || !address || !hasFrog) {
+            setTravels([]);
+            setStats(null);
+            setTotal(0);
+            setSouvenirImages({});
+            setLoading(false);
+            return;
         }
-    };
+
+        void fetchData(activeFrogId);
+    }, [activeFrogId, address, frogLoading, hasFrog, isConnected, page]);
 
     const fetchData = async (fId?: string | null) => {
         if (!address) {
@@ -132,6 +123,7 @@ export function TravelHistoryPage() {
 
         try {
             setLoading(true);
+            setSouvenirImages({});
             
             // 获取旅行历史
             const params: any = { 
@@ -204,7 +196,33 @@ export function TravelHistoryPage() {
         setSelectedTravel(null);
     };
 
-    if (loading) {
+    if (!isConnected) {
+        return (
+            <FeatureGateState
+                emoji="🔗"
+                title="请先连接钱包"
+                description="连接钱包后查看你的旅行日记和探索记录。"
+                actionLabel="返回首页"
+                actionTo="/"
+            />
+        );
+    }
+
+    if (!frogLoading && !hasFrog) {
+        return (
+            <FeatureGateState
+                emoji="🐸"
+                title="还没有旅行中的青蛙"
+                description="先铸造一只青蛙，才能解锁旅行、徽章和家园体验。"
+                actionLabel="立即铸造"
+                actionTo="/?mint=true"
+                secondaryLabel="返回首页"
+                secondaryTo="/"
+            />
+        );
+    }
+
+    if (frogLoading || loading) {
         return (
             <div className="min-h-screen bg-gradient-to-b from-sky-200 to-green-200 flex items-center justify-center">
                 <motion.div
@@ -267,12 +285,14 @@ export function TravelHistoryPage() {
                             value={selectedFrogId}
                             onChange={(e) => {
                                 const newId = e.target.value;
-                                setSelectedFrogId(newId);
                                 setPage(1);
-                                const url = new URL(window.location.href);
-                                if (newId && newId !== 'all') url.searchParams.set('frogId', newId);
-                                else url.searchParams.delete('frogId');
-                                window.history.replaceState({}, '', url);
+                                const nextSearchParams = new URLSearchParams(searchParams);
+                                if (newId && newId !== 'all') {
+                                    nextSearchParams.set('frogId', newId);
+                                } else {
+                                    nextSearchParams.delete('frogId');
+                                }
+                                setSearchParams(nextSearchParams, { replace: true });
                             }}
                             className="bg-transparent border-none focus:ring-0 text-gray-800 font-medium cursor-pointer outline-none font-exo"
                         >
@@ -391,7 +411,7 @@ export function TravelHistoryPage() {
                     </h3>
                     
                     {(!travels || travels.length === 0) ? (
-                        <EmptyTravels onStartTravel={() => navigate('/')} />
+                        <EmptyTravels onStartTravel={() => navigate(frog ? `/frog/${frog.tokenId}` : '/')} />
                     ) : (
                         travels.map((travel, index) => {
                             const chainIdToKey: Record<number, keyof typeof chainConfig> = {

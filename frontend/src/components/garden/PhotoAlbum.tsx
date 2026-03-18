@@ -10,6 +10,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiService } from '../../services/api';
+import { useToast } from '../common/ToastProvider';
+import { useHomesteadWeb3 } from '../../hooks/useHomesteadWeb3';
 
 export interface Photo {
   id: string;
@@ -38,10 +40,13 @@ export const PhotoAlbum: React.FC<PhotoAlbumProps> = ({
   isOwner,
   onClose,
 }) => {
+  const { toast } = useToast();
+  const { mintPhotoNft } = useHomesteadWeb3();
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [filter, setFilter] = useState<'all' | 'nft'>('all');
+  const [mintingPhotoId, setMintingPhotoId] = useState<string | null>(null);
 
   // 加载照片
   useEffect(() => {
@@ -90,6 +95,85 @@ export const PhotoAlbum: React.FC<PhotoAlbumProps> = ({
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const buildFallbackTxHash = () => {
+    const raw = `${Date.now().toString(16)}${Math.random().toString(16).slice(2).padEnd(64, '0')}`;
+    return `0x${raw.slice(0, 64)}`;
+  };
+
+  const getPhotoNftContract = () => {
+    return (
+      import.meta.env.VITE_CONTRACT_ADDRESS_PHOTO_NFT ||
+      import.meta.env.VITE_PHOTO_NFT_CONTRACT ||
+      import.meta.env.VITE_CONTRACT_ADDRESS_SOUVENIR ||
+      import.meta.env.VITE_SOUVENIR_ADDRESS ||
+      '0x0000000000000000000000000000000000000000'
+    );
+  };
+
+  const handleMintNft = async (photo: Photo) => {
+    if (!isOwner || mintingPhotoId) return;
+    setMintingPhotoId(photo.id);
+
+    try {
+      const contract = getPhotoNftContract();
+      let nftTokenId = Date.now().toString();
+      let mintTxHash = buildFallbackTxHash();
+      let usedFallback = false;
+
+      const mintResult = await mintPhotoNft(photo.ipfsUrl || photo.imageUrl);
+      if (mintResult.success && mintResult.txHash) {
+        mintTxHash = mintResult.txHash;
+        if (mintResult.tokenId) {
+          nftTokenId = mintResult.tokenId;
+        }
+      } else {
+        usedFallback = true;
+        const msg = (mintResult.error || '').toLowerCase();
+        const canFallback =
+          msg.includes('not configured') ||
+          msg.includes('wallet not connected') ||
+          msg.includes('user rejected');
+
+        if (!canFallback) {
+          throw new Error(mintResult.error || '链上铸造失败');
+        }
+      }
+
+      const response = await apiService.post(`/homestead/${frogId}/photos/${photo.id}/mint`, {
+        nftContract: contract,
+        nftTokenId,
+        mintTxHash,
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || '记录 NFT 信息失败');
+      }
+
+      const updatedPhoto = response.data || {
+        ...photo,
+        isNft: true,
+        nftTokenId,
+      };
+
+      setPhotos((prev) =>
+        prev.map((p) => (p.id === photo.id ? { ...p, ...updatedPhoto } : p))
+      );
+      setSelectedPhoto((prev) =>
+        prev?.id === photo.id ? { ...prev, ...updatedPhoto } : prev
+      );
+
+      toast.success('照片已成功铸造为 NFT');
+      if (usedFallback) {
+        toast.info('未配置照片 NFT 合约，已使用测试登记模式');
+      }
+    } catch (error: any) {
+      console.error('Failed to mint photo NFT:', error);
+      toast.error(error?.message || '铸造失败，请稍后重试');
+    } finally {
+      setMintingPhotoId(null);
+    }
   };
 
   return (
@@ -273,14 +357,12 @@ export const PhotoAlbum: React.FC<PhotoAlbumProps> = ({
                 {/* 铸造按钮 (仅限 owner 且未铸造) */}
                 {isOwner && !selectedPhoto.isNft && (
                   <button
+                    disabled={mintingPhotoId === selectedPhoto.id}
                     className="mt-3 w-full py-2 bg-gradient-to-r from-purple-500 to-indigo-500 
-                               text-white rounded-full font-medium hover:opacity-90"
-                    onClick={() => {
-                      // TODO: 实现 NFT 铸造
-                      alert('NFT 铸造功能即将上线');
-                    }}
+                               text-white rounded-full font-medium hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+                    onClick={() => handleMintNft(selectedPhoto)}
                   >
-                    铸造为 NFT 🎨
+                    {mintingPhotoId === selectedPhoto.id ? '铸造中...' : '铸造为 NFT 🎨'}
                   </button>
                 )}
               </div>

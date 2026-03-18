@@ -123,6 +123,12 @@ export enum ChainEventType {
 
 // 事件响应配置
 export const EVENT_RESPONSES: Record<ChainEventType, EventResponse> = {
+  [ChainEventType.TRANSFER]: {
+    animation: 'IDLE',
+    sound: false,
+    notification: false,
+    dialog: null,
+  },
   [ChainEventType.LARGE_TRANSFER]: {
     animation: 'EXCITED',
     sound: true,
@@ -165,35 +171,11 @@ export const EVENT_RESPONSES: Record<ChainEventType, EventResponse> = {
     notification: false,
     dialog: null,
   },
-  [ChainEventType.TRANSFER]: {
-    animation: 'IDLE',
-    sound: false,
-    notification: false,
-    dialog: null,
-  },
-  [ChainEventType.LARGE_TRANSFER]: {
-    animation: 'EXCITED',
-    sound: true,
-    notification: true,
-    dialog: '检测到一笔大额转账！',
-  },
-  [ChainEventType.WHALE_TRANSFER]: {
-    animation: 'RICH',
-    sound: true,
-    notification: true,
-    dialog: '🐋 巨鲸出没！这笔交易太大了！',
-  },
   [ChainEventType.PRICE_CHANGE]: {
     animation: 'IDLE',
     sound: false,
     notification: false,
     dialog: null,
-  },
-  [ChainEventType.GAS_SPIKE]: {
-    animation: 'THINKING',
-    sound: false,
-    notification: true,
-    dialog: 'Gas 费突然飙升，建议稍后再交易~',
   },
   [ChainEventType.GAS_DROP]: {
     animation: 'HAPPY',

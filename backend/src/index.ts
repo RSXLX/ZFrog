@@ -11,6 +11,7 @@ import { eventListener } from './workers/eventListener';
 import { crossChainListener } from './services/cross-chain-listener.service';
 import { explorationScheduler } from './services/exploration-scheduler.service';
 import { startStatusCron } from './services/status-cron.job';
+import { initializeShop } from './services/shop.service';
 import { initializeWebSocket, setIO } from './websocket';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 
@@ -126,6 +127,7 @@ httpServer.listen(config.PORT, async () => {
   
   // Start background workers
   try {
+    await initializeShop();
     await eventListener.start();
     travelProcessor.start();
     

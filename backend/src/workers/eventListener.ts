@@ -6,7 +6,7 @@ import { prisma } from '../database';
 import { FrogStatus, CrossChainStatus } from '@prisma/client';
 import { config } from '../config';
 import { logger } from '../utils/logger';
-import { ZETAFROG_ABI } from '../config/contracts';
+import { TRAVEL_ABI, ZETAFROG_ABI } from '../config/contracts';
 import { travelP0Service } from '../services/travel/travel-p0.service';
 import { ChainKey } from '../config/chains';
 
@@ -873,10 +873,10 @@ class EventListener {
             // Read active travel from Travel contract
             const result = await this.publicClient.readContract({
                 address: config.TRAVEL_CONTRACT_ADDRESS as `0x${string}`,
-                abi: ZETAFROG_ABI,
+                abi: TRAVEL_ABI,
                 functionName: 'getActiveTravel',
                 args: [BigInt(tokenId)],
-            }) as [bigint, bigint, string, bigint, boolean];
+            }) as [bigint, bigint, string, bigint, boolean, boolean];
 
             const [startTime, endTime, targetWallet, targetChainId, completed] = result;
 
@@ -987,10 +987,10 @@ class EventListener {
             // 合约返回: [startTime, endTime, targetWallet, targetChainId, completed]
             const travelData = await this.publicClient.readContract({
                 address: config.TRAVEL_CONTRACT_ADDRESS as `0x${string}`,
-                abi: ZETAFROG_ABI,
+                abi: TRAVEL_ABI,
                 functionName: 'getActiveTravel',
                 args: [BigInt(tokenId)],
-            }) as [bigint, bigint, string, bigint, boolean];
+            }) as [bigint, bigint, string, bigint, boolean, boolean];
 
             const startTime = Number(travelData[0]);
             const endTime = Number(travelData[1]);

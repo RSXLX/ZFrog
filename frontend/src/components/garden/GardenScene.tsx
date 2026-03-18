@@ -137,11 +137,11 @@ export const GardenScene: React.FC<GardenSceneProps> = ({
           }
         }));
         setPlacedItems(items);
-        setComfortData({
-            score: res.data.comfortScore || 0,
-            level: '未知', // TODO: 从后端获取
-            buffs: [] // TODO: 从后端获取
-        });
+        setComfortData(prev => ({
+          score: res.data.comfortScore || 0,
+          level: prev?.level || '普通',
+          buffs: prev?.buffs || []
+        }));
       }
     } catch (err) {
       console.error('Failed to load layout:', err);
@@ -484,4 +484,3 @@ export const GardenScene: React.FC<GardenSceneProps> = ({
     </div>
   );
 };
-

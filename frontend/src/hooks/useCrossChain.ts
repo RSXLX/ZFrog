@@ -11,14 +11,25 @@ import { useState, useCallback,  useEffect } from 'react';
 import { useAccount, useWalletClient, usePublicClient } from 'wagmi';
 import { parseEther, type Address, encodeFunctionData } from 'viem';
 import { apiService } from '../services/api';
+import { BSC_CONNECTOR_ADDRESS, SEPOLIA_CONNECTOR_ADDRESS } from '../config/contracts';
 
 // ============ 配置 ============
 
-// ZetaChain Gateway 地址
+const getAddressOrFallback = (address: string | undefined, fallback: Address): Address => {
+  if (address && /^0x[a-fA-F0-9]{40}$/.test(address)) {
+    return address as Address;
+  }
+  return fallback;
+};
+
+// ZetaChain Gateway/Connector 地址（支持环境变量覆盖）
 const GATEWAY_ADDRESSES: Record<string, Address> = {
-  '7001': '0x6c533f7fe93fae114d0954697069df33c9b74fd7', // ZetaChain Athens Testnet
-  '97': '0x0000000000000000000000000000000000000000', // BSC Testnet (placeholder)
-  '11155111': '0x0000000000000000000000000000000000000000', // Sepolia (placeholder)
+  '7001': getAddressOrFallback(
+    import.meta.env.VITE_ZETACHAIN_GATEWAY_ADDRESS,
+    '0x6c533f7fe93fae114d0954697069df33c9b74fd7' as Address
+  ), // ZetaChain Athens Testnet
+  '97': getAddressOrFallback(import.meta.env.VITE_BSC_GATEWAY_ADDRESS, BSC_CONNECTOR_ADDRESS), // BSC Testnet
+  '11155111': getAddressOrFallback(import.meta.env.VITE_SEPOLIA_GATEWAY_ADDRESS, SEPOLIA_CONNECTOR_ADDRESS), // Sepolia
 };
 
 // 支持的链

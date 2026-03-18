@@ -156,6 +156,7 @@ export function TravelCheck({ frogId, frogName, onConfirm, onCancel }: TravelChe
   };
 
   const { allPassing, passingCount, totalCount } = checkStatus();
+  const canConfirmTravel = requirements?.canTravel ?? allPassing;
 
   if (loading || checkLoading) {
     return (
@@ -263,6 +264,34 @@ export function TravelCheck({ frogId, frogName, onConfirm, onCancel }: TravelChe
           </div>
         )}
 
+        {requirements && requirements.failedRequirements.length > 0 && (
+          <div className="p-3 rounded-xl bg-red-50 mb-4">
+            <div className="flex items-center gap-2 text-red-700 mb-2">
+              <Icons.Warning />
+              <span className="font-medium">当前还不能出发</span>
+            </div>
+            <ul className="space-y-1 text-sm text-red-600">
+              {requirements.failedRequirements.map((reason) => (
+                <li key={reason}>• {reason}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {requirements && requirements.warnings.length > 0 && (
+          <div className="p-3 rounded-xl bg-amber-50 mb-4">
+            <div className="flex items-center gap-2 text-amber-700 mb-2">
+              <Icons.Warning />
+              <span className="font-medium">出发前提醒</span>
+            </div>
+            <ul className="space-y-1 text-sm text-amber-600">
+              {requirements.warnings.map((warning) => (
+                <li key={warning}>• {warning}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* 操作按钮 */}
         <div className="flex gap-3">
           <motion.button
@@ -279,13 +308,13 @@ export function TravelCheck({ frogId, frogName, onConfirm, onCancel }: TravelChe
           </motion.button>
           
           <motion.button
-            whileHover={{ scale: allPassing ? 1.02 : 1 }}
-            whileTap={{ scale: allPassing ? 0.98 : 1 }}
+            whileHover={{ scale: canConfirmTravel ? 1.02 : 1 }}
+            whileTap={{ scale: canConfirmTravel ? 0.98 : 1 }}
             onClick={onConfirm}
-            disabled={!allPassing || status?.isSick}
+            disabled={!canConfirmTravel}
             className={`
               flex-1 py-3 rounded-xl font-bold
-              ${allPassing && !status?.isSick
+              ${canConfirmTravel
                 ? `${clayStyles.button} bg-gradient-to-br from-blue-400 to-cyan-500 text-white`
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }

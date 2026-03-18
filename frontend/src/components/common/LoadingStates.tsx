@@ -22,7 +22,7 @@ export function LoadingSpinner({
   return (
     <motion.div
       animate={{ rotate: 360 }}
-      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+      transition={{ duration: 1, repeat: Infinity, ease: 'linear' as const }}
       className={`${sizeClasses[size]} ${color} ${className}`}
     >
       <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
@@ -100,7 +100,7 @@ export function Skeleton({
       transition={{
         duration: 1.5,
         repeat: Infinity,
-        ease: 'easeInOut',
+        ease: 'easeInOut' as const,
       }}
       style={{ width, height }}
       className={`bg-gray-200 ${circle ? 'rounded-full' : 'rounded-md'} ${className}`}
@@ -144,6 +144,3 @@ export function LoadingPage({
     </div>
   );
 }
-
-// Export all loading components
-export { LoadingSpinner, LoadingDots, Skeleton, LoadingPage };

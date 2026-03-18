@@ -50,6 +50,10 @@ const FrogCustomizeDialog: React.FC<FrogCustomizeDialogProps> = ({ visible, onCl
   };
 
   const currentOptions = options[activeTab as keyof typeof options] || [];
+  const selectedBody = options.body.find(option => option.id === avatar.body);
+  const selectedEyes = options.eyes.find(option => option.id === avatar.eyes);
+  const selectedMouth = options.mouth.find(option => option.id === avatar.mouth);
+  const selectedAccessory = options.accessory.find(option => option.id === avatar.accessory);
 
   return (
     <AnimatePresence>
@@ -62,16 +66,16 @@ const FrogCustomizeDialog: React.FC<FrogCustomizeDialogProps> = ({ visible, onCl
             {/* Preview */}
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
               <svg width="100" height="100" viewBox="0 0 200 200">
-                <circle cx="100" cy="100" r="60" fill={options.body.find(o => o.id === avatar.body)?.color || '#4ADE80'} />
+                <circle cx="100" cy="100" r="60" fill={selectedBody?.color || '#4ADE80'} />
                 <text x="100" y="105" textAnchor="middle" fontSize="40">
-                  {options.eyes.find(o => o.id === avatar.eyes)?.emoji || '😐'}
+                  {selectedEyes?.emoji || '😐'}
                 </text>
                 <text x="100" y="135" textAnchor="middle" fontSize="30">
-                  {options.mouth.find(o => o.id === avatar.mouth)?.emoji || '🙂'}
+                  {selectedMouth?.emoji || '🙂'}
                 </text>
                 {avatar.accessory !== 'none' && (
                   <text x="100" y="50" textAnchor="middle" fontSize="30">
-                    {options.accessory.find(o => o.id === avatar.accessory)?.emoji || ''}
+                    {selectedAccessory?.emoji || ''}
                   </text>
                 )}
               </svg>
@@ -90,7 +94,7 @@ const FrogCustomizeDialog: React.FC<FrogCustomizeDialogProps> = ({ visible, onCl
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
               {currentOptions.map(option => (
                 <motion.button key={option.id} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => onUpdateAvatar(activeTab, option.id)} style={{ padding: 12, background: avatar[activeTab as keyof typeof avatar] === option.id ? '#e0f2fe' : 'white', border: `2px solid ${avatar[activeTab as keyof typeof avatar] === option.id ? '#3b82f6' : '#e5e7eb'}`, borderRadius: 12, cursor: 'pointer', textAlign: 'center' }}>
-                  {option.color ? <div style={{ width: 30, height: 30, borderRadius: '50%', background: option.color, margin: '0 auto 8px' }} /> : <div style={{ fontSize: 24, marginBottom: 4 }}>{option.emoji}</div>}
+                  {'color' in option ? <div style={{ width: 30, height: 30, borderRadius: '50%', background: option.color, margin: '0 auto 8px' }} /> : <div style={{ fontSize: 24, marginBottom: 4 }}>{'emoji' in option ? option.emoji : ''}</div>}
                   <div style={{ fontSize: 12, color: '#666' }}>{option.label}</div>
                 </motion.button>
               ))}

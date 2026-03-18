@@ -1,5 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import LongTermGoalPanel from '../LongTermGoalPanel';
+import type { LongTermGoalView } from '../../hooks/useLongTermGoals';
 
 interface DailyTask {
   id: string;
@@ -15,9 +17,20 @@ interface TasksDialogProps {
   visible: boolean;
   onClose: () => void;
   tasks?: DailyTask[];
+  totalReward?: number;
+  longTermGoals?: LongTermGoalView[];
+  nextTip?: string;
 }
 
-const TasksDialog: React.FC<TasksDialogProps> = ({ walletAddress, visible, onClose, tasks = [] }) => {
+const TasksDialog: React.FC<TasksDialogProps> = ({
+  walletAddress,
+  visible,
+  onClose,
+  tasks = [],
+  totalReward = 0,
+  longTermGoals = [],
+  nextTip,
+}) => {
   const getProgress = () => {
     const completed = tasks.filter(t => t.completed).length;
     return { completed, total: tasks.length };
@@ -48,13 +61,14 @@ const TasksDialog: React.FC<TasksDialogProps> = ({ walletAddress, visible, onClo
             <h2 className="dialog-title">📋 每日任务</h2>
             
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>
-                进度: {progress.completed}/{progress.total}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 4 }}>
+                <span>进度: {progress.completed}/{progress.total}</span>
+                <span>今日奖励: +{totalReward}</span>
               </div>
               <div style={{ height: 8, background: '#eee', borderRadius: 4, overflow: 'hidden' }}>
                 <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: `${(progress.completed / progress.total) * 100}%` }}
+                  animate={{ width: `${progress.total > 0 ? (progress.completed / progress.total) * 100 : 0}%` }}
                   style={{ height: '100%', background: 'linear-gradient(90deg, #4ADE80, #22C55E)' }}
                 />
               </div>
@@ -97,6 +111,23 @@ const TasksDialog: React.FC<TasksDialogProps> = ({ walletAddress, visible, onClo
                   </div>
                 ))
               )}
+            </div>
+
+            <div
+              style={{
+                marginTop: 18,
+                paddingTop: 16,
+                borderTop: '1px solid #e5e7eb',
+              }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>
+                长期目标
+              </div>
+              <LongTermGoalPanel goals={longTermGoals} nextTip={nextTip} compact />
+            </div>
+
+            <div style={{ marginTop: 14, fontSize: 11, color: '#94a3b8' }}>
+              当前钱包：{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
             </div>
           </motion.div>
         </motion.div>

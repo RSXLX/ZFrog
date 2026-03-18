@@ -50,6 +50,42 @@ export interface Frog {
   friendshipId?: number;
 }
 
+export type BadgeRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+export type BadgeCategory = 'travel' | 'social' | 'achievement' | 'collection' | 'special' | 'event';
+
+export interface Badge {
+  id: string | number;
+  name: string;
+  description: string;
+  icon?: string;
+  rarity?: BadgeRarity;
+  category?: BadgeCategory;
+  requirement?: {
+    value: number;
+  };
+}
+
+export type FriendStatus = 'online' | 'offline' | 'traveling' | 'sleeping';
+
+export type Friend = Omit<Frog, 'status'> & {
+  status?: FriendStatus;
+  avatar?: string;
+  lastSeen?: string;
+  location?: string;
+  commonFriends?: number;
+};
+
+export interface Garden {
+  id: number;
+  ownerName?: string;
+  visitorCount?: number;
+  messageCount?: number;
+  giftCount?: number;
+  badgeCount?: number;
+}
+
+export type TravelStatus = 'Active' | 'Processing' | 'Completed' | 'Cancelled' | 'Failed';
+
 export interface Travel {
   id: number;
   frogId: number;
@@ -62,9 +98,14 @@ export interface Travel {
   endTime: Date | string;
   completedAt?: Date | string | null;
   
-  status: 'Active' | 'Processing' | 'Completed' | 'Cancelled' | 'Failed';
+  status: TravelStatus;
   currentStage?: TravelStage; // New
   progress?: number; // New
+  destination?: string;
+  chain?: string;
+  duration?: number;
+  startedAt?: Date | string;
+  _preloading?: boolean;
   
   startTxHash?: string; // New
   completeTxHash?: string; // New

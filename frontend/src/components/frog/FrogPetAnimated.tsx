@@ -13,7 +13,7 @@ interface FrogPetAnimatedProps {
 }
 
 // 动画变体
-const frogVariants = {
+const frogVariants: Record<string, any> = {
     idle: {
         y: [0, -5, 0],
         transition: { duration: 2, repeat: Infinity, ease: "easeInOut" }
@@ -45,7 +45,7 @@ const frogVariants = {
 };
 
 // 眼睛动画
-const eyeVariants = {
+const eyeVariants: Record<string, any> = {
     open: { scaleY: 1 },
     blink: {
         scaleY: [1, 0.1, 1],

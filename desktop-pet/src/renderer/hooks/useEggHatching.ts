@@ -101,7 +101,7 @@ const INTERACTION_EFFECTS: Record<HatchInteractionType, {
 // ==================== Hook 实现 ====================
 
 export function useEggHatching(
-  eggId: string,
+  _eggId: string,
   initialHatchTime: number = DEFAULT_HATCH_TIME
 ): UseEggHatchingReturn {
   // 内存状态
@@ -138,7 +138,7 @@ export function useEggHatching(
     if (!isHatching) return;
 
     const interval = setInterval(() => {
-      setProgress(prev => {
+      setProgress(_prev => {
         const elapsed = Date.now() - memory.startTime;
         const adjustedTime = memory.estimatedHatchTime / memory.accelerationFactor;
         const newPercentage = Math.min(100, (elapsed / adjustedTime) * 100);
@@ -254,7 +254,7 @@ export function useEggHatching(
   };
 
   // 获取互动消息
-  const getInteractionMessage = (type: HatchInteractionType, effectiveness: number): string => {
+  const getInteractionMessage = (type: HatchInteractionType, _effectiveness: number): string => {
     const messages: Record<HatchInteractionType, string[]> = {
       tap: ['戳了一下蛋壳', '轻轻敲击蛋壳', '蛋壳发出清脆声响'],
       shake: ['轻轻摇晃蛋', '蛋在手中滚动', '感受到生命的律动'],

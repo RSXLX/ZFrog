@@ -88,7 +88,7 @@ export function FrogSvg({
   const mouthPath = MOUTH_PATHS[state] || MOUTH_PATHS[FrogState.IDLE];
   
   // 动画变体
-  const bodyVariants = {
+  const bodyVariants: Record<string, any> = {
     idle: {
       scaleY: [1, 0.97, 1],
       y: [0, 3, 0],
@@ -111,7 +111,7 @@ export function FrogSvg({
   };
 
   // 眼睛动画
-  const eyeVariants = {
+  const eyeVariants: Record<string, any> = {
     idle: {
       scaleY: [1, 1, 0.1, 1, 1],
       transition: { duration: 4.5, repeat: Infinity, times: [0, 0.96, 0.98, 1, 1] }
@@ -229,14 +229,12 @@ export function FrogSvg({
           <circle cx="108" cy="100" r="1.5" fill="#15803D" opacity="0.6"/>
           
           {/* 嘴巴 */}
-          <motion.path
+          <path
             d={mouthPath}
             stroke="#15803D"
             strokeWidth="2.5"
             strokeLinecap="round"
             fill="none"
-            animate={{ d: mouthPath }}
-            transition={{ duration: 0.3 }}
           />
           
           {/* 腮红 */}

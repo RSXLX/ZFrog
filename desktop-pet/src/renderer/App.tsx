@@ -1,15 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 
-// Components
 import Frog from './components/Frog/Frog';
 import StatusBar from './components/Frog/StatusBar';
 import InteractionBubble from './components/Frog/InteractionBubble';
 import QuickMenu from './components/Frog/QuickMenu';
 import WeatherEffect from './components/WeatherEffect';
 import HaloMenu from './components/HaloMenu/HaloMenu';
+import { HibernationStatus } from './components/HibernationStatus';
 
-// Dialogs
 import TasksDialog from './components/Dialogs/TasksDialog';
 import FriendsDialog from './components/Dialogs/FriendsDialog';
 import BadgesDialog from './components/Dialogs/BadgesDialog';
@@ -19,24 +18,30 @@ import ChainMonitorPanel from './components/Dialogs/ChainMonitorPanel';
 import HomeDialog from './components/Dialogs/HomeDialog';
 import BagDialog from './components/Dialogs/BagDialog';
 import ProfileDialog from './components/Dialogs/ProfileDialog';
+import CollectionDialog from './components/Dialogs/CollectionDialog';
 import QuietModePanel from '../components/QuietModePanel';
 
-// Hooks
 import { useFrogState } from './hooks/useFrogState';
 import { useLifeCycle } from './hooks/useLifeCycle';
 import { useChainMonitor } from './hooks/useChainMonitor';
 import { useMemory } from './hooks/useMemory';
 import { useTimeSystem } from './hooks/useTimeSystem';
 import { useAchievements } from './hooks/useAchievements';
-import { useInventory } from './hooks/useInventory';
+import { useInventory, type InventoryItem } from './hooks/useInventory';
 import { useSocial } from './hooks/useSocial';
 import { useTravel } from './hooks/useTravel';
 import { usePetStats } from './hooks/usePetStats';
 import { useDailyTasks } from './hooks/useDailyTasks';
 import { useSound } from './hooks/useSound';
-import { useQuietMode } from './hooks/useQuietMode';
+import { useHibernation } from './hooks/useHibernation';
+import { useActivity } from './hooks/useActivity';
+import { useCollectionBook } from './hooks/useCollectionBook';
+import { useDecoration } from './hooks/useDecoration';
+import { useLongTermGoals } from './hooks/useLongTermGoals';
+import { useQuietMode } from '../hooks/useQuietMode';
+import api from './services/api';
+import storage from './services/storage';
 
-// Styles
 import './styles/global.css';
 
 declare global {
@@ -54,37 +59,45 @@ declare global {
   }
 }
 
+const initialDialogs = {
+  tasks: false,
+  friends: false,
+  badges: false,
+  travel: false,
+  home: false,
+  collection: false,
+  bag: false,
+  settings: false,
+  chainMonitor: false,
+  profile: false,
+  quietMode: false,
+};
+
+type DialogKey = keyof typeof initialDialogs;
+
 function App() {
-  // State
   const [showMenu, setShowMenu] = useState(false);
   const [pokeCount, setPokeCount] = useState(0);
   const [lastInteractTime, setLastInteractTime] = useState(Date.now());
   const [isPatrolling, setIsPatrolling] = useState(false);
-  
-  // UI State
   const [bubbleMessage, setBubbleMessage] = useState('');
   const [showBubble, setShowBubble] = useState(false);
   const [quickMenu, setQuickMenu] = useState({ visible: false, x: 0, y: 0 });
-  
-  // Dialogs State
-  const [dialogs, setDialogs] = useState({
-    tasks: false,
-    friends: false,
-    badges: false,
-    travel: false,
-    home: false,
-    bag: false,
-    settings: false,
-    chainMonitor: false,
-    profile: false,
-    quietMode: false,
+  const [dialogs, setDialogs] = useState(initialDialogs);
+  const [walletAddress] = useState(() => storage.getWalletAddress() || '0x1234567890abcdef1234567890abcdef12345678');
+  const [tokenId, setTokenId] = useState(1);
+  const [petName, setPetName] = useState(() => {
+    try {
+      return localStorage.getItem('zfrog_pet_name') || '呱呱';
+    } catch {
+      return '呱呱';
+    }
   });
-  
-  // Mock Data
-  const [walletAddress] = useState('0x1234567890abcdef1234567890abcdef12345678');
-  const [tokenId] = useState(1);
-  
-  // Hooks
+
+  const loginCheckedRef = useRef(false);
+  const handledMilestoneRef = useRef<string | null>(null);
+  const travelReadyRef = useRef<string | null>(null);
+
   const frogState = useFrogState();
   useLifeCycle(frogState);
   const chainMonitor = useChainMonitor(frogState);
@@ -98,94 +111,316 @@ function App() {
   const dailyTasks = useDailyTasks();
   const { play: playSound } = useSound();
   const quietMode = useQuietMode();
+  const activity = useActivity();
+  const collectionBook = useCollectionBook();
+  const decoration = useDecoration();
+  const { hibernation, recordInteraction, wakeUp, isHibernating } = useHibernation(frogState);
 
-  // Quiet Mode Effect
-  useEffect(() => {
-    if (quietMode.behavior.frogState === 'sleeping') {
-      frogState.setCurrentState('sleeping');
-    } else if (quietMode.behavior.frogState === 'hidden') {
-      // Handle hidden state
-    } else if (frogState.currentState === 'sleeping' && quietMode.behavior.frogState !== 'sleeping') {
-      frogState.setCurrentState('idle');
-    }
-  }, [quietMode.behavior.frogState, frogState]);
+  const taskProgress = dailyTasks.getProgress();
+  const totalTaskReward = dailyTasks.getTotalReward();
+  const decorationInventory = inventory.getItemsByType('decoration').filter(item => item.quantity > 0);
+  const longTermGoals = useLongTermGoals({
+    tasksCompleted: taskProgress.completed,
+    tasksTotal: taskProgress.total,
+    travelHistory: travel.travelHistory,
+    placedDecorationTypes: decoration.decorations.map(item => item.itemId),
+  });
 
-  // Show interaction bubble
   const showInteractionBubble = useCallback((message: string) => {
     setBubbleMessage(message);
     setShowBubble(true);
   }, []);
 
-  // Play sound on interaction
-  const handleInteraction = useCallback((type: 'pet' | 'poke' | 'feed') => {
+  const handleInteractionSound = useCallback((type: 'pet' | 'poke' | 'feed') => {
     if (quietMode.behavior.playSounds) {
       playSound(type);
     }
   }, [playSound, quietMode.behavior.playSounds]);
 
-  // Time-based greeting
+  const openDialog = useCallback((name: DialogKey) => {
+    setDialogs(prev => ({ ...prev, [name]: true }));
+  }, []);
+
+  const closeDialog = useCallback((name: DialogKey) => {
+    setDialogs(prev => ({ ...prev, [name]: false }));
+  }, []);
+
+  const applyItemEffect = useCallback((item: InventoryItem) => {
+    if (item.effect?.hunger) {
+      petStats.increaseStat('hunger', item.effect.hunger);
+    }
+    if (item.effect?.happiness) {
+      petStats.increaseStat('happiness', item.effect.happiness);
+    }
+    if (item.effect?.energy) {
+      petStats.increaseStat('energy', item.effect.energy);
+    }
+  }, [petStats]);
+
+  const handleUseBagItem = useCallback((itemId: string) => {
+    const item = inventory.useItem(itemId);
+    if (!item) {
+      showInteractionBubble('背包里已经没有这个道具了');
+      return;
+    }
+
+    applyItemEffect(item);
+    petStats.addExp(2);
+    recordInteraction();
+    showInteractionBubble(`${item.name} 已经用上啦`);
+  }, [inventory, applyItemEffect, petStats, recordInteraction, showInteractionBubble]);
+
+  const handlePlaceDecoration = useCallback((itemId: string) => {
+    const item = inventory.items.find(entry => entry.id === itemId);
+    if (!item || item.quantity <= 0) {
+      showInteractionBubble('这个装饰暂时不在背包里');
+      return;
+    }
+
+    inventory.removeItem(itemId, 1);
+    decoration.placeDecoration(
+      itemId,
+      12 + Math.random() * 70,
+      18 + Math.random() * 52,
+      { scale: 0.9 + Math.random() * 0.3 }
+    );
+    recordInteraction();
+    showInteractionBubble(`把 ${item.name} 摆进家园了`);
+  }, [inventory, decoration, recordInteraction, showInteractionBubble]);
+
+  const handleRemoveDecoration = useCallback((decorationId: string) => {
+    const placed = decoration.decorations.find(item => item.id === decorationId);
+    if (!placed) return;
+
+    decoration.removeDecoration(decorationId);
+    inventory.addItem(placed.itemId, 1);
+    showInteractionBubble('先把它收回背包，等等再重新摆');
+  }, [decoration, inventory, showInteractionBubble]);
+
+  const performPetInteraction = useCallback(() => {
+    frogState.interact('pet');
+    handleInteractionSound('pet');
+    showInteractionBubble('好舒服呀～');
+    remember('interaction', 'pet', 0.7);
+    petStats.addExp(5);
+    dailyTasks.completeTask('2');
+    achievements.incrementProgress('first_pet');
+    achievements.incrementProgress('pet_50');
+  }, [frogState, handleInteractionSound, showInteractionBubble, remember, petStats, dailyTasks, achievements]);
+
+  const performFeedInteraction = useCallback(() => {
+    frogState.interact('feed');
+    handleInteractionSound('feed');
+    showInteractionBubble('好吃！');
+    remember('interaction', 'feed', 0.6);
+    petStats.increaseStat('hunger', 15);
+    petStats.addExp(3);
+    dailyTasks.completeTask('1');
+    achievements.incrementProgress('feed_10');
+  }, [frogState, handleInteractionSound, showInteractionBubble, remember, petStats, dailyTasks, achievements]);
+
+  const handleMenuAction = useCallback((action: string) => {
+    if (isHibernating && action !== 'quiet' && action !== 'settings') {
+      wakeUp();
+      showInteractionBubble('先把它叫醒再说');
+      return;
+    }
+
+    recordInteraction();
+
+    switch (action) {
+      case 'tasks':
+        openDialog('tasks');
+        break;
+      case 'travel':
+        openDialog('travel');
+        break;
+      case 'bag':
+        openDialog('bag');
+        break;
+      case 'friends':
+        openDialog('friends');
+        dailyTasks.completeTask('5');
+        break;
+      case 'badges':
+        openDialog('badges');
+        break;
+      case 'home':
+        openDialog('home');
+        break;
+      case 'collection':
+        openDialog('collection');
+        break;
+      case 'settings':
+        openDialog('settings');
+        break;
+      case 'monitor':
+        openDialog('chainMonitor');
+        break;
+      case 'profile':
+        openDialog('profile');
+        break;
+      case 'quiet':
+        openDialog('quietMode');
+        break;
+      default:
+        break;
+    }
+  }, [isHibernating, wakeUp, showInteractionBubble, recordInteraction, openDialog, dailyTasks]);
+
+  useEffect(() => {
+    if (quietMode.behavior.frogState === 'sleeping') {
+      frogState.setCurrentState('sleeping');
+    } else if (frogState.currentState === 'sleeping' && quietMode.behavior.frogState !== 'sleeping') {
+      frogState.setCurrentState('idle');
+    }
+  }, [quietMode.behavior.frogState, frogState]);
+
   useEffect(() => {
     if (frogState.currentState === 'idle' && Math.random() > 0.7 && quietMode.behavior.showAnimations) {
       showInteractionBubble(timeSystem.getGreeting());
     }
   }, [timeSystem.timeOfDay, frogState.currentState, quietMode.behavior.showAnimations, showInteractionBubble, timeSystem]);
 
-  // Electron API setup
+  useEffect(() => {
+    if (hibernation.status === 'SLEEPING') {
+      showInteractionBubble('呼…进入冬眠了');
+    } else if (hibernation.status === 'WAKING') {
+      showInteractionBubble('慢慢醒过来中…');
+    }
+  }, [hibernation.status, showInteractionBubble]);
+
   useEffect(() => {
     if (window.electronAPI?.onMenuAction) {
       window.electronAPI.onMenuAction((action: string) => handleMenuAction(action));
     }
-  }, []);
+  }, [handleMenuAction]);
 
-  // Context menu setup
   useEffect(() => {
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-      setQuickMenu({ visible: true, x: e.clientX, y: e.clientY });
+    let cancelled = false;
+
+    const syncWebPrimaryFrog = async () => {
+      const frog = await api.getMyFrog(walletAddress);
+      if (!frog || cancelled) return;
+
+      setTokenId(frog.tokenId);
+      setPetName(prev => {
+        try {
+          return localStorage.getItem('zfrog_pet_name') || frog.name || prev;
+        } catch {
+          return frog.name || prev;
+        }
+      });
     };
+
+    void syncWebPrimaryFrog();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [walletAddress]);
+
+  useEffect(() => {
+    const handleContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+      setQuickMenu({ visible: true, x: event.clientX, y: event.clientY });
+    };
+
     document.addEventListener('contextmenu', handleContextMenu);
     return () => document.removeEventListener('contextmenu', handleContextMenu);
   }, []);
 
-  // Menu action handler
-  const handleMenuAction = useCallback((action: string) => {
-    switch (action) {
-      case 'travel': setDialogs(d => ({ ...d, travel: true })); break;
-      case 'bag': setDialogs(d => ({ ...d, bag: true })); break;
-      case 'friends': setDialogs(d => ({ ...d, friends: true })); break;
-      case 'badges': setDialogs(d => ({ ...d, badges: true })); break;
-      case 'home': setDialogs(d => ({ ...d, home: true })); break;
-      case 'settings': setDialogs(d => ({ ...d, settings: true })); break;
-      case 'monitor': setDialogs(d => ({ ...d, chainMonitor: true })); break;
-      case 'profile': setDialogs(d => ({ ...d, profile: true })); break;
-      case 'quiet': setDialogs(d => ({ ...d, quietMode: true })); break;
+  useEffect(() => {
+    setLastInteractTime(Date.now());
+  }, [frogState.currentState]);
+
+  useEffect(() => {
+    if (loginCheckedRef.current) return;
+    loginCheckedRef.current = true;
+
+    const reward = activity.checkDailyLogin();
+    if (reward > 0) {
+      petStats.addExp(reward);
+      showInteractionBubble(`欢迎回来，签到奖励 +${reward} EXP`);
     }
-  }, []);
+  }, [activity.checkDailyLogin, petStats.addExp, showInteractionBubble]);
 
-  // Update last interact time
-  useEffect(() => setLastInteractTime(Date.now()), [frogState.currentState]);
+  useEffect(() => {
+    const streakAchievement = achievements.achievements.find(item => item.id === 'streak_7');
+    if (!streakAchievement || streakAchievement.progress === activity.streak || streakAchievement.unlocked) return;
+    achievements.updateProgress('streak_7', activity.streak);
+  }, [activity.streak, achievements.achievements, achievements.updateProgress]);
 
-  // Handle frog click
+  useEffect(() => {
+    const friendsAchievement = achievements.achievements.find(item => item.id === 'friends_10');
+    if (!friendsAchievement || friendsAchievement.progress === social.friends.length || friendsAchievement.unlocked) return;
+    achievements.updateProgress('friends_10', social.friends.length);
+  }, [social.friends.length, achievements.achievements, achievements.updateProgress]);
+
+  useEffect(() => {
+    const stats = petStats.stats;
+    const statValues = [stats.health, stats.hunger, stats.energy, stats.happiness, stats.charm, stats.intelligence];
+    const allStatsAchievement = achievements.achievements.find(item => item.id === 'all_stats_max');
+    if (statValues.every(value => value >= 100) && allStatsAchievement && !allStatsAchievement.unlocked) {
+      achievements.unlockAchievement('all_stats_max');
+    }
+  }, [petStats.stats, achievements.achievements, achievements.unlockAchievement]);
+
+  useEffect(() => {
+    const milestone = longTermGoals.pendingMilestone;
+    if (!milestone) {
+      handledMilestoneRef.current = null;
+      return;
+    }
+
+    if (handledMilestoneRef.current === milestone.goalId) return;
+    handledMilestoneRef.current = milestone.goalId;
+
+    petStats.addExp(milestone.reward.exp);
+    milestone.reward.items.forEach(item => inventory.addItem(item.itemId, item.quantity));
+    showInteractionBubble(milestone.message);
+    longTermGoals.acknowledgeMilestone(milestone.goalId);
+  }, [longTermGoals, inventory, petStats, showInteractionBubble]);
+
+  useEffect(() => {
+    if (!travel.currentTravel) {
+      travelReadyRef.current = null;
+      return;
+    }
+
+    if (travel.getProgress() >= 100 && travelReadyRef.current !== travel.currentTravel.id) {
+      travelReadyRef.current = travel.currentTravel.id;
+      showInteractionBubble(`${travel.currentTravel.name} 的旅行结束了，记得领取收获`);
+    }
+  }, [travel, showInteractionBubble]);
+
+  useEffect(() => {
+    if (!travel.currentTravel && frogState.currentState === 'traveling') {
+      frogState.setCurrentState('idle');
+    }
+  }, [travel.currentTravel, frogState]);
+
   const handleFrogClick = useCallback((area: string) => {
     if (!quietMode.behavior.allowInteraction) return;
-    
-    if (pokeCount > 0 && Date.now() - lastInteractTime > 3000) setPokeCount(0);
-    
+    if (isHibernating) {
+      wakeUp();
+      return;
+    }
+
+    recordInteraction();
+
+    if (pokeCount > 0 && Date.now() - lastInteractTime > 3000) {
+      setPokeCount(0);
+    }
+
     switch (area) {
       case 'head':
-        frogState.interact('pet');
-        handleInteraction('pet');
-        showInteractionBubble('好舒服呀～');
-        remember('interaction', 'pet', 0.7);
-        petStats.addExp(5);
-        dailyTasks.completeTask('1');
-        achievements.incrementProgress('first_pet');
-        achievements.incrementProgress('pet_50');
+        performPetInteraction();
         break;
       case 'body':
-        setPokeCount(p => p + 1);
+        setPokeCount(prev => prev + 1);
         frogState.interact('poke');
-        handleInteraction('poke');
+        handleInteractionSound('poke');
         showInteractionBubble('哎呀！');
         if (pokeCount >= 3) {
           frogState.setAngry();
@@ -193,118 +428,176 @@ function App() {
         }
         break;
       case 'mouth':
-        frogState.interact('feed');
-        handleInteraction('feed');
-        showInteractionBubble('好吃！');
-        remember('interaction', 'feed', 0.6);
-        petStats.increaseStat('hunger', 15);
-        petStats.addExp(3);
-        dailyTasks.completeTask('1');
-        achievements.incrementProgress('feed_10');
+        performFeedInteraction();
+        break;
+      default:
         break;
     }
-  }, [frogState, pokeCount, lastInteractTime, quietMode.behavior.allowInteraction, handleInteraction, showInteractionBubble, remember, petStats, dailyTasks, achievements]);
+  }, [
+    quietMode.behavior.allowInteraction,
+    isHibernating,
+    wakeUp,
+    recordInteraction,
+    pokeCount,
+    lastInteractTime,
+    performPetInteraction,
+    frogState,
+    handleInteractionSound,
+    showInteractionBubble,
+    performFeedInteraction,
+  ]);
 
-  // Handle drag end
   const handleDragEnd = useCallback((x: number, y: number) => {
     frogState.setPosition(x, y);
     window.electronAPI?.moveWindow(x, y);
   }, [frogState]);
 
-  // Handle patrol toggle
   const handlePatrolToggle = useCallback(() => {
     if (isPatrolling) {
       frogState.stopPatrol();
       setIsPatrolling(false);
       showInteractionBubble('巡逻结束');
       dailyTasks.completeTask('3');
+      achievements.incrementProgress('patrol_5');
     } else {
       frogState.startPatrol();
       setIsPatrolling(true);
       showInteractionBubble('开始巡逻！');
     }
-  }, [isPatrolling, frogState, showInteractionBubble, dailyTasks]);
+  }, [isPatrolling, frogState, showInteractionBubble, dailyTasks, achievements]);
 
-  // Handle menu select
   const handleMenuSelect = useCallback((item: string) => {
     if (item === 'patrol') {
       handlePatrolToggle();
     } else if (item === 'sleep') {
       frogState.setCurrentState('sleeping');
       showInteractionBubble('晚安～');
-    } else if (item === 'profile') {
-      setDialogs(d => ({ ...d, profile: true }));
     } else {
       handleMenuAction(item);
     }
-    setShowMenu(false);
-  }, [handlePatrolToggle, handleMenuAction, frogState, showInteractionBubble]);
 
-  // Handle quick menu select
+    setShowMenu(false);
+  }, [handlePatrolToggle, frogState, showInteractionBubble, handleMenuAction]);
+
   const handleQuickMenuSelect = useCallback((action: string) => {
+    if (isHibernating) {
+      wakeUp();
+      showInteractionBubble('它还在睡，先轻轻叫醒它');
+      return;
+    }
+
+    recordInteraction();
+
     switch (action) {
       case 'pet':
-        frogState.interact('pet');
-        showInteractionBubble('好舒服呀～');
+        performPetInteraction();
         break;
       case 'feed':
-        frogState.interact('feed');
-        showInteractionBubble('好吃！');
+        performFeedInteraction();
         break;
       case 'patrol':
         handlePatrolToggle();
         break;
       case 'travel':
-        setDialogs(d => ({ ...d, travel: true }));
+        openDialog('travel');
         break;
       case 'sleep':
         frogState.setCurrentState('sleeping');
         showInteractionBubble('晚安～');
         break;
+      default:
+        break;
     }
-  }, [frogState, handlePatrolToggle, showInteractionBubble]);
+  }, [
+    isHibernating,
+    wakeUp,
+    showInteractionBubble,
+    recordInteraction,
+    performPetInteraction,
+    performFeedInteraction,
+    handlePatrolToggle,
+    openDialog,
+    frogState,
+  ]);
 
-  // Close dialog helper
-  const closeDialog = (name: string) => setDialogs(d => ({ ...d, [name]: false }));
+  const handleTravelStart = useCallback((destinationId: string, duration: number) => {
+    const selectedDestination = travel.destinations.find(item => item.id === destinationId);
+    if (!selectedDestination) return;
 
-  // Handle travel start
-  const handleTravelStart = (chain: string, duration: number) => {
     frogState.setCurrentState('traveling');
-    showInteractionBubble('出发去旅行！');
-    travel.startTravel(travel.destinations.find(d => d.chain === chain) || travel.destinations[0]);
+    showInteractionBubble(`出发去 ${selectedDestination.name}！`);
+    travel.startTravel({ ...selectedDestination, duration });
     dailyTasks.completeTask('4');
+  }, [travel, frogState, showInteractionBubble, dailyTasks]);
+
+  const handleTravelComplete = useCallback(() => {
+    const result = travel.completeTravel();
+    if (!result) return;
+
+    frogState.setCurrentState('happy');
+    petStats.addExp(result.exp);
+    result.items.forEach(itemId => inventory.addItem(itemId, 1));
     achievements.incrementProgress('travel_3');
+    showInteractionBubble(`旅行归来，带回了 ${result.exp} EXP 和新的收获`);
+  }, [travel, frogState, petStats, inventory, achievements, showInteractionBubble]);
+
+  const profileData = {
+    name: petName,
+    ...petStats.stats,
   };
 
   return (
     <div style={{ width: '100%', height: '100%', background: 'transparent', position: 'relative' }}>
-      {/* Weather Effect */}
       <WeatherEffect weather={timeSystem.weather} />
-
-      {/* Status Bar */}
+      <HibernationStatus state={hibernation} onWake={wakeUp} />
       <StatusBar hunger={petStats.stats.hunger} energy={petStats.stats.energy} happiness={petStats.stats.happiness} />
 
-      {/* Frog */}
-      <Frog state={frogState.currentState} mood={frogState.mood} stats={petStats.stats} onClick={handleFrogClick} onDragStart={() => {}} onDragEnd={handleDragEnd} />
+      <Frog
+        state={frogState.currentState}
+        mood={frogState.mood}
+        stats={petStats.stats}
+        onClick={handleFrogClick}
+        onDragStart={() => {}}
+        onDragEnd={handleDragEnd}
+      />
 
-      {/* Interaction Bubble */}
       <InteractionBubble message={bubbleMessage} visible={showBubble} onHide={() => setShowBubble(false)} />
 
-      {/* Quick Menu */}
-      <QuickMenu visible={quickMenu.visible} x={quickMenu.x} y={quickMenu.y} onSelect={handleQuickMenuSelect} onClose={() => setQuickMenu({ ...quickMenu, visible: false })} />
+      <QuickMenu
+        visible={quickMenu.visible}
+        x={quickMenu.x}
+        y={quickMenu.y}
+        onSelect={handleQuickMenuSelect}
+        onClose={() => setQuickMenu(prev => ({ ...prev, visible: false }))}
+      />
 
-      {/* Halo Menu */}
       <HaloMenu visible={showMenu} onSelect={handleMenuSelect} onClose={() => setShowMenu(false)} />
 
-      {/* Menu Button */}
-      <motion.div style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 10, opacity: 0.5, color: 'white', cursor: 'pointer', textAlign: 'center' }} whileHover={{ scale: 1.1 }} onClick={() => setShowMenu(!showMenu)}>
+      <motion.div
+        style={{
+          position: 'absolute',
+          bottom: 8,
+          right: 8,
+          fontSize: 10,
+          opacity: 0.5,
+          color: 'white',
+          cursor: 'pointer',
+          textAlign: 'center',
+        }}
+        whileHover={{ scale: 1.1 }}
+        onClick={() => setShowMenu(prev => !prev)}
+      >
         <div>🐸</div>
         <div>{showMenu ? '关闭' : '菜单'}</div>
       </motion.div>
 
-      {/* Status Indicator */}
-      <motion.div style={{ position: 'absolute', bottom: 8, left: 8, fontSize: 9, color: 'rgba(255,255,255,0.5)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} key={frogState.currentState}>
-        {frogState.currentState === 'idle' && '🐸 Lv.' + petStats.stats.level}
+      <motion.div
+        style={{ position: 'absolute', bottom: 8, left: 8, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        key={frogState.currentState}
+      >
+        {frogState.currentState === 'idle' && `🐸 Lv.${petStats.stats.level}`}
         {frogState.currentState === 'sleeping' && '😴'}
         {frogState.currentState === 'eating' && '🍽️'}
         {frogState.currentState === 'happy' && '😊'}
@@ -323,16 +616,78 @@ function App() {
         {frogState.currentState === 'patrolling' && '🎯'}
       </motion.div>
 
-      {/* Dialogs */}
-      <TasksDialog walletAddress={walletAddress} visible={dialogs.tasks} onClose={() => closeDialog('tasks')} tasks={dailyTasks.tasks} />
-      <FriendsDialog walletAddress={walletAddress} visible={dialogs.friends} onClose={() => closeDialog('friends')} friends={social.friends} />
-      <BadgesDialog tokenId={tokenId} visible={dialogs.badges} onClose={() => closeDialog('badges')} achievements={achievements.achievements} />
-      <TravelDialog tokenId={tokenId} visible={dialogs.travel} onClose={() => closeDialog('travel')} onTravelStart={handleTravelStart} travel={travel} />
+      <TasksDialog
+        walletAddress={walletAddress}
+        visible={dialogs.tasks}
+        onClose={() => closeDialog('tasks')}
+        tasks={dailyTasks.tasks}
+        totalReward={totalTaskReward}
+        longTermGoals={longTermGoals.goals}
+        nextTip={longTermGoals.nextTip}
+      />
+      <FriendsDialog
+        walletAddress={walletAddress}
+        visible={dialogs.friends}
+        onClose={() => closeDialog('friends')}
+        friends={social.friends}
+      />
+      <BadgesDialog
+        tokenId={tokenId}
+        ownerAddress={walletAddress}
+        petName={petName}
+        visible={dialogs.badges}
+        onClose={() => closeDialog('badges')}
+        achievements={achievements.achievements}
+      />
+      <TravelDialog
+        visible={dialogs.travel}
+        onClose={() => closeDialog('travel')}
+        onTravelStart={handleTravelStart}
+        onTravelComplete={handleTravelComplete}
+        walletAddress={walletAddress}
+        tokenId={tokenId}
+        petName={petName}
+        travel={travel}
+      />
       <SettingsDialog visible={dialogs.settings} onClose={() => closeDialog('settings')} />
-      <ChainMonitorPanel visible={dialogs.chainMonitor} onClose={() => closeDialog('chainMonitor')} onSimulate={(e) => chainMonitor.simulateEvent(e as any)} />
-      <HomeDialog tokenId={tokenId} visible={dialogs.home} onClose={() => closeDialog('home')} />
-      <BagDialog visible={dialogs.bag} onClose={() => closeDialog('bag')} inventory={inventory} />
-      <ProfileDialog visible={dialogs.profile} onClose={() => closeDialog('profile')} petData={petStats.stats} />
+      <ChainMonitorPanel
+        visible={dialogs.chainMonitor}
+        onClose={() => closeDialog('chainMonitor')}
+        onSimulate={(event) => chainMonitor.simulateEvent(event as never)}
+      />
+      <HomeDialog
+        visible={dialogs.home}
+        onClose={() => closeDialog('home')}
+        decorationInventory={decorationInventory}
+        decorations={decoration.decorations}
+        onPlaceDecoration={handlePlaceDecoration}
+        onRemoveDecoration={handleRemoveDecoration}
+        longTermGoals={longTermGoals.goals}
+      />
+      <CollectionDialog
+        visible={dialogs.collection}
+        onClose={() => closeDialog('collection')}
+        entries={collectionBook.collection}
+      />
+      <BagDialog
+        visible={dialogs.bag}
+        onClose={() => closeDialog('bag')}
+        inventory={inventory}
+        onUseItem={handleUseBagItem}
+      />
+      <ProfileDialog
+        visible={dialogs.profile}
+        onClose={() => closeDialog('profile')}
+        petData={profileData}
+        careStreak={longTermGoals.careStreak}
+        completedGoalCount={longTermGoals.completedGoalCount}
+        collectionSummary={{
+          total: collectionBook.collection.length,
+          mutationCount: collectionBook.collection.filter(item => item.mutationTraits.length > 0).length,
+        }}
+        longTermGoals={longTermGoals.goals}
+        nextTip={longTermGoals.nextTip}
+      />
       <QuietModePanel visible={dialogs.quietMode} onClose={() => closeDialog('quietMode')} />
     </div>
   );

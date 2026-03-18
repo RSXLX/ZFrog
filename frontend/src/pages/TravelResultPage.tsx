@@ -22,6 +22,9 @@ export function TravelResultPage() {
             return;
         }
 
+        let isCancelled = false;
+        let interval: ReturnType<typeof setInterval> | null = null;
+
         const fetchTravel = async () => {
             try {
                 setLoading(true);
@@ -34,12 +37,15 @@ export function TravelResultPage() {
                     response = await apiService.get(`/travels/journal/${travelId}`);
                 }
                 
+                if (isCancelled) return;
+
                 if (response.success || response.data) {
                     setTravel(response.data);
                     
                     // 如果旅行还在进行中，定期刷新状态
                     if (response.data.status === 'Active') {
-                        const interval = setInterval(async () => {
+                        interval = setInterval(async () => {
+                            if (isCancelled) return;
                             try {
                                 let refreshResponse = await apiService.get(`/travels/p0/${travelId}`);
                                 if (!refreshResponse.success) {
@@ -48,28 +54,36 @@ export function TravelResultPage() {
                                 
                                 if (refreshResponse.success || refreshResponse.data) {
                                     setTravel(refreshResponse.data);
-                                    if (refreshResponse.data.status === 'Completed') {
+                                    if (refreshResponse.data.status === 'Completed' && interval) {
                                         clearInterval(interval);
+                                        interval = null;
                                     }
                                 }
                             } catch (err) {
                                 console.error('Failed to refresh travel status:', err);
                             }
                         }, 5000); // 每5秒刷新一次
-                        
-                        return () => clearInterval(interval);
                     }
                 } else {
                     setError('找不到旅行记录');
                 }
             } catch (err: any) {
+                if (isCancelled) return;
                 setError(err.message || '加载失败');
             } finally {
+                if (isCancelled) return;
                 setLoading(false);
             }
         };
 
-        fetchTravel();
+        void fetchTravel();
+
+        return () => {
+            isCancelled = true;
+            if (interval) {
+                clearInterval(interval);
+            }
+        };
     }, [travelId, navigate]);
 
     if (loading) {

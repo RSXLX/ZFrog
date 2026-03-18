@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Award, Lock, Unlock, Star, Trophy, Zap, Flame, Droplets, Wind, Mountain, Sparkles } from 'lucide-react';
+import { Award, Lock, Unlock, Star, Trophy, Zap, Flame, Droplets, Wind, Mountain, Sparkles, Users } from 'lucide-react';
 import { Button } from '../common/Button';
 import { ScaleOnHover } from '../common/animations/FadeIn';
 import type { Badge, BadgeRarity, BadgeCategory } from '../../types';
@@ -49,8 +49,6 @@ const categoryIcons: Record<BadgeCategory, typeof Award> = {
   special: Sparkles,
   event: Flame,
 };
-
-import { Users } from 'lucide-react';
 
 export function BadgeCard({
   badge,

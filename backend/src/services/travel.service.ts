@@ -26,6 +26,7 @@ import { logger } from '../utils/logger';
 import { badgeService } from './badge/badge.service';
 import { travelP0Service } from './travel/travel-p0.service';
 import { ChainKey } from '../config/chains';
+import { ZETAFROG_ABI, TRAVEL_ABI } from '../config/contracts';
 
 const prisma = new PrismaClient();
 
@@ -93,6 +94,7 @@ class TravelService {
     private provider: JsonRpcProvider;
     private wallet: Wallet | null;
     private frogContract: Contract;
+    private travelContract: Contract;
     private souvenirContract: Contract;
 
     constructor() {
@@ -108,14 +110,18 @@ class TravelService {
             this.wallet = new ethers.Wallet(privateKey, this.provider);
         }
 
-        // Load contract ABIs
-        const frogABI = require('../abi/ZetaFrogNFT.json');
         const souvenirABI = require('../abi/SouvenirNFT.json');
 
         // Initialize contracts
         this.frogContract = new ethers.Contract(
             config.ZETAFROG_NFT_ADDRESS || '',
-            frogABI,
+            ZETAFROG_ABI,
+            this.wallet || this.provider
+        );
+
+        this.travelContract = new ethers.Contract(
+            config.TRAVEL_CONTRACT_ADDRESS || '',
+            TRAVEL_ABI,
             this.wallet || this.provider
         );
 
@@ -239,10 +245,11 @@ class TravelService {
             // 6. Complete travel on contract
             if (this.wallet) {
                 logger.info(`[TravelService] Calling completeTravel on contract...`);
-                const tx = await this.frogContract.completeTravel(
+                const tx = await this.travelContract.completeTravel(
                     travel.frog.tokenId,
                     journalHash,
-                    souvenirId
+                    souvenirId,
+                    true
                 );
                 await tx.wait();
             }

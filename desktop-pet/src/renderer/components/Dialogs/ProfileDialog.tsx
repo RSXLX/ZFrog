@@ -1,5 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import LongTermGoalPanel from '../LongTermGoalPanel';
+import type { LongTermGoalView } from '../../hooks/useLongTermGoals';
 
 interface ProfileDialogProps {
   visible: boolean;
@@ -16,9 +18,26 @@ interface ProfileDialogProps {
     charm: number;
     intelligence: number;
   };
+  careStreak: number;
+  completedGoalCount: number;
+  collectionSummary: {
+    total: number;
+    mutationCount: number;
+  };
+  longTermGoals: LongTermGoalView[];
+  nextTip?: string;
 }
 
-const ProfileDialog: React.FC<ProfileDialogProps> = ({ visible, onClose, petData }) => {
+const ProfileDialog: React.FC<ProfileDialogProps> = ({
+  visible,
+  onClose,
+  petData,
+  careStreak,
+  completedGoalCount,
+  collectionSummary,
+  longTermGoals,
+  nextTip,
+}) => {
   const getStatColor = (value: number) => {
     if (value > 70) return '#4ADE80';
     if (value > 40) return '#FCD34D';
@@ -89,12 +108,50 @@ const ProfileDialog: React.FC<ProfileDialogProps> = ({ visible, onClose, petData
               </div>
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 18 }}>
+              <div style={{ padding: 10, borderRadius: 10, background: '#f8fafc', textAlign: 'center' }}>
+                <div style={{ fontSize: 18 }}>🔥</div>
+                <div style={{ fontSize: 11, color: '#64748b' }}>照护连胜</div>
+                <div style={{ fontWeight: 700 }}>{careStreak} 天</div>
+              </div>
+              <div style={{ padding: 10, borderRadius: 10, background: '#f8fafc', textAlign: 'center' }}>
+                <div style={{ fontSize: 18 }}>📚</div>
+                <div style={{ fontSize: 11, color: '#64748b' }}>图鉴收集</div>
+                <div style={{ fontWeight: 700 }}>{collectionSummary.total}</div>
+              </div>
+              <div style={{ padding: 10, borderRadius: 10, background: '#f8fafc', textAlign: 'center' }}>
+                <div style={{ fontSize: 18 }}>🏁</div>
+                <div style={{ fontSize: 11, color: '#64748b' }}>长期达成</div>
+                <div style={{ fontWeight: 700 }}>{completedGoalCount}</div>
+              </div>
+            </div>
+
             <StatBar label="生命值" value={petData.health} icon="❤️" />
             <StatBar label="饱食度" value={petData.hunger} icon="🍎" />
             <StatBar label="精力" value={petData.energy} icon="⚡" />
             <StatBar label="快乐度" value={petData.happiness} icon="💖" />
             <StatBar label="魅力" value={petData.charm} icon="✨" />
             <StatBar label="智力" value={petData.intelligence} icon="🧠" />
+
+            <div
+              style={{
+                marginTop: 18,
+                padding: 12,
+                borderRadius: 12,
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+              }}
+            >
+              <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>图鉴备注</div>
+              <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.6 }}>
+                已收集 {collectionSummary.total} 个条目，其中变异条目 {collectionSummary.mutationCount} 个。
+              </div>
+            </div>
+
+            <div style={{ marginTop: 18 }}>
+              <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>长期养成</div>
+              <LongTermGoalPanel goals={longTermGoals} nextTip={nextTip} compact />
+            </div>
           </motion.div>
         </motion.div>
       )}

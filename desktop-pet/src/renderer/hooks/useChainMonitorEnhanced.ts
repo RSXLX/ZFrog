@@ -78,7 +78,7 @@ export function useChainMonitorEnhanced(): UseChainMonitorEnhancedReturn {
       transactionHash: `0x${Math.random().toString(16).slice(2, 42)}`,
       from: `0x${Math.random().toString(16).slice(2, 42)}`,
       to: `0x${Math.random().toString(16).slice(2, 42)}`,
-      value: Math.random() * 1000,
+      value: (Math.random() * 1000).toFixed(4),
     };
     
     setLastEvent(mockEvent);

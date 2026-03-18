@@ -10,7 +10,7 @@ import { ipfsService } from '../services/ipfs.service';
 import { explorationService } from '../services/travel/exploration.service';
 import { config } from '../config';
 import { logger } from '../utils/logger';
-import { ZETAFROG_ABI, SOUVENIR_ABI } from '../config/contracts';
+import { SOUVENIR_ABI, TRAVEL_ABI } from '../config/contracts';
 import { ChainKey, CHAIN_ID_TO_KEY, getChainConfig } from '../config/chains';
 import { travelP0Service } from '../services/travel/travel-p0.service';
 import { NFTImageOrchestratorService } from '../services/nft-image-orchestrator.service';
@@ -884,7 +884,7 @@ class TravelProcessor {
         try {
             const { request } = await this.publicClient.simulateContract({
                 address: config.TRAVEL_CONTRACT_ADDRESS as `0x${string}`,
-                abi: ZETAFROG_ABI,
+                abi: TRAVEL_ABI,
                 functionName: 'completeTravel',
                 args: [BigInt(frogId), journalHash, BigInt(souvenirId), true], // Corrected args
                 account: this.account,

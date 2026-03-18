@@ -3,9 +3,8 @@
  * 宠物蛋展示组件 - 基于ZFrog桌面宠物框架
  */
 
-import React from 'react';
 import { motion } from 'framer-motion';
-import { Pet, PetStage, PetMood, FoodType } from '../../hooks/usePetEgg';
+import type { Pet, PetStage, PetMood, FoodType } from '../../hooks/usePetEgg';
 import './PetEgg.css';
 
 interface PetEggProps {
@@ -21,21 +20,17 @@ interface PetEggProps {
 // 阶段对应的emoji
 const stageEmojis: Record<PetStage, string> = {
   egg: '🥚',
-  baby: '👶',
-  child: '🧒',
-  teen: '🧑',
-  adult: '👨',
-  senior: '👴',
+  tadpole: '🐟',
+  young_frog: '🐸',
+  adult_frog: '👑',
 };
 
 // 阶段对应的中文名称
 const stageNames: Record<PetStage, string> = {
   egg: '蛋',
-  baby: '婴儿',
-  child: '儿童',
-  teen: '青少年',
-  adult: '成年',
-  senior: '老年',
+  tadpole: '蝌蚪',
+  young_frog: '幼蛙',
+  adult_frog: '成蛙',
 };
 
 // 心情对应的颜色
@@ -50,7 +45,7 @@ const moodColors: Record<PetMood, string> = {
   sick: '#ff5722',
 };
 
-export const PetEgg: React.FC<PetEggProps> = ({
+export const PetEgg = ({
   pet,
   onFeed,
   onPlay,
@@ -58,7 +53,7 @@ export const PetEgg: React.FC<PetEggProps> = ({
   onToggleSleep,
   onTreat,
   onCuddle,
-}) => {
+}: PetEggProps) => {
   if (!pet) {
     return (
       <div className="pet-egg-empty">
@@ -74,7 +69,7 @@ export const PetEgg: React.FC<PetEggProps> = ({
     );
   }
 
-  const { attributes, stage, mood, name, isSleeping, isSick, poopCount } = pet;
+  const { attributes, stage, mood, name, isSleeping, isSick } = pet;
 
   // 计算属性条颜色
   const getBarColor = (value: number): string => {
@@ -125,7 +120,7 @@ export const PetEgg: React.FC<PetEggProps> = ({
           { key: 'hunger', icon: '🍖', label: '饥饿', value: attributes.hunger },
           { key: 'happiness', icon: '😊', label: '心情', value: attributes.happiness },
           { key: 'energy', icon: '⚡', label: '精力', value: attributes.energy },
-          { key: 'hygiene', icon: '🧼', label: '卫生', value: attributes.hygiene },
+          { key: 'cleanliness', icon: '🧼', label: '卫生', value: attributes.cleanliness },
         ].map((attr) => (
           <div key={attr.key} className="attribute-bar">
             <span className="attr-icon">{attr.icon}</span>
@@ -143,9 +138,9 @@ export const PetEgg: React.FC<PetEggProps> = ({
           </div>
         ))}
 
-        {poopCount > 0 && (
+        {attributes.cleanliness < 40 && (
           <div className="poop-warning">
-            {'💩'.repeat(poopCount)} 有 {poopCount} 个便便需要清理！
+            🧼 清洁度偏低，记得给它打扫一下环境。
           </div>
         )}
       </div>
@@ -154,7 +149,7 @@ export const PetEgg: React.FC<PetEggProps> = ({
       <div className="action-buttons">
         <button 
           className="action-btn feed" 
-          onClick={() => onFeed('apple')}
+          onClick={() => onFeed('insect' as FoodType)}
           disabled={isSleeping}
         >
           <span className="btn-icon">🍖</span>
@@ -173,7 +168,7 @@ export const PetEgg: React.FC<PetEggProps> = ({
         <button 
           className="action-btn clean" 
           onClick={onClean}
-          disabled={isSleeping || poopCount === 0}
+          disabled={isSleeping || attributes.cleanliness >= 100}
         >
           <span className="btn-icon">🧹</span>
           <span className="btn-label">清洁</span>

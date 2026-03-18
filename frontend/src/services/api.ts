@@ -125,7 +125,7 @@ class ApiService {
   async syncFrog(tokenId: number): Promise<boolean> {
     try {
       const response = await this.post('/api/frogs/sync', { tokenId });
-      return response.data.success;
+      return response.success;
     } catch (error) {
         console.error('Sync failed:', error);
         return false;
@@ -241,7 +241,7 @@ class ApiService {
       });
 
       if (!response.success) {
-        throw new Error(response.data?.error?.message || 'Failed to start travel');
+        throw new Error(response.error || response.data?.error?.message || 'Failed to start travel');
       }
 
       return response.data;
@@ -280,7 +280,7 @@ class ApiService {
     });
 
     if (!response.success) {
-      throw new Error(response.data?.error?.message || 'Failed to start travel');
+      throw new Error(response.error || response.data?.error?.message || 'Failed to start travel');
     }
 
     return response.data;

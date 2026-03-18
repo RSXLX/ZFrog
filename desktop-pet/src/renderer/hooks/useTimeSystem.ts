@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
-type Weather = 'sunny' | 'cloudy' | 'rainy' | 'snowy';
+export type Weather = 'sunny' | 'cloudy' | 'rainy' | 'snowy';
 
 export interface TimeSystemState {
   timeOfDay: TimeOfDay;

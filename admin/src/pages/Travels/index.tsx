@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Space, message, Popconfirm, Select, Modal, Descriptions, Spin } from 'antd';
+import { Card, Table, Tag, Button, Space, message, Popconfirm, Select, Modal, Descriptions, Spin, Alert } from 'antd';
 import { ReloadOutlined, CheckCircleOutlined, EyeOutlined } from '@ant-design/icons';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/error';
 
 interface TravelRecord {
   id: number;
   frogId: number;
   frogName: string;
   targetChain: string;
-  targetWallet: string;
+  targetWallet?: string;
   status: string;
   isCrossChain: boolean;
   startTime: string;
@@ -53,6 +54,7 @@ const Travels: React.FC = () => {
   const [detailVisible, setDetailVisible] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedTravel, setSelectedTravel] = useState<TravelDetail | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTravels();
@@ -65,13 +67,10 @@ const Travels: React.FC = () => {
         params: { status: statusFilter || undefined },
       });
       setTravels((response as { data: TravelRecord[] }).data);
+      setLoadError(null);
     } catch (err) {
-      // 模拟数据
-      setTravels([
-        { id: 1, frogId: 1, frogName: 'Frog #1', targetChain: 'BSC_TESTNET', targetWallet: '0x1234...5678', status: 'Active', isCrossChain: true, startTime: '2026-01-15 10:00', endTime: '2026-01-15 11:00', duration: 3600 },
-        { id: 2, frogId: 2, frogName: 'Frog #2', targetChain: 'ZETACHAIN_ATHENS', targetWallet: '0xabcd...ef01', status: 'Completed', isCrossChain: false, startTime: '2026-01-14 09:00', endTime: '2026-01-14 10:00', duration: 3600 },
-        { id: 3, frogId: 3, frogName: 'Frog #3', targetChain: 'ETH_SEPOLIA', targetWallet: '0x9876...5432', status: 'Active', isCrossChain: true, startTime: '2026-01-15 09:30', endTime: '2026-01-15 10:30', duration: 3600 },
-      ]);
+      setTravels([]);
+      setLoadError(getApiErrorMessage(err, '加载旅行列表失败'));
     } finally {
       setLoading(false);
     }
@@ -84,22 +83,9 @@ const Travels: React.FC = () => {
       const response = await api.get(`/api/admin/travels/${record.id}`);
       setSelectedTravel(response as unknown as TravelDetail);
     } catch (err) {
-      // 使用模拟数据
-      setSelectedTravel({
-        ...record,
-        targetWallet: '0x' + '1234'.repeat(10),
-        currentStage: 'EXPLORING',
-        progress: 65,
-        crossChainStatus: record.isCrossChain ? 'ON_TARGET_CHAIN' : undefined,
-        startTxHash: '0x' + 'abc123'.repeat(6),
-        journalContent: '今天我来到了一个神奇的钱包地址，发现这里有很多有趣的交易记录...',
-        observedTxCount: 42,
-        observedTotalValue: '1.5 ETH',
-        discoveries: [
-          { type: 'balance', title: '发现大户', description: '这个地址持有超过 100 ETH', rarity: 3 },
-          { type: 'activity', title: 'DeFi 达人', description: '最近参与了 Uniswap 交易', rarity: 2 },
-        ],
-      });
+      setSelectedTravel(null);
+      message.error(getApiErrorMessage(err, '加载旅行详情失败'));
+      setDetailVisible(false);
     } finally {
       setDetailLoading(false);
     }
@@ -111,7 +97,7 @@ const Travels: React.FC = () => {
       message.success('强制完成成功');
       fetchTravels();
     } catch (err) {
-      message.warning('后端 API 未实现');
+      message.error(getApiErrorMessage(err, '强制完成失败'));
     }
   };
 
@@ -189,6 +175,15 @@ const Travels: React.FC = () => {
           </Space>
         }
       >
+        {loadError && (
+          <Alert
+            type="error"
+            showIcon
+            message="加载失败"
+            description={loadError}
+            style={{ marginBottom: 16 }}
+          />
+        )}
         <Table
           dataSource={travels}
           columns={columns}

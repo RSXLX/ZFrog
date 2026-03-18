@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, Table, Tag, Input, Button, Space, Modal, Select, message, Descriptions, Popconfirm } from 'antd';
 import { SearchOutlined, ReloadOutlined, RollbackOutlined } from '@ant-design/icons';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/error';
 
 interface FrogRecord {
   id: number;
@@ -44,16 +45,13 @@ const Frogs: React.FC = () => {
       const response = await api.get('/api/admin/frogs', {
         params: { page, pageSize, search },
       });
-      const data = response as { data: FrogRecord[]; total: number };
+      const data = response as unknown as { data: FrogRecord[]; total: number };
       setFrogs(data.data);
       setTotal(data.total);
     } catch (err) {
-      // 模拟数据
-      setFrogs([
-        { id: 1, tokenId: 1, name: 'Frog #1', ownerAddress: '0x53C1844Af058fE3B3195e49fEC8f97E0a4F87772', status: 'Idle', xp: 150, level: 2, totalTravels: 5, createdAt: '2026-01-10' },
-        { id: 2, tokenId: 2, name: 'Frog #2', ownerAddress: '0xAbC1234567890AbCdEf1234567890AbCdEf12345', status: 'Traveling', xp: 300, level: 3, totalTravels: 12, createdAt: '2026-01-08' },
-      ]);
-      setTotal(2);
+      setFrogs([]);
+      setTotal(0);
+      message.error(getApiErrorMessage(err, '加载青蛙列表失败'));
     } finally {
       setLoading(false);
     }
@@ -78,7 +76,7 @@ const Frogs: React.FC = () => {
       setEditModalVisible(false);
       fetchFrogs();
     } catch (err) {
-      message.warning('后端 API 未实现，状态未更新');
+      message.error(getApiErrorMessage(err, '状态更新失败'));
       setEditModalVisible(false);
     }
   };
@@ -88,7 +86,7 @@ const Frogs: React.FC = () => {
     try {
       setRecalling(record.tokenId);
       const response = await api.post(`/api/admin/frogs/${record.tokenId}/emergency-return`);
-      const result = response as { success: boolean; txHash: string; message: string };
+      const result = response as unknown as { success: boolean; txHash: string; message: string };
       message.success(`召回成功！交易哈希: ${result.txHash?.slice(0, 10)}...`);
       fetchFrogs();
     } catch (err: any) {

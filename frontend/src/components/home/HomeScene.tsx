@@ -40,7 +40,6 @@ const SIZE_CONFIG = {
 };
 
 export function HomeScene({
-  frogId = 1,
   frogName = 'ZetaFrog',
   frogState = FrogState.IDLE,
   unreadDiaries = 0,
@@ -87,8 +86,8 @@ export function HomeScene({
 
   // 查看纪念品
   const handleViewSouvenirs = useCallback(() => {
-    navigate(`/souvenirs/${frogId}`);
-  }, [navigate, frogId]);
+    navigate('/souvenirs');
+  }, [navigate]);
 
   // 选择道具
   const handleSelectItem = useCallback((item: any) => {

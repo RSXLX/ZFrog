@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { GardenFrogState, getFriendshipLevel } from '../../types/garden';
 import { apiService } from '../../services/api';
+import { useToast } from '../common/ToastProvider';
 
 interface GardenInteractionPanelProps {
   frogState: GardenFrogState;
@@ -16,13 +17,46 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
   onClose,
   onInteractionComplete
 }) => {
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showHeartAnimation, setShowHeartAnimation] = useState(false);
+  const [friendshipXp, setFriendshipXp] = useState(0);
+  const [friendshipLoading, setFriendshipLoading] = useState(true);
 
-  // 模拟友好度数据（实际应从 API 获取）
-  const friendshipXp = 680;
   const friendshipLevel = getFriendshipLevel(friendshipXp);
-  const progressPercent = ((friendshipXp - friendshipLevel.minXp) / (friendshipLevel.maxXp - friendshipLevel.minXp)) * 100;
+  const progressPercent =
+    friendshipLevel.maxXp === Infinity
+      ? 100
+      : ((friendshipXp - friendshipLevel.minXp) / (friendshipLevel.maxXp - friendshipLevel.minXp)) * 100;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadFriendship = async () => {
+      setFriendshipLoading(true);
+      try {
+        const response = await apiService.get<{ success: boolean; data: any[] }>(`/friends/list/${hostFrogId}`);
+        const list = response?.data || [];
+        const matched = list.find((item) => item.tokenId === frogState.frog.tokenId);
+        if (!cancelled) {
+          setFriendshipXp(Math.max(0, Number(matched?.intimacy || 0)));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setFriendshipXp(0);
+        }
+      } finally {
+        if (!cancelled) {
+          setFriendshipLoading(false);
+        }
+      }
+    };
+
+    void loadFriendship();
+    return () => {
+      cancelled = true;
+    };
+  }, [hostFrogId, frogState.frog.tokenId]);
 
   // 计算做客时长
   const getVisitDuration = () => {
@@ -42,8 +76,11 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
         targetFrogId: frogState.frog.tokenId,
         type: 'like'
       });
+      toast.success('❤️ 点赞成功');
+      setFriendshipXp(prev => prev + 5);
     } catch (error) {
       console.error('Like failed:', error);
+      toast.error('点赞失败');
     }
     
     setIsLoading(false);
@@ -59,9 +96,11 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
         type: 'feed',
         data: { foodType: 'apple' }
       });
-      alert('🍎 喂食成功！');
+      toast.success('🍎 喂食成功');
+      setFriendshipXp(prev => prev + 10);
     } catch (error) {
       console.error('Feed failed:', error);
+      toast.error('喂食失败');
     }
     setIsLoading(false);
   };
@@ -75,9 +114,11 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
         type: 'gift',
         data: { giftType: 'flower' }
       });
-      alert('🎁 送礼成功！');
+      toast.success('🎁 送礼成功');
+      setFriendshipXp(prev => prev + 30);
     } catch (error) {
       console.error('Gift failed:', error);
+      toast.error('送礼失败');
     }
     setIsLoading(false);
   };
@@ -90,9 +131,11 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
         targetFrogId: frogState.frog.tokenId,
         type: 'photo'
       });
-      alert('📸 合影成功！');
+      toast.success('📸 合影成功');
+      setFriendshipXp(prev => prev + 15);
     } catch (error) {
       console.error('Photo failed:', error);
+      toast.error('合影失败');
     }
     setIsLoading(false);
   };
@@ -108,9 +151,11 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
         authorFrogId: hostFrogId,
         content: message
       });
-      alert('💬 留言成功！');
+      toast.success('💬 留言成功');
+      setFriendshipXp(prev => prev + 5);
     } catch (error) {
       console.error('Message failed:', error);
+      toast.error('留言失败');
     }
     setIsLoading(false);
   };
@@ -123,9 +168,11 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
         await apiService.post(`/garden/${hostFrogId}/leave`, {
           guestFrogId: frogState.frog.tokenId
         });
+        toast.success('访客已离开');
         onInteractionComplete();
       } catch (error) {
         console.error('Send off failed:', error);
+        toast.error('送客失败');
       }
       setIsLoading(false);
     }
@@ -241,7 +288,7 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
               />
             </div>
             <p className="text-xs text-gray-400 mt-1 text-right">
-              {friendshipXp}/{friendshipLevel.maxXp === Infinity ? '∞' : friendshipLevel.maxXp}
+              {friendshipLoading ? '加载中...' : `${friendshipXp}/${friendshipLevel.maxXp === Infinity ? '∞' : friendshipLevel.maxXp}`}
             </p>
           </div>
         </div>

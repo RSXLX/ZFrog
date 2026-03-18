@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Frog, FriendInteraction } from '../../types';
 import { useFriendWebSocket } from '../../hooks/useFriendWebSocket';
 import { apiService } from '../../services/api';
@@ -19,6 +20,7 @@ const FriendsList: React.FC<FriendsListProps> = ({
   onAddFriendClick,
   onSearchClick
 }) => {
+  const navigate = useNavigate();
   const [friends, setFriends] = useState<(Frog & { friendshipId: number; lastInteraction: FriendInteraction | null; isOnline?: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -174,14 +176,14 @@ const FriendsList: React.FC<FriendsListProps> = ({
               </button>
               <button
                 className="action-btn"
-                onClick={() => window.location.href = `/visit/${friend.ownerAddress}`}
+                onClick={() => navigate(`/visit/${friend.ownerAddress}`)}
                 title="家园"
               >
                 🏠
               </button>
               <button
                 className="action-btn"
-                onClick={() => window.location.href = `/frog/${friend.tokenId}`}
+                onClick={() => navigate(`/frog/${friend.tokenId}`)}
                 title="详情"
               >
                 👁️

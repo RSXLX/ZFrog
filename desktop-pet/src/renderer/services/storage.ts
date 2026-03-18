@@ -15,7 +15,7 @@ export interface StoredSettings {
 }
 
 const defaultSettings: StoredSettings = {
-  apiUrl: 'http://localhost:3000/api',
+  apiUrl: 'http://localhost:3001/api',
   notifications: true,
   startWithSystem: false,
   alwaysOnTop: true,

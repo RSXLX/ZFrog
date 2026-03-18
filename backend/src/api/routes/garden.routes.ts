@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../../database';
+import { recordTaskProgress } from '../../services/daily-task.service';
 import { 
   notifyGardenVisitRequest,
   notifyGardenVisitorEntered,
@@ -181,6 +182,12 @@ router.post('/:frogId/visit', async (req, res) => {
       status: 'Active',
       startedAt: visit.createdAt
     });
+
+    try {
+      await recordTaskProgress(guestFrog.ownerAddress, 'visit');
+    } catch (error) {
+      console.warn('[Garden] Failed to record visit task progress:', error);
+    }
     
     res.status(201).json({
       success: true,

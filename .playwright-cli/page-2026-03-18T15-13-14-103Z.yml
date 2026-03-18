@@ -1,0 +1,95 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - navigation [ref=e4]:
+      - generic [ref=e7]:
+        - link "🐸 ZetaFrog" [ref=e8] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e10]: 🐸
+          - generic [ref=e11]: ZetaFrog
+        - generic [ref=e12]:
+          - link "首页" [ref=e13] [cursor=pointer]:
+            - /url: /
+            - img [ref=e14]
+            - generic [ref=e17]: 首页
+          - link "青蛙" [ref=e18] [cursor=pointer]:
+            - /url: /my-frog
+            - img [ref=e19]
+            - generic [ref=e22]: 青蛙
+          - link "家园" [ref=e23] [cursor=pointer]:
+            - /url: /garden
+            - img [ref=e24]
+            - generic [ref=e27]: 家园
+          - link "纪念品" [ref=e28] [cursor=pointer]:
+            - /url: /souvenirs
+            - img [ref=e29]
+            - generic [ref=e33]: 纪念品
+          - link "旅行日记" [ref=e34] [cursor=pointer]:
+            - /url: /travel-history
+            - img [ref=e35]
+            - generic [ref=e37]: 旅行日记
+          - link "徽章" [ref=e38] [cursor=pointer]:
+            - /url: /badges
+            - img [ref=e39]
+            - generic [ref=e45]: 徽章
+        - button "连接钱包" [ref=e115]:
+          - generic [ref=e116]:
+            - img [ref=e117]
+            - text: 连接钱包
+    - main [ref=e51]:
+      - generic [ref=e121]:
+        - button "← 返回首页" [ref=e124]:
+          - generic [ref=e125]: ←
+          - generic [ref=e126]: 返回首页
+        - generic [ref=e128]:
+          - generic [ref=e129]:
+            - heading "🐸 你的青蛙 回来啦！" [level=2] [ref=e130]
+            - paragraph [ref=e131]: 2 分钟前
+          - generic [ref=e132]:
+            - generic [ref=e133]:
+              - generic [ref=e134]: "+0"
+              - generic [ref=e135]: 经验值
+            - generic [ref=e136]:
+              - generic [ref=e137]: "1"
+              - generic [ref=e138]: 链上发现
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - heading "📖 旅行日记" [level=3] [ref=e141]
+              - generic [ref=e142]: 🤩
+            - paragraph [ref=e143]: 旅途结束啦，带回一颗暖乎乎的星星。
+          - generic [ref=e144]:
+            - heading "✨ 旅途发现" [level=3] [ref=e145]
+            - generic [ref=e147]:
+              - generic [ref=e148]: ⭐⭐⭐
+              - generic [ref=e149]:
+                - heading "暖星" [level=4] [ref=e150]
+                - paragraph [ref=e151]: 一颗刚刚被风吹热的小星星。
+          - generic [ref=e152]:
+            - heading "🎁 带回的纪念品" [level=3] [ref=e153]:
+              - generic [ref=e154]: 🎁
+              - text: 带回的纪念品
+            - generic [ref=e155]:
+              - generic [ref=e156]: ⭐
+              - generic [ref=e157]:
+                - heading "暖星纪念牌" [level=4] [ref=e158]
+                - paragraph [ref=e159]: 一枚记录这次旅程的星星徽记。
+                - generic [ref=e160]:
+                  - generic [ref=e161]: ⭐⭐⭐
+                  - generic [ref=e162]: 来自 ZetaChain
+        - generic [ref=e163]:
+          - button "🎒 再次出发" [ref=e165]:
+            - generic [ref=e166]: 🎒
+            - generic [ref=e167]: 再次出发
+          - button "📖 查看日记详情" [ref=e169]:
+            - generic [ref=e170]: 📖
+            - generic [ref=e171]: 查看日记详情
+          - button "📚 所有日记" [ref=e173]:
+            - generic [ref=e174]: 📚
+            - generic [ref=e175]: 所有日记
+          - button "🏆 我的徽章" [ref=e177]:
+            - generic [ref=e178]: 🏆
+            - generic [ref=e179]: 我的徽章
+    - contentinfo [ref=e109]:
+      - paragraph [ref=e110]: 🐸 ZetaFrog - Hop Across Chains, Collect Stories
+      - paragraph [ref=e111]: Built with ❤️ on ZetaChain
+  - generic "打开好友面板 (Alt+F)" [ref=e112] [cursor=pointer]:
+    - generic [ref=e113]: 🐸

@@ -6,7 +6,7 @@ import { AccountCard } from '../components/wallet/AccountCard';
 import { FrogMint } from '../components/frog/FrogMint';
 import { FrogPet } from '../components/frog/FrogPet';
 import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useFrogStore } from '../stores/frogStore';
 import CrossChainTransfer from '../components/crosschain/CrossChainTransfer';
 import { apiService } from '../services/api';
@@ -14,6 +14,7 @@ import { Palette, ScanSearch, BookOpen, Warehouse, Gift, Medal, Skull, Zap, Sear
 
 export function Home() {
   const { isConnected, address } = useAccount();
+  const navigate = useNavigate();
   const [hasFrogs, setHasFrogs] = useState(false);
   const [checkLoading, setCheckLoading] = useState(false);
   const { setCurrentFrog, currentFrog } = useFrogStore();
@@ -158,7 +159,7 @@ export function Home() {
               <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/50">
                 <FrogMint
                   onSuccess={() => {
-                    window.location.href = '/my-frog';
+                    navigate('/my-frog');
                   }}
                 />
               </div>

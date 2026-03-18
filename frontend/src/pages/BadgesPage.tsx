@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMyFrog } from '../hooks/useMyFrog';
 import { Button } from '../components/common/Button';
+import { FeatureGateState } from '../components/common/FeatureGateState';
 import { apiService } from '../services/api';
+import { useToast } from '../components/common/ToastProvider';
 
 interface Badge {
   id: string;
@@ -78,7 +80,7 @@ const RARITY_CONFIG: Record<number, {
 };
 
 // 动画 variants
-const badgeVariants = {
+const badgeVariants: Record<string, any> = {
   hidden: { opacity: 0, scale: 0.8, y: 20 },
   visible: (i: number) => ({
     opacity: 1,
@@ -98,7 +100,7 @@ const badgeVariants = {
   },
 };
 
-const modalVariants = {
+const modalVariants: Record<string, any> = {
   hidden: { opacity: 0, scale: 0.9, y: 20 },
   visible: {
     opacity: 1,
@@ -111,6 +113,7 @@ const modalVariants = {
 
 export function BadgesPage() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { frog, loading: frogLoading, isConnected, hasFrog } = useMyFrog();
   const [badges, setBadges] = useState<Badge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,8 +208,7 @@ export function BadgesPage() {
         await navigator.share({ title: 'ZetaFrog 徽章', text });
       } else {
         await navigator.clipboard.writeText(text);
-        // TODO: 添加 toast 提示
-        alert('已复制到剪贴板！');
+        toast.success('已复制到剪贴板');
       }
     } catch (error) {
       console.error('分享失败:', error);
@@ -216,41 +218,28 @@ export function BadgesPage() {
   // 未连接钱包
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-sky-200 to-green-200 flex flex-col items-center justify-center p-4">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 200 }}
-          className="text-7xl mb-6"
-        >
-          🔗
-        </motion.div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">请先连接钱包</h2>
-        <p className="text-gray-600">连接钱包后查看你的徽章收藏</p>
-      </div>
+      <FeatureGateState
+        emoji="🔗"
+        title="请先连接钱包"
+        description="连接钱包后查看你的徽章收藏。"
+        actionLabel="返回首页"
+        actionTo="/"
+      />
     );
   }
 
   // 没有青蛙
   if (!frogLoading && !hasFrog) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-sky-200 to-green-200 flex flex-col items-center justify-center p-4">
-        <motion.div
-          initial={{ y: -20 }}
-          animate={{ y: [0, -10, 0] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-          className="text-7xl mb-6"
-        >
-          🐸
-        </motion.div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">还没有青蛙</h2>
-        <p className="text-gray-600 mb-6">先铸造一只青蛙开始收集徽章吧！</p>
-        <Link to="/?mint=true">
-          <Button variant="primary" className="text-lg px-6 py-3">
-            🎉 立即铸造
-          </Button>
-        </Link>
-      </div>
+      <FeatureGateState
+        emoji="🐸"
+        title="还没有青蛙"
+        description="先铸造一只青蛙，才能开始收集徽章和旅行成就。"
+        actionLabel="🎉 立即铸造"
+        actionTo="/?mint=true"
+        secondaryLabel="返回首页"
+        secondaryTo="/"
+      />
     );
   }
 
@@ -495,7 +484,7 @@ export function BadgesPage() {
                 : '还没有徽章，快去旅行收集吧！'}
             </p>
             {filter !== 'locked' && category === 'all' && (
-              <Button onClick={() => navigate('/')} variant="primary">
+              <Button onClick={() => navigate(frog ? `/frog/${frog.tokenId}` : '/')} variant="primary">
                 🚀 开始旅行
               </Button>
             )}

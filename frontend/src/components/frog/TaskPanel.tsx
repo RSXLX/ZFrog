@@ -27,11 +27,12 @@ interface Task {
 
 interface TaskPanelProps {
   ownerAddress: string;
+  onClaimed?: () => void;
 }
 
 type TabType = 'daily' | 'weekly';
 
-export function TaskPanel({ ownerAddress }: TaskPanelProps) {
+export function TaskPanel({ ownerAddress, onClaimed }: TaskPanelProps) {
   const [dailyTasks, setDailyTasks] = useState<Task[]>([]);
   const [weeklyTasks, setWeeklyTasks] = useState<Task[]>([]);
   const [activeTab, setActiveTab] = useState<TabType>('daily');
@@ -70,6 +71,7 @@ export function TaskPanel({ ownerAddress }: TaskPanelProps) {
       if (response.success) {
         // 刷新任务列表
         await fetchTasks();
+        onClaimed?.();
       }
     } catch (err) {
       console.error('Failed to claim reward:', err);

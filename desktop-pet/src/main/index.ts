@@ -37,7 +37,7 @@ function createWindow() {
   }
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5180');
+    mainWindow.loadURL('http://localhost:5173');
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
@@ -74,8 +74,12 @@ function createTray() {
       }
     }},
     { type: 'separator' },
+    { label: '任务', click: () => { mainWindow?.webContents.send('menu-action', 'tasks'); mainWindow?.show(); }},
     { label: '旅行', click: () => { mainWindow?.webContents.send('menu-action', 'travel'); mainWindow?.show(); }},
     { label: '背包', click: () => { mainWindow?.webContents.send('menu-action', 'bag'); mainWindow?.show(); }},
+    { label: '图鉴', click: () => { mainWindow?.webContents.send('menu-action', 'collection'); mainWindow?.show(); }},
+    { label: '家园', click: () => { mainWindow?.webContents.send('menu-action', 'home'); mainWindow?.show(); }},
+    { label: '资料', click: () => { mainWindow?.webContents.send('menu-action', 'profile'); mainWindow?.show(); }},
     { label: '好友', click: () => { mainWindow?.webContents.send('menu-action', 'friends'); mainWindow?.show(); }},
     { type: 'separator' },
     { label: '退出', click: () => app.quit() }

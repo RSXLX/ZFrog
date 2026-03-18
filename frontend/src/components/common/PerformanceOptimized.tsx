@@ -212,6 +212,3 @@ export function InView({
     </motion.div>
   );
 }
-
-// Export all performance components
-export { LazyImage, VirtualList, LazyComponent, InView };

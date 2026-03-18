@@ -1,31 +1,92 @@
 import { useState, useEffect, useCallback } from 'react';
 
-export type Chain = 'zetachain' | 'bsc' | 'ethereum' | 'solana';
+export type TravelChain = 'ZETACHAIN_ATHENS' | 'BSC_TESTNET' | 'ETH_SEPOLIA';
 
 export interface TravelDestination {
   id: string;
   name: string;
-  chain: Chain;
+  targetChain: TravelChain;
+  chainId: number;
   description: string;
   icon: string;
   duration: number; // minutes
+  journalMood: string;
+  journalTemplate: string;
   rewards: {
     exp: number;
     items?: string[];
   };
 }
 
+export interface LocalTravelHistoryEntry {
+  id: string;
+  destinationId: string;
+  destination: string;
+  targetChain: TravelChain;
+  chainId: number;
+  icon: string;
+  timestamp: number;
+  completed: boolean;
+  journalTitle?: string;
+  journalContent?: string;
+  journalMood?: string;
+  souvenir?: {
+    name: string;
+    rarity: string;
+  };
+}
+
 const destinations: TravelDestination[] = [
-  { id: '1', name: 'ZetaChain Athens', chain: 'zetachain', description: '探索 ZetaChain 主网', icon: '⛓️', duration: 30, rewards: { exp: 50, items: ['zn'] } },
-  { id: '2', name: 'BSC Testnet', chain: 'bsc', description: 'BNB Chain 测试网', icon: '🟡', duration: 20, rewards: { exp: 30, items: ['bnb'] } },
-  { id: '3', name: 'Ethereum Sepolia', chain: 'ethereum', description: '以太坊测试网', icon: '💎', duration: 45, rewards: { exp: 60, items: ['eth'] } },
-  { id: '4', name: 'Solana Devnet', chain: 'solana', description: 'Solana 开发网', icon: '☀️', duration: 25, rewards: { exp: 40, items: ['sol'] } },
+  {
+    id: 'zeta-athens',
+    name: 'ZetaChain Athens',
+    targetChain: 'ZETACHAIN_ATHENS',
+    chainId: 7001,
+    description: '探索 ZetaChain Athens 的跨链中心',
+    icon: '⚡',
+    duration: 30,
+    journalMood: 'EXCITED',
+    journalTemplate: '在跨链枢纽间来回穿梭，带回了一段关于互操作性的旅行见闻。',
+    rewards: { exp: 50, items: ['gift_box'] },
+  },
+  {
+    id: 'bsc-testnet',
+    name: 'BSC Testnet',
+    targetChain: 'BSC_TESTNET',
+    chainId: 97,
+    description: '去 BNB Chain 测试网踩点新的链上足迹',
+    icon: '🟡',
+    duration: 20,
+    journalMood: 'CURIOUS',
+    journalTemplate: '这次在 BSC 的旅行更像一场试验，把每次探索都记成了新的足迹。',
+    rewards: { exp: 30, items: ['cake'] },
+  },
+  {
+    id: 'ethereum-sepolia',
+    name: 'Ethereum Sepolia',
+    targetChain: 'ETH_SEPOLIA',
+    chainId: 11155111,
+    description: '前往以太坊 Sepolia 收集更经典的链上风景',
+    icon: '💎',
+    duration: 45,
+    journalMood: 'THOUGHTFUL',
+    journalTemplate: '在 Sepolia 的区块之间慢慢散步，把观察到的细节都写进了日记里。',
+    rewards: { exp: 60, items: ['toy_ball'] },
+  },
 ];
+
+const souvenirByItem: Record<string, { name: string; rarity: string }> = {
+  gift_box: { name: '跨链礼盒', rarity: 'Rare' },
+  cake: { name: '旅行蛋糕', rarity: 'Common' },
+  toy_ball: { name: '纪念皮球', rarity: 'Uncommon' },
+  flower: { name: '沿途花束', rarity: 'Common' },
+};
 
 export function useTravel() {
   const [currentTravel, setCurrentTravel] = useState<TravelDestination | null>(null);
-  const [travelHistory, setTravelHistory] = useState<{destination: string; timestamp: number; completed: boolean}[]>([]);
+  const [travelHistory, setTravelHistory] = useState<LocalTravelHistoryEntry[]>([]);
   const [elapsed, setElapsed] = useState(0);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
 
   // Load from storage
   useEffect(() => {
@@ -36,7 +97,8 @@ export function useTravel() {
         setTravelHistory(data.history || []);
         if (data.currentTravel) {
           setCurrentTravel(data.currentTravel);
-          setElapsed(Math.floor((Date.now() - data.startTime) / 1000));
+          setStartedAt(data.startedAt || Date.now());
+          setElapsed(Math.floor((Date.now() - (data.startedAt || Date.now())) / 1000));
         }
       }
     } catch (e) {
@@ -47,11 +109,11 @@ export function useTravel() {
   // Save to storage
   useEffect(() => {
     try {
-      localStorage.setItem('zfrog_travel', JSON.stringify({ history: travelHistory, currentTravel }));
+      localStorage.setItem('zfrog_travel', JSON.stringify({ history: travelHistory, currentTravel, startedAt }));
     } catch (e) {
       console.warn('Failed to save travel data:', e);
     }
-  }, [travelHistory, currentTravel]);
+  }, [travelHistory, currentTravel, startedAt]);
 
   // Timer
   useEffect(() => {
@@ -67,36 +129,58 @@ export function useTravel() {
   const startTravel = useCallback((destination: TravelDestination) => {
     setCurrentTravel(destination);
     setElapsed(0);
+    setStartedAt(Date.now());
   }, []);
 
   const completeTravel = useCallback(() => {
     if (!currentTravel) return null;
-    
+
+    const rewardItem = (currentTravel.rewards.items || [])[0];
+    const souvenir = rewardItem ? souvenirByItem[rewardItem] : undefined;
     const result = {
       exp: currentTravel.rewards.exp,
       items: currentTravel.rewards.items || [],
     };
-    
+
     setTravelHistory(prev => [...prev, {
+      id: `${currentTravel.id}-${Date.now()}`,
+      destinationId: currentTravel.id,
       destination: currentTravel.name,
+      targetChain: currentTravel.targetChain,
+      chainId: currentTravel.chainId,
+      icon: currentTravel.icon,
       timestamp: Date.now(),
-      completed: true
+      completed: true,
+      journalTitle: `${currentTravel.name} Journey`,
+      journalContent: currentTravel.journalTemplate,
+      journalMood: currentTravel.journalMood,
+      souvenir,
     }]);
-    
+
     setCurrentTravel(null);
     setElapsed(0);
-    
+    setStartedAt(null);
+
     return result;
   }, [currentTravel]);
 
   const cancelTravel = useCallback(() => {
     setTravelHistory(prev => [...prev, {
+      id: `${currentTravel?.id || 'travel'}-${Date.now()}`,
+      destinationId: currentTravel?.id || '',
       destination: currentTravel?.name || '',
+      targetChain: currentTravel?.targetChain || 'ZETACHAIN_ATHENS',
+      chainId: currentTravel?.chainId || 7001,
+      icon: currentTravel?.icon || '⚡',
       timestamp: Date.now(),
-      completed: false
+      completed: false,
+      journalTitle: currentTravel ? `${currentTravel.name} Journey` : undefined,
+      journalContent: currentTravel ? '这次旅程临时取消了，等状态更好时再出发。' : undefined,
+      journalMood: 'SLEEPY',
     }]);
     setCurrentTravel(null);
     setElapsed(0);
+    setStartedAt(null);
   }, [currentTravel]);
 
   const getProgress = useCallback(() => {
@@ -114,6 +198,7 @@ export function useTravel() {
     currentTravel,
     travelHistory,
     elapsed,
+    startedAt,
     startTravel,
     completeTravel,
     cancelTravel,

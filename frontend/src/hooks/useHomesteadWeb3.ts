@@ -74,6 +74,12 @@ const ERC721_TRANSFER_ABI = [
   },
 ];
 
+const getLogTopics = (log: unknown): readonly `0x${string}`[] => {
+  if (!log || typeof log !== 'object') return [];
+  const maybeTopics = (log as { topics?: unknown }).topics;
+  return Array.isArray(maybeTopics) ? (maybeTopics as readonly `0x${string}`[]) : [];
+};
+
 // ============ Hook ============
 
 export function useHomesteadWeb3() {
@@ -148,13 +154,6 @@ export function useHomesteadWeb3() {
         }
 
         return { success: true, txHash: hash };
-
-        // 等待交易确认
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash });
-        }
-
-        return { success: true, txHash: hash };
       } catch (error: any) {
         console.error('Tip failed:', error);
         return { 
@@ -221,8 +220,13 @@ export function useHomesteadWeb3() {
 
   // ============ 照片 NFT 铸造 ============
   
-  // 简化版本 - 实际项目中需要与合约集成
-  const PHOTO_NFT_CONTRACT = '0x0000000000000000000000000000000000000000'; // TODO: 配置实际地址
+  // 支持从环境变量读取，未配置时会在调用时给出错误提示
+  const PHOTO_NFT_CONTRACT =
+    (import.meta.env.VITE_CONTRACT_ADDRESS_PHOTO_NFT ||
+      import.meta.env.VITE_PHOTO_NFT_CONTRACT ||
+      import.meta.env.VITE_CONTRACT_ADDRESS_SOUVENIR ||
+      import.meta.env.VITE_SOUVENIR_ADDRESS ||
+      '') as Address | '';
   
   const PHOTO_NFT_ABI = [
     {
@@ -245,7 +249,7 @@ export function useHomesteadWeb3() {
         return { success: false, error: 'Wallet not connected' };
       }
 
-      if (PHOTO_NFT_CONTRACT === '0x0000000000000000000000000000000000000000') {
+      if (!PHOTO_NFT_CONTRACT) {
         return { success: false, error: 'Photo NFT contract not configured' };
       }
 
@@ -269,12 +273,26 @@ export function useHomesteadWeb3() {
         // 等待交易确认并获取 tokenId (简化版)
         if (publicClient) {
           const receipt = await publicClient.waitForTransactionReceipt({ hash });
-          // 实际项目中需要解析事件获取 tokenId
+          const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+          const zeroAddressTopic = '0x0000000000000000000000000000000000000000000000000000000000000000';
+
+          const mintLog = receipt.logs.find((log) => {
+            const topics = getLogTopics(log);
+            return (
+              log.address.toLowerCase() === PHOTO_NFT_CONTRACT.toLowerCase() &&
+              topics[0]?.toLowerCase() === transferTopic &&
+              topics[1]?.toLowerCase() === zeroAddressTopic &&
+              !!topics[3]
+            );
+          });
+
+          const mintTopics = mintLog ? getLogTopics(mintLog) : [];
+          const tokenId = mintTopics[3] ? BigInt(mintTopics[3]).toString() : undefined;
+
           return { 
             success: true, 
             txHash: hash,
-            // @ts-ignore
-            tokenId: receipt.logs[0]?.topics?.[3]?.toString() || '0', 
+            tokenId,
           };
         }
 
@@ -289,7 +307,7 @@ export function useHomesteadWeb3() {
         setIsLoading(false);
       }
     },
-    [walletClient, address, publicClient]
+    [walletClient, address, publicClient, PHOTO_NFT_CONTRACT]
   );
 
   return {

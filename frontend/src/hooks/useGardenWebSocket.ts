@@ -11,11 +11,17 @@ interface GardenWebSocketEvents {
   onGift?: (data: any) => void;
 }
 
+interface GardenWebSocketOptions {
+  enabled?: boolean;
+}
+
 export const useGardenWebSocket = (
   frogId: number,
-  events: GardenWebSocketEvents = {}
+  events: GardenWebSocketEvents = {},
+  options: GardenWebSocketOptions = {}
 ) => {
-  const socket = useWebSocket();
+  const { enabled = true } = options;
+  const socket = useWebSocket({ enabled });
   const subscribedGardenId = useRef<number | null>(null);
 
   // 订阅家园事件
@@ -158,7 +164,7 @@ export const useGardenWebSocket = (
   }, []);
 
   return {
-    isConnected: !!socket,
+    isConnected: enabled && socket.isConnected,
     subscribeToGarden,
     unsubscribeFromGarden,
     sendVisitRequest,

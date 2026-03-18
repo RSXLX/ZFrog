@@ -177,7 +177,7 @@ export function ChatBubble({
 }
 
 // 气泡弹出动画
-const bubbleVariants = {
+const bubbleVariants: Record<string, any> = {
   hidden: {
     opacity: 0,
     scale: 0.8,

@@ -39,6 +39,9 @@ export function useFrogState(): UseFrogStateReturn {
   });
   const [position, setPosition] = useState({ x: 100, y: 100 });
   const [isPatrolling, setIsPatrolling] = useState(false);
+  const updatePosition = useCallback((x: number, y: number) => {
+    setPosition({ x, y });
+  }, []);
   
   const autoActionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const patrolTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -58,7 +61,7 @@ export function useFrogState(): UseFrogStateReturn {
       const newX = Math.random() * screenWidth;
       const newY = Math.random() * screenHeight;
       
-      setPosition({ x: newX, y: newY });
+      updatePosition(newX, newY);
       
       // Move window
       window.electronAPI?.moveWindow(newX, newY);
@@ -196,7 +199,7 @@ export function useFrogState(): UseFrogStateReturn {
       case 'price_down':
         setCurrentState('scared');
         setMood('very_sad');
-        setTimeout(() => { setCurrentState('crying'); setTimeout(() => { setCurrentState('sad'); setTimeout(() => setCurrentState('idle'), 4000); }, 3000); }, 2000);
+        setTimeout(() => { setCurrentState('crying'); setTimeout(() => { setMood('sad'); setTimeout(() => setCurrentState('idle'), 4000); }, 3000); }, 2000);
         break;
     }
   }, [isPatrolling, stopPatrol]);
@@ -239,6 +242,6 @@ export function useFrogState(): UseFrogStateReturn {
   return {
     currentState, mood, stats, setStats, interact, setChainEvent,
     setMood, setCurrentState, setHungry, setSleepy, setAngry, restore,
-    triggerAutoAction, startPatrol, stopPatrol, position, setPosition
+    triggerAutoAction, startPatrol, stopPatrol, position, setPosition: updatePosition
   };
 }

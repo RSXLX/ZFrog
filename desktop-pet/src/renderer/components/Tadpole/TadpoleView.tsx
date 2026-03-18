@@ -97,7 +97,7 @@ export const TadpoleView: React.FC<TadpoleViewProps> = ({
           environment={tadpoleState.environment}
           growth={pet.attributes.growth}
           isEating={isInteracting}
-          isMoving={!isInterInteracting}
+          isMoving={!isInteracting}
           onEnvironmentChange={handleEnvironmentChange}
         />
       </div>

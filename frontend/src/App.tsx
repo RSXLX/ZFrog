@@ -104,8 +104,10 @@ export function App() {
                 
                 {/* 旅行相关 */}
                 <Route path="/travel/:travelId" element={<TravelResultPage />} />
+                <Route path="/travel-result/:travelId" element={<TravelResultPage />} />
                 <Route path="/travel-detail/:travelId" element={<TravelDetailPage />} />
                 <Route path="/travel-history" element={<TravelHistoryPage />} />
+                <Route path="/souvenirs/:frogId" element={<SouvenirsPage />} />
                 
                 {/* 其他 */}
                 <Route path="/desktop" element={<Desktop />} />
@@ -128,4 +130,3 @@ export function App() {
     </ToastProvider>
   );
 }
-

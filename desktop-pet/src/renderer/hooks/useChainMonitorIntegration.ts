@@ -1,125 +1,129 @@
-/**
- * Chain Monitor Integration Hook
- * Integrates real ZetaChain monitoring with existing app state
- */
-
 import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  chainMonitor,
-  ChainEvent,
-  ChainEventType,
-  ChainEventCallback,
-} from '../../../services/chainMonitor';
+import { chainMonitor, type ChainEvent, type ChainEventCallback } from '../../services/chainMonitor';
+import { ChainEventType, EVENT_RESPONSES } from '../../config/chain';
 
 interface UseChainMonitorIntegrationReturn {
-  // Connection state
   isInitialized: boolean;
   isMonitoring: boolean;
   providerConnected: boolean;
   wsConnected: boolean;
   lastGasPrice: string;
   eventCount: number;
-  
-  // Event history
   recentEvents: ChainEvent[];
-  
-  // Actions
   initialize: () => Promise<void>;
   startMonitoring: () => void;
   stopMonitoring: () => Promise<void>;
   addEventListener: (eventType: ChainEventType, callback: ChainEventCallback) => () => void;
-  
-  // Frog reaction helpers
   shouldFrogReact: (eventType: ChainEventType) => boolean;
   getFrogReaction: (eventType: ChainEventType) => { animation: string; sound: boolean; message: string };
 }
 
 export function useChainMonitorIntegration(): UseChainMonitorIntegrationReturn {
-  // Connection state
   const [isInitialized, setIsInitialized] = useState(false);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [providerConnected, setProviderConnected] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
   const [lastGasPrice, setLastGasPrice] = useState('0');
   const [eventCount, setEventCount] = useState(0);
-  
-  // Event history
   const [recentEvents, setRecentEvents] = useState<ChainEvent[]>([]);
-  
-  // Refs for event listeners
+
+  const statusIntervalRef = useRef<number | null>(null);
   const unsubscribersRef = useRef<(() => void)[]>([]);
 
-  // Initialize chain monitor
-  const initialize = useCallback(async () => {
-    try {
-      await chainMonitor.initialize();
-      setIsInitialized(true);
-      setIsMonitoring(true);
-      
-      // Add listener for all events
-      const unsubscribeAll = chainMonitor.addEventListener('*' as ChainEventType, (event) => {
-        setRecentEvents(prev => [event, ...prev].slice(0, 50)); // Keep last 50
-        setEventCount(count => count + 1);
-      });
-      
-      unsubscribersRef.current.push(unsubscribeAll);
-      
-      // Update status periodically
-      const statusInterval = setInterval(() => {
-        const status = chainMonitor.getStatus();
-        setProviderConnected(status.providerConnected);
-        setWsConnected(status.wsConnected);
-        setLastGasPrice(status.lastGasPrice);
-        setIsMonitoring(status.isRunning);
-      }, 5000);
-      
-      return () => {
-        clearInterval(statusInterval);
-      };
-    } catch (error) {
-      console.error('Failed to initialize chain monitor:', error);
-      throw error;
-    }
+  const syncStatus = useCallback(() => {
+    const status = chainMonitor.getStatus();
+    setProviderConnected(status.providerConnected);
+    setWsConnected(status.wsConnected);
+    setLastGasPrice(status.lastGasPrice);
+    setIsMonitoring(status.isRunning);
+    setEventCount(status.eventCount);
   }, []);
 
-  // Start monitoring
+  const initialize = useCallback(async () => {
+    await chainMonitor.initialize();
+    setIsInitialized(true);
+    setIsMonitoring(true);
+    syncStatus();
+
+    const unsubscribeAll = chainMonitor.addEventListener('*' as ChainEventType, (event) => {
+      setRecentEvents(prev => [event, ...prev].slice(0, 50));
+      setEventCount(prev => prev + 1);
+    });
+
+    unsubscribersRef.current.push(unsubscribeAll);
+
+    if (statusIntervalRef.current) {
+      window.clearInterval(statusIntervalRef.current);
+    }
+
+    statusIntervalRef.current = window.setInterval(() => {
+      syncStatus();
+    }, 5000);
+  }, [syncStatus]);
+
   const startMonitoring = useCallback(() => {
     if (!isInitialized) {
-      initialize();
+      void initialize();
     }
   }, [isInitialized, initialize]);
 
-  // Stop monitoring
   const stopMonitoring = useCallback(async () => {
-    await chainMonitor.stop();
-    setIsMonitoring(false);
-    
-    // Unsubscribe all listeners
+    if (statusIntervalRef.current) {
+      window.clearInterval(statusIntervalRef.current);
+      statusIntervalRef.current = null;
+    }
+
     unsubscribersRef.current.forEach(unsubscribe => unsubscribe());
     unsubscribersRef.current = [];
-  }, []);
 
-  // Add event listener helper
+    await chainMonitor.stop();
+    syncStatus();
+  }, [syncStatus]);
+
   const addEventListener = useCallback((eventType: ChainEventType, callback: ChainEventCallback) => {
     const unsubscribe = chainMonitor.addEventListener(eventType, callback);
     unsubscribersRef.current.push(unsubscribe);
     return unsubscribe;
   }, []);
 
-  // Frog reaction helpers
-  const shouldFrogReact = useCallback((eventType: ChainEventType): boolean => {
-    // Frog should react to these events
-    const reactiveEvents = [
-      ChainEventType.LARGE_TRANSFER,
-      ChainEventType.WHALE_TRANSFER,
-      ChainEventType.GAS_SPIKE,
-      ChainEventType.GAS_DROP,
-      ChainEventType.PRICE_ALERT,
-    ];
-    return reactiveEvents.includes(eventType);
+  const shouldFrogReact = useCallback((eventType: ChainEventType) => {
+    const response = EVENT_RESPONSES[eventType];
+    return Boolean(response?.notification || response?.sound);
   }, []);
 
   const getFrogReaction = useCallback((eventType: ChainEventType) => {
-    switch (eventType) {
-      case ChainEventType.LARGE_TRANSFER:
-        return { animation: '
+    const response = EVENT_RESPONSES[eventType];
+    return {
+      animation: response?.animation?.toLowerCase() ?? 'idle',
+      sound: Boolean(response?.sound),
+      message: response?.dialog || '链上有新动态啦',
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (statusIntervalRef.current) {
+        window.clearInterval(statusIntervalRef.current);
+      }
+
+      unsubscribersRef.current.forEach(unsubscribe => unsubscribe());
+      unsubscribersRef.current = [];
+    };
+  }, []);
+
+  return {
+    isInitialized,
+    isMonitoring,
+    providerConnected,
+    wsConnected,
+    lastGasPrice,
+    eventCount,
+    recentEvents,
+    initialize,
+    startMonitoring,
+    stopMonitoring,
+    addEventListener,
+    shouldFrogReact,
+    getFrogReaction,
+  };
+}

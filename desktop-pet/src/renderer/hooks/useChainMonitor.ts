@@ -3,13 +3,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 // Chain event types
 type ChainEvent = 'large_buy' | 'large_sell' | 'price_up' | 'price_down' | 'gas_high';
 
-interface MonitorConfig {
-  watchAddresses: string[];
-  largeTradeThreshold: number; // in USDT
-  priceCheckInterval: number; // ms
-  gasAlertThreshold: number; // Gwei
-}
-
 interface UseChainMonitorReturn {
   isMonitoring: boolean;
   lastEvent: ChainEvent | null;
@@ -28,12 +21,6 @@ export function useChainMonitor(frogState: any): UseChainMonitorReturn {
   const [lastEventTime, setLastEventTime] = useState<Date | null>(null);
   
   const monitorIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const configRef = useRef<MonitorConfig>({
-    watchAddresses: [],
-    largeTradeThreshold: 10000,
-    priceCheckInterval: 60000, // 1 minute
-    gasAlertThreshold: 100,
-  });
 
   const handleChainEvent = useCallback((event: ChainEvent) => {
     console.log('[ChainMonitor] Event:', event);

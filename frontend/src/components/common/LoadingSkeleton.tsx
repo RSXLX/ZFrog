@@ -15,7 +15,7 @@ export const LoadingSkeleton = memo(function LoadingSkeleton({
   type = 'page',
   className = ''
 }: LoadingSkeletonProps) {
-  const shimmer = {
+  const shimmer: Record<string, any> = {
     animate: {
       backgroundPosition: ['200% 0', '-200% 0'],
     },

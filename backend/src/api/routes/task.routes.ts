@@ -14,6 +14,20 @@ import {
 const router = Router();
 
 /**
+ * GET /api/tasks/config
+ * 获取任务配置（静态数据）
+ */
+router.get('/config', async (_req: Request, res: Response) => {
+  return res.json({
+    success: true,
+    data: {
+      daily: Object.values(DAILY_TASKS),
+      weekly: Object.values(WEEKLY_TASKS),
+    },
+  });
+});
+
+/**
  * GET /api/tasks/:ownerAddress
  * 获取每日任务列表和进度
  */
@@ -36,11 +50,16 @@ router.get('/:ownerAddress', async (req: Request, res: Response) => {
       ...p,
     }));
 
+    const weeklyTasks = progress.weekly.map((p: DailyTaskProgress) => ({
+      ...WEEKLY_TASKS[p.taskId as keyof typeof WEEKLY_TASKS],
+      ...p,
+    }));
+
     return res.json({
       success: true,
       data: {
         daily: dailyTasks,
-        weekly: progress.weekly,
+        weekly: weeklyTasks,
         todayLoginTime: progress.todayLoginTime,
         allDailyComplete: progress.allDailyComplete,
       },
@@ -90,20 +109,6 @@ router.post('/:ownerAddress/claim', async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : 'Failed to claim reward',
     });
   }
-});
-
-/**
- * GET /api/tasks/config
- * 获取任务配置（静态数据）
- */
-router.get('/config', async (_req: Request, res: Response) => {
-  return res.json({
-    success: true,
-    data: {
-      daily: Object.values(DAILY_TASKS),
-      weekly: Object.values(WEEKLY_TASKS),
-    },
-  });
 });
 
 export default router;

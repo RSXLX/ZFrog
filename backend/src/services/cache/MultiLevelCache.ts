@@ -259,7 +259,7 @@ export class MultiLevelCache {
           const [, data] = results?.[i] || [];
 
           if (data) {
-            const parsed = JSON.parse(data);
+            const parsed = JSON.parse(String(data)) as { data: T; version?: number };
             result.set(key, parsed.data as T);
 
             // 回填 L1
@@ -338,7 +338,7 @@ export class MultiLevelCache {
   async healthCheck(): Promise<{ status: 'healthy' | 'degraded' | 'unhealthy'; details: any }> {
     const details = {
       l1: { size: this.l1Cache.size, maxSize: this.L1_MAX_SIZE },
-      l2: { connected: false },
+      l2: { connected: false, error: undefined as string | undefined },
       stats: this.getStats()
     };
 

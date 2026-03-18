@@ -6,10 +6,20 @@
 import { Router } from 'express';
 import { prisma } from '../../database';
 import frogStatusService from '../../services/frog-status.service';
+import { recordTaskProgress } from '../../services/daily-task.service';
 import lilyService from '../../services/lily.service';
+import { checkTravelRequirements } from '../../services/travel-status.service';
 import { logger } from '../../utils/logger';
 
 const router = Router();
+
+async function recordProgress(ownerAddress: string, action: 'feed' | 'clean' | 'game') {
+  try {
+    await recordTaskProgress(ownerAddress, action);
+  } catch (error) {
+    logger.warn(`[Nurture] Failed to record ${action} task progress for ${ownerAddress}:`, error);
+  }
+}
 
 /**
  * GET /api/nurture/:frogId/status
@@ -76,6 +86,7 @@ router.post('/:frogId/feed', async (req, res) => {
 
     // 执行喂食
     const effects = await frogStatusService.feedFrog(frogId, foodType);
+    await recordProgress(frog.ownerAddress, 'feed');
 
     res.json({
       success: true,
@@ -130,6 +141,8 @@ router.post('/:frogId/clean', async (req, res) => {
       const balanceInfo = await lilyService.getBalance(frog.ownerAddress);
       newBalance = balanceInfo.balance;
     }
+
+    await recordProgress(frog.ownerAddress, 'clean');
 
     res.json({
       success: true,
@@ -222,6 +235,8 @@ router.post('/:frogId/play/guess', async (req, res) => {
         rewardAmount = 0;
       }
     }
+
+    await recordProgress(frog.ownerAddress, 'game');
 
     res.json({
       success: true,
@@ -356,6 +371,8 @@ router.post('/:frogId/play/catch-bug', async (req, res) => {
       rewardAmount = 0;
     }
 
+    await recordProgress(frog.ownerAddress, 'game');
+
     res.json({
       success: true,
       score,
@@ -445,7 +462,7 @@ router.get('/:frogId/travel-check', async (req, res) => {
       return res.status(400).json({ error: 'Invalid frog ID' });
     }
 
-    const result = await frogStatusService.checkTravelPrerequisites(frogId);
+    const result = await checkTravelRequirements(frogId);
     
     res.json({
       success: true,
@@ -637,6 +654,8 @@ router.post('/:frogId/play/lily-pad', async (req, res) => {
       rewardAmount = 0;
     }
 
+    await recordProgress(frog.ownerAddress, 'game');
+
     res.json({
       success: true,
       score,
@@ -709,6 +728,8 @@ router.post('/:frogId/play/memory', async (req, res) => {
     } else {
       rewardAmount = 0;
     }
+
+    await recordProgress(frog.ownerAddress, 'game');
 
     res.json({
       success: true,

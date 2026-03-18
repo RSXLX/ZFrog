@@ -1,10 +1,10 @@
 // backend/src/services/contract.service.ts
-import { createWalletClient, createPublicClient, http, parseEther, Hex } from 'viem';
+import { createWalletClient, createPublicClient, http, Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { bscTestnet, sepolia } from 'viem/chains';
 import { config } from '../config';
 import { logger } from '../utils/logger';
-import { ZETAFROG_ABI } from '../config/contracts';
+import { ZETAFROG_ABI, TRAVEL_ABI } from '../config/contracts';
 
 // 自定义ZetaChain测试网配置
 const zetaChainTestnet = {
@@ -52,10 +52,20 @@ const CHAIN_CONFIG = {
 export class ContractService {
   private walletClients: Record<string, any> = {};
 
+  private getTravelChainContext() {
+    return {
+      walletClient: this.walletClients.ZETACHAIN_ATHENS,
+      publicClient: CHAIN_CONFIG.ZETACHAIN_ATHENS.client,
+    };
+  }
+
   constructor() {
     // 初始化每个链的钱包客户端
     if (config.RELAYER_PRIVATE_KEY) {
-      const account = privateKeyToAccount(config.RELAYER_PRIVATE_KEY as Hex);
+      const privateKey = config.RELAYER_PRIVATE_KEY.startsWith('0x')
+        ? config.RELAYER_PRIVATE_KEY
+        : `0x${config.RELAYER_PRIVATE_KEY}`;
+      const account = privateKeyToAccount(privateKey as Hex);
       
       Object.entries(CHAIN_CONFIG).forEach(([chainKey, config]) => {
         this.walletClients[chainKey] = createWalletClient({
@@ -85,14 +95,19 @@ export class ContractService {
       if (!config.ZETAFROG_NFT_ADDRESS) {
         throw new Error('ZetaFrog NFT contract address not configured');
       }
+      if (!config.TRAVEL_CONTRACT_ADDRESS) {
+        throw new Error('Travel contract address not configured');
+      }
 
       const chainConfig = CHAIN_CONFIG[targetChain as keyof typeof CHAIN_CONFIG];
       if (!chainConfig) {
         throw new Error(`Unsupported chain: ${targetChain}`);
       }
 
-      const walletClient = this.walletClients[targetChain];
-      const publicClient = chainConfig.client;
+      const { walletClient, publicClient } = this.getTravelChainContext();
+      if (!walletClient) {
+        throw new Error('Travel wallet client not initialized');
+      }
 
       // 获取目标链的chain ID
       const targetChainId = chainConfig.chain.id;
@@ -104,8 +119,8 @@ export class ContractService {
 
       // 构建交易数据
       const { request } = await publicClient.simulateContract({
-        address: config.ZETAFROG_NFT_ADDRESS as Hex,
-        abi: ZETAFROG_ABI,
+        address: config.TRAVEL_CONTRACT_ADDRESS as Hex,
+        abi: TRAVEL_ABI,
         functionName: 'startTravel',
         args: [BigInt(frogTokenId), targetWallet as Hex, BigInt(duration), BigInt(targetChainId)],
         account: walletClient.account,
@@ -120,28 +135,14 @@ export class ContractService {
         confirmations: 1,
       });
 
-      // 从事件日志中解析travelId（如果合约事件包含的话）
-      let travelId = 0;
-      try {
-        // 尝试解析TravelStarted事件
-        const travelStartedEvent = receipt.logs.find((log: any) => {
-          // 这里需要根据实际的事件签名来匹配
-          return log.topics[0] === '0x...'; // TravelStarted事件的keccak256哈希
-        });
-        
-        if (travelStartedEvent) {
-          // 解析事件数据获取travelId
-          // travelId = parseInt(travelStartedEvent.data, 16);
-        }
-      } catch (error) {
-        logger.warn('Failed to parse travelId from event, using default value');
-      }
+      // Travel 合约不会生成数据库 travelId，这里返回一个前端可追踪的临时标识。
+      const travelId = Date.now();
 
-      logger.info(`Random travel started successfully: txHash=${txHash}, travelId=${travelId}`);
+      logger.info(`Random travel started successfully: txHash=${txHash}, syntheticTravelId=${travelId}`);
 
       return {
         txHash: txHash,
-        travelId: travelId || Date.now(), // 临时使用时间戳作为travelId
+        travelId,
       };
     } catch (error) {
       logger.error('Failed to start random travel:', error);
@@ -162,21 +163,21 @@ export class ContractService {
       if (!config.RELAYER_PRIVATE_KEY) {
         throw new Error('Relayer private key not configured');
       }
-
-      const chainConfig = CHAIN_CONFIG[chain as keyof typeof CHAIN_CONFIG];
-      if (!chainConfig) {
-        throw new Error(`Unsupported chain: ${chain}`);
+      if (!config.TRAVEL_CONTRACT_ADDRESS) {
+        throw new Error('Travel contract address not configured');
       }
 
-      const walletClient = this.walletClients[chain];
-      const publicClient = chainConfig.client;
+      const { walletClient, publicClient } = this.getTravelChainContext();
+      if (!walletClient) {
+        throw new Error('Travel wallet client not initialized');
+      }
 
       logger.info(`Completing travel for frog #${frogTokenId} on ${chain}`);
 
       // 构建交易数据
       const { request } = await publicClient.simulateContract({
-        address: config.ZETAFROG_NFT_ADDRESS as Hex,
-        abi: ZETAFROG_ABI,
+        address: config.TRAVEL_CONTRACT_ADDRESS as Hex,
+        abi: TRAVEL_ABI,
         functionName: 'completeTravel',
         args: [BigInt(frogTokenId), journalHash, BigInt(souvenirId), true],  // Added success flag
         account: walletClient.account,

@@ -435,15 +435,12 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
 
             <g className={`frog-body-svg ${state === FrogState.ANGRY ? 'frog-angry-shake' : ''}`} filter="url(#softShadow)">
               {/* 身体主体 */}
-              <motion.path 
+              <path 
                 d="M 45 75 A 32 32 0 1 1 90 60 Q 100 70 110 60 A 32 32 0 1 1 155 75 C 180 90 190 120 190 145 C 190 180 150 190 100 190 C 50 190 10 180 10 145 C 10 120 20 90 45 75 Z" 
                 fill="url(#skinGradient)" 
                 stroke={state === FrogState.ANGRY ? '#991b1b' : '#22C55E'} 
                 strokeWidth="1.5" 
                 strokeLinejoin="round"
-                animate={{
-                  stroke: state === FrogState.ANGRY ? '#991b1b' : '#22C55E'
-                }}
               />
 
               {/* 左眼 */}
@@ -502,7 +499,7 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
               </AnimatePresence>
 
               {/* 动态嘴巴 */}
-              <motion.path
+              <path
                 d={state === FrogState.HAPPY || state === FrogState.EATING || state === FrogState.LOVE
                     ? "M 80 130 Q 100 150 120 130"
                     : state === FrogState.SCARED || state === FrogState.ANGRY
@@ -513,15 +510,6 @@ export function FrogPet({ frogId, name, initialState = FrogState.IDLE, onInterac
                 strokeWidth="2.5"
                 fill="none"
                 strokeLinecap="round"
-                animate={{
-                  d: state === FrogState.HAPPY || state === FrogState.EATING || state === FrogState.LOVE
-                    ? "M 80 130 Q 100 150 120 130"
-                    : state === FrogState.ANGRY
-                    ? "M 80 145 L 100 135 L 120 145"
-                    : state === FrogState.SCARED
-                    ? "M 85 140 Q 100 135 115 140"
-                    : "M 90 135 Q 100 138 110 135"
-                }}
               />
                  
               {/* 愤怒符号 💢 */}

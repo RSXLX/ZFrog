@@ -8,10 +8,8 @@
 
 import { ethers } from 'ethers';
 import {
-  ZETACHAIN_CONFIG,
   CURRENT_NETWORK,
   MONITORING_CONFIG,
-  EVENT_RESPONSES,
   ChainEventType,
 } from '../config/chain';
 
@@ -191,7 +189,7 @@ export class ChainMonitorService {
       
       // 解析交易日志 (ERC20 转账等)
       for (const log of receipt.logs) {
-        await this.parseEventLog(log, txHash, blockNumber);
+        await this.parseEventLog(log);
       }
     } catch (error) {
       console.error(`[ChainMonitor] 分析交易 ${txHash} 失败:`, error);
@@ -199,11 +197,7 @@ export class ChainMonitorService {
   }
   
   // 解析事件日志
-  private async parseEventLog(
-    log: ethers.Log,
-    txHash: string,
-    blockNumber: number
-  ): Promise<void> {
+  private async parseEventLog(log: ethers.Log): Promise<void> {
     try {
       // ERC20 Transfer 事件签名: Transfer(address indexed from, address indexed to, uint256 value)
       const transferSignature = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
@@ -441,14 +435,6 @@ export class ChainMonitorService {
 
 // 导出单例实例
 export const chainMonitor = ChainMonitorService.getInstance();
-
-// 导出类型
-export type {
-  ChainEvent,
-  ChainEventCallback,
-  LargeTransferEvent,
-  GasPriceEvent,
-};
 
 // 默认导出
 export default chainMonitor;

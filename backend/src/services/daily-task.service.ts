@@ -141,16 +141,44 @@ export interface TaskListResult {
   allDailyComplete: boolean;
 }
 
+function getStartOfDay(date: Date = new Date()): Date {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function getStartOfWeek(date: Date = new Date()): Date {
+  const start = getStartOfDay(date);
+  const dayOfWeek = start.getDay();
+  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  start.setDate(start.getDate() - daysSinceMonday);
+  return start;
+}
+
+function getEmptyTaskRecordData(ownerAddress: string, date: Date) {
+  return {
+    ownerAddress,
+    date,
+    loginTime: null,
+    feedCount: 0,
+    cleanCount: 0,
+    gameCount: 0,
+    visitCount: 0,
+    healthKept: true,
+    claimedTasks: [],
+  };
+}
+
 /**
  * 获取用户每日任务进度
  */
 export async function getDailyTaskProgress(ownerAddress: string): Promise<TaskListResult> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const normalizedOwnerAddress = ownerAddress.toLowerCase();
+  const today = getStartOfDay();
   
   // 获取用户的青蛙
   const frog = await prisma.frog.findFirst({
-    where: { ownerAddress: ownerAddress.toLowerCase() },
+    where: { ownerAddress: normalizedOwnerAddress },
     select: { id: true, health: true },
   });
   
@@ -159,10 +187,12 @@ export async function getDailyTaskProgress(ownerAddress: string): Promise<TaskLi
   }
 
   // 获取或创建今日任务记录
-  let taskRecord = await prisma.dailyTask.findFirst({
+  let taskRecord = await prisma.dailyTask.findUnique({
     where: {
-      ownerAddress: ownerAddress.toLowerCase(),
-      date: { gte: today },
+      ownerAddress_date: {
+        ownerAddress: normalizedOwnerAddress,
+        date: today,
+      },
     },
   });
 
@@ -170,7 +200,7 @@ export async function getDailyTaskProgress(ownerAddress: string): Promise<TaskLi
     // 创建今日任务记录
     taskRecord = await prisma.dailyTask.create({
       data: {
-        ownerAddress: ownerAddress.toLowerCase(),
+        ownerAddress: normalizedOwnerAddress,
         date: today,
         loginTime: new Date(),
         feedCount: 0,
@@ -255,9 +285,16 @@ export async function getDailyTaskProgress(ownerAddress: string): Promise<TaskLi
   });
 
   // 计算每周任务进度
-  const weekStart = new Date();
-  weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // 本周日
-  weekStart.setHours(0, 0, 0, 0);
+  const weekStart = getStartOfWeek();
+  const weeklyClaimRecord = await prisma.dailyTask.findUnique({
+    where: {
+      ownerAddress_date: {
+        ownerAddress: normalizedOwnerAddress,
+        date: weekStart,
+      },
+    },
+  });
+  const weeklyClaimedTasks = (weeklyClaimRecord?.claimedTasks as string[] | null) || [];
   
   // 获取本周旅行次数
   const travelCount = await prisma.travel.count({
@@ -271,7 +308,7 @@ export async function getDailyTaskProgress(ownerAddress: string): Promise<TaskLi
   // 获取本周互动次数（简化：使用visitCount总和）
   const weeklyVisits = await prisma.dailyTask.aggregate({
     where: {
-      ownerAddress: ownerAddress.toLowerCase(),
+      ownerAddress: normalizedOwnerAddress,
       date: { gte: weekStart },
     },
     _sum: { visitCount: true },
@@ -287,15 +324,12 @@ export async function getDailyTaskProgress(ownerAddress: string): Promise<TaskLi
   
   // 获取本周青蛙记录（检查是否升级 - 简化处理，认为本周有xp获取就算）
   const frogData = await prisma.frog.findFirst({
-    where: { ownerAddress: ownerAddress.toLowerCase() },
+    where: { ownerAddress: normalizedOwnerAddress },
     select: { level: true, xp: true },
   });
   
   // 简化：检查等级是否大于1（表示有过升级）
   const leveledUp = (frogData?.level ?? 1) > 1;
-  
-  // 获取周任务领取记录（存在 localStorage 或单独表，这里简化处理）
-  const weeklyClaimedKey = `weekly_claimed_${ownerAddress.toLowerCase()}_${weekStart.getTime()}`;
   
   const weeklyProgress: DailyTaskProgress[] = [];
   
@@ -305,7 +339,7 @@ export async function getDailyTaskProgress(ownerAddress: string): Promise<TaskLi
     progress: travelCount,
     target: WEEKLY_TASKS.TRAVELER.target || 3,
     completed: travelCount >= (WEEKLY_TASKS.TRAVELER.target || 3),
-    claimed: false, // TODO: 从数据库读取
+    claimed: weeklyClaimedTasks.includes(WEEKLY_TASKS.TRAVELER.id),
   });
   
   // 社交蝴蝶
@@ -315,7 +349,7 @@ export async function getDailyTaskProgress(ownerAddress: string): Promise<TaskLi
     progress: totalVisits,
     target: WEEKLY_TASKS.SOCIAL_STAR.target || 20,
     completed: totalVisits >= (WEEKLY_TASKS.SOCIAL_STAR.target || 20),
-    claimed: false,
+    claimed: weeklyClaimedTasks.includes(WEEKLY_TASKS.SOCIAL_STAR.id),
   });
   
   // 收藏家
@@ -324,7 +358,7 @@ export async function getDailyTaskProgress(ownerAddress: string): Promise<TaskLi
     progress: souvenirCount,
     target: WEEKLY_TASKS.COLLECTOR.target || 2,
     completed: souvenirCount >= (WEEKLY_TASKS.COLLECTOR.target || 2),
-    claimed: false,
+    claimed: weeklyClaimedTasks.includes(WEEKLY_TASKS.COLLECTOR.id),
   });
   
   // 成长之路
@@ -333,7 +367,7 @@ export async function getDailyTaskProgress(ownerAddress: string): Promise<TaskLi
     progress: leveledUp ? 1 : 0,
     target: 1,
     completed: !!leveledUp,
-    claimed: false,
+    claimed: weeklyClaimedTasks.includes(WEEKLY_TASKS.GROWTH_PATH.id),
   });
 
   return {
@@ -351,8 +385,8 @@ export async function recordTaskProgress(
   ownerAddress: string,
   action: 'feed' | 'clean' | 'game' | 'visit'
 ): Promise<void> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const normalizedOwnerAddress = ownerAddress.toLowerCase();
+  const today = getStartOfDay();
 
   const updateData: Record<string, any> = {};
   switch (action) {
@@ -373,13 +407,13 @@ export async function recordTaskProgress(
   await prisma.dailyTask.upsert({
     where: {
       ownerAddress_date: {
-        ownerAddress: ownerAddress.toLowerCase(),
+        ownerAddress: normalizedOwnerAddress,
         date: today,
       },
     },
     update: updateData,
     create: {
-      ownerAddress: ownerAddress.toLowerCase(),
+      ownerAddress: normalizedOwnerAddress,
       date: today,
       loginTime: new Date(),
       feedCount: action === 'feed' ? 1 : 0,
@@ -399,26 +433,32 @@ export async function claimTaskReward(
   ownerAddress: string,
   taskId: string
 ): Promise<{ success: boolean; reward?: any; error?: string }> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const normalizedOwnerAddress = ownerAddress.toLowerCase();
+  const today = getStartOfDay();
+  const weekStart = getStartOfWeek();
 
   // 获取任务配置
-  const taskConfig = DAILY_TASKS[taskId as keyof typeof DAILY_TASKS];
+  const taskConfig =
+    DAILY_TASKS[taskId as keyof typeof DAILY_TASKS] ||
+    WEEKLY_TASKS[taskId as keyof typeof WEEKLY_TASKS];
   if (!taskConfig) {
     return { success: false, error: 'Task not found' };
   }
 
-  // 获取任务记录
-  const taskRecord = await prisma.dailyTask.findFirst({
-    where: {
-      ownerAddress: ownerAddress.toLowerCase(),
-      date: { gte: today },
-    },
-  });
+  const isWeeklyTask = taskId in WEEKLY_TASKS;
+  const claimDate = isWeeklyTask ? weekStart : today;
 
-  if (!taskRecord) {
-    return { success: false, error: 'No task record found' };
-  }
+  // 获取任务记录
+  const taskRecord = await prisma.dailyTask.upsert({
+    where: {
+      ownerAddress_date: {
+        ownerAddress: normalizedOwnerAddress,
+        date: claimDate,
+      },
+    },
+    update: {},
+    create: getEmptyTaskRecordData(normalizedOwnerAddress, claimDate),
+  });
 
   // 检查是否已领取
   const claimedTasks = taskRecord.claimedTasks as string[] || [];
@@ -428,7 +468,9 @@ export async function claimTaskReward(
 
   // 检查任务是否完成
   const progress = await getDailyTaskProgress(ownerAddress);
-  const task = progress.daily.find(t => t.taskId === taskId);
+  const task = (isWeeklyTask ? progress.weekly : progress.daily).find(
+    (progressItem) => progressItem.taskId === taskId
+  );
   if (!task || !task.completed) {
     return { success: false, error: 'Task not completed' };
   }
@@ -436,13 +478,13 @@ export async function claimTaskReward(
   // 发放奖励
   if (taskConfig.reward.lily) {
     await prisma.lilyBalance.upsert({
-      where: { ownerAddress: ownerAddress.toLowerCase() },
+      where: { ownerAddress: normalizedOwnerAddress },
       update: {
         balance: { increment: taskConfig.reward.lily },
         totalEarned: { increment: taskConfig.reward.lily },
       },
       create: {
-        ownerAddress: ownerAddress.toLowerCase(),
+        ownerAddress: normalizedOwnerAddress,
         balance: taskConfig.reward.lily,
         totalEarned: taskConfig.reward.lily,
         totalSpent: 0,
@@ -454,10 +496,10 @@ export async function claimTaskReward(
     // 记录交易
     await prisma.lilyTransaction.create({
       data: {
-        ownerAddress: ownerAddress.toLowerCase(),
+        ownerAddress: normalizedOwnerAddress,
         amount: taskConfig.reward.lily,
         type: 'TASK_REWARD',
-        description: `完成任务: ${taskConfig.name}`,
+        description: `${isWeeklyTask ? '完成周任务' : '完成任务'}: ${taskConfig.name}`,
       },
     });
   }
@@ -465,7 +507,7 @@ export async function claimTaskReward(
   // 如果有 XP 奖励
   if (taskConfig.reward.xp) {
     const frog = await prisma.frog.findFirst({
-      where: { ownerAddress: ownerAddress.toLowerCase() },
+      where: { ownerAddress: normalizedOwnerAddress },
     });
     if (frog) {
       await prisma.frog.update({

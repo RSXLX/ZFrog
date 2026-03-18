@@ -10,4 +10,4 @@ export type {
 } from './hatchMemoryStorage';
 
 // 重新导出链上监控
-export { chainMonitor } from './chainMonitor';
+export { chainMonitor } from '../../services/chainMonitor';

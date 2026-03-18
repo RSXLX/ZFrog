@@ -10,6 +10,9 @@
 const PINATA_API_KEY = import.meta.env.VITE_PINATA_API_KEY || '';
 const PINATA_SECRET_KEY = import.meta.env.VITE_PINATA_SECRET_KEY || '';
 const PINATA_JWT = import.meta.env.VITE_PINATA_JWT || '';
+const isPinataConfigured = Boolean(PINATA_JWT || (PINATA_API_KEY && PINATA_SECRET_KEY));
+const PINATA_CONFIG_ERROR =
+  'IPFS service is not configured. Please set VITE_PINATA_JWT or PINATA API key pair.';
 
 const IPFS_GATEWAYS = [
   'https://gateway.pinata.cloud/ipfs/',
@@ -38,14 +41,10 @@ export interface PhotoMetadata {
  * 上传文件到 IPFS
  */
 export async function uploadToIpfs(file: File): Promise<UploadResult> {
-  if (!PINATA_JWT && (!PINATA_API_KEY || !PINATA_SECRET_KEY)) {
-    // 如果没有配置 Pinata，模拟返回
-    console.warn('IPFS not configured, using mock upload');
-    const mockHash = `Qm${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+  if (!isPinataConfigured) {
     return {
-      success: true,
-      ipfsHash: mockHash,
-      ipfsUrl: `${IPFS_GATEWAYS[0]}${mockHash}`,
+      success: false,
+      error: PINATA_CONFIG_ERROR,
     };
   }
 
@@ -94,13 +93,10 @@ export async function uploadToIpfs(file: File): Promise<UploadResult> {
  * 上传 JSON 元数据到 IPFS
  */
 export async function uploadMetadataToIpfs(metadata: PhotoMetadata): Promise<UploadResult> {
-  if (!PINATA_JWT && (!PINATA_API_KEY || !PINATA_SECRET_KEY)) {
-    console.warn('IPFS not configured, using mock upload');
-    const mockHash = `Qm${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+  if (!isPinataConfigured) {
     return {
-      success: true,
-      ipfsHash: mockHash,
-      ipfsUrl: `${IPFS_GATEWAYS[0]}${mockHash}`,
+      success: false,
+      error: PINATA_CONFIG_ERROR,
     };
   }
 

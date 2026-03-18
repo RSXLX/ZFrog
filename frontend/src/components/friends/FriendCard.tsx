@@ -107,10 +107,16 @@ export function FriendCard({
             >
               礼物
             </Button>
-            <Button
+              <Button
               variant="primary"
               size="sm"
-              onClick={() => onVisit?.(friend) || navigate(`/garden/${friend.id}`)}
+              onClick={() => {
+                if (onVisit) {
+                  onVisit(friend);
+                  return;
+                }
+                navigate(friend.ownerAddress ? `/visit/${friend.ownerAddress}` : '/garden');
+              }}
             >
               拜访
             </Button>

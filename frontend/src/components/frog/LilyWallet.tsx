@@ -11,6 +11,7 @@ import { apiService } from '../../services/api';
 
 interface LilyWalletProps {
   ownerAddress: string;
+  refreshTrigger?: number;
 }
 
 // SVG 图标
@@ -69,8 +70,8 @@ interface Transaction {
   createdAt: string;
 }
 
-export function LilyWallet({ ownerAddress }: LilyWalletProps) {
-  const { balance, loading, refresh } = useLilyBalance(ownerAddress);
+export function LilyWallet({ ownerAddress, refreshTrigger = 0 }: LilyWalletProps) {
+  const { balance, loading } = useLilyBalance(ownerAddress, refreshTrigger);
   const [showHistory, setShowHistory] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -80,8 +81,8 @@ export function LilyWallet({ ownerAddress }: LilyWalletProps) {
     setHistoryLoading(true);
     try {
       const response = await apiService.get(`/nurture/transactions/${ownerAddress}?limit=20`);
-      if (response.data.success) {
-        setTransactions(response.data.data);
+      if (response.success) {
+        setTransactions(response.data);
       }
     } catch (err) {
       console.error('获取交易历史失败:', err);
@@ -103,6 +104,8 @@ export function LilyWallet({ ownerAddress }: LilyWalletProps) {
       DAILY_SIGNIN: '每日签到',
       TRAVEL_REWARD: '旅行奖励',
       MEDICINE_COST: '治疗消费',
+      TASK_REWARD: '任务奖励',
+      SHOP_PURCHASE: '商店消费',
     };
     return labels[type] || type;
   };
@@ -115,9 +118,15 @@ export function LilyWallet({ ownerAddress }: LilyWalletProps) {
       DAILY_SIGNIN: '📅',
       TRAVEL_REWARD: '✈️',
       MEDICINE_COST: '💊',
+      TASK_REWARD: '🏆',
+      SHOP_PURCHASE: '🛒',
     };
     return icons[type] || '💰';
   };
+
+  const dailyGameLimit = balance
+    ? balance.dailyGameEarned + balance.dailyRemainingGameReward
+    : 0;
 
   if (loading && !balance) {
     return (
@@ -188,14 +197,18 @@ export function LilyWallet({ ownerAddress }: LilyWalletProps) {
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm text-purple-600 font-medium">今日游戏奖励</span>
             <span className="text-sm text-purple-800 font-bold">
-              {balance?.dailyGameEarned || 0} / 150
+              {balance?.dailyGameEarned || 0} / {dailyGameLimit || 0}
             </span>
           </div>
           <div className="h-2 bg-purple-200 rounded-full overflow-hidden">
             <motion.div
               className="h-full bg-gradient-to-r from-purple-400 to-indigo-500 rounded-full"
               initial={{ width: 0 }}
-              animate={{ width: `${Math.min(100, ((balance?.dailyGameEarned || 0) / 150) * 100)}%` }}
+              animate={{
+                width: `${dailyGameLimit > 0
+                  ? Math.min(100, ((balance?.dailyGameEarned || 0) / dailyGameLimit) * 100)
+                  : 0}%`,
+              }}
             />
           </div>
         </div>

@@ -1,8 +1,7 @@
 // backend/src/config/contracts.ts
 
-// ZetaFrogNFT ABI (完整版 - 与合约完全匹配)
+// ZetaFrog NFT 代理合约 ABI
 export const ZETAFROG_ABI = [
-    // === 写入函数 ===
     {
         "inputs": [{"internalType": "string", "name": "name", "type": "string"}],
         "name": "mintFrog",
@@ -10,6 +9,122 @@ export const ZETAFROG_ABI = [
         "stateMutability": "nonpayable",
         "type": "function"
     },
+    {
+        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+        "name": "getFrog",
+        "outputs": [
+            {"internalType": "string", "name": "name", "type": "string"},
+            {"internalType": "uint64", "name": "birthday", "type": "uint64"},
+            {"internalType": "uint32", "name": "totalTravels", "type": "uint32"},
+            {"internalType": "uint8", "name": "status", "type": "uint8"},
+            {"internalType": "uint256", "name": "xp", "type": "uint256"},
+            {"internalType": "uint256", "name": "level", "type": "uint256"}
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+        "name": "getFrogStatus",
+        "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+        "name": "ownerOf",
+        "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "address", "name": "owner", "type": "address"}],
+        "name": "balanceOf",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "address", "name": "owner", "type": "address"}],
+        "name": "getTokenIdByOwner",
+        "outputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "address", "name": "owner", "type": "address"}],
+        "name": "hasFrog",
+        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "totalSupply",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "travelContract",
+        "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "omniTravelContract",
+        "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "owner",
+        "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "MAX_SUPPLY",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+        "name": "emergencyResetFrogStatus",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
+            {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
+            {"indexed": false, "internalType": "string", "name": "name", "type": "string"},
+            {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
+        ],
+        "name": "FrogMinted",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
+            {"indexed": false, "internalType": "uint256", "name": "newLevel", "type": "uint256"},
+            {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
+        ],
+        "name": "LevelUp",
+        "type": "event"
+    }
+] as const;
+
+// Travel 合约 ABI
+export const TRAVEL_ABI = [
     {
         "inputs": [
             {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
@@ -42,46 +157,6 @@ export const ZETAFROG_ABI = [
         "type": "function"
     },
     {
-        "inputs": [
-            {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
-            {"internalType": "uint256", "name": "xpAmount", "type": "uint256"}
-        ],
-        "name": "addExperience",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [{"internalType": "address", "name": "_manager", "type": "address"}],
-        "name": "setTravelManager",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [{"internalType": "address", "name": "_souvenir", "type": "address"}],
-        "name": "setSouvenirNFT",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-
-    // === 读取函数 ===
-    {
-        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-        "name": "getFrog",
-        "outputs": [
-            {"internalType": "string", "name": "name", "type": "string"},
-            {"internalType": "uint64", "name": "birthday", "type": "uint64"},
-            {"internalType": "uint32", "name": "totalTravels", "type": "uint32"},
-            {"internalType": "uint8", "name": "status", "type": "uint8"},
-            {"internalType": "uint256", "name": "xp", "type": "uint256"},
-            {"internalType": "uint256", "name": "level", "type": "uint256"}
-        ],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
         "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
         "name": "getActiveTravel",
         "outputs": [
@@ -97,13 +172,6 @@ export const ZETAFROG_ABI = [
     },
     {
         "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-        "name": "canTravel",
-        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
         "name": "getTravelJournals",
         "outputs": [{"internalType": "string[]", "name": "", "type": "string[]"}],
         "stateMutability": "view",
@@ -111,45 +179,8 @@ export const ZETAFROG_ABI = [
     },
     {
         "inputs": [],
-        "name": "totalSupply",
-        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-        "name": "ownerOf",
-        "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [{"internalType": "address", "name": "owner", "type": "address"}],
-        "name": "balanceOf",
-        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [],
         "name": "travelManager",
         "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "souvenirNFT",
-        "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-
-    // === 常量 ===
-    {
-        "inputs": [],
-        "name": "MAX_SUPPLY",
-        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
         "stateMutability": "view",
         "type": "function"
     },
@@ -174,19 +205,6 @@ export const ZETAFROG_ABI = [
         "stateMutability": "view",
         "type": "function"
     },
-
-    // === 事件 ===
-    {
-        "anonymous": false,
-        "inputs": [
-            {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
-            {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
-            {"indexed": false, "internalType": "string", "name": "name", "type": "string"},
-            {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
-        ],
-        "name": "FrogMinted",
-        "type": "event"
-    },
     {
         "anonymous": false,
         "inputs": [
@@ -194,7 +212,8 @@ export const ZETAFROG_ABI = [
             {"indexed": true, "internalType": "address", "name": "targetWallet", "type": "address"},
             {"indexed": false, "internalType": "uint256", "name": "targetChainId", "type": "uint256"},
             {"indexed": false, "internalType": "uint64", "name": "startTime", "type": "uint64"},
-            {"indexed": false, "internalType": "uint64", "name": "endTime", "type": "uint64"}
+            {"indexed": false, "internalType": "uint64", "name": "endTime", "type": "uint64"},
+            {"indexed": false, "internalType": "bool", "name": "isRandom", "type": "bool"}
         ],
         "name": "TravelStarted",
         "type": "event"
@@ -205,7 +224,8 @@ export const ZETAFROG_ABI = [
             {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
             {"indexed": false, "internalType": "string", "name": "journalHash", "type": "string"},
             {"indexed": false, "internalType": "uint256", "name": "souvenirId", "type": "uint256"},
-            {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
+            {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"},
+            {"indexed": false, "internalType": "uint256", "name": "xpReward", "type": "uint256"}
         ],
         "name": "TravelCompleted",
         "type": "event"
@@ -217,16 +237,6 @@ export const ZETAFROG_ABI = [
             {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
         ],
         "name": "TravelCancelled",
-        "type": "event"
-    },
-    {
-        "anonymous": false,
-        "inputs": [
-            {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
-            {"indexed": false, "internalType": "uint256", "name": "newLevel", "type": "uint256"},
-            {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
-        ],
-        "name": "LevelUp",
         "type": "event"
     }
 ] as const;

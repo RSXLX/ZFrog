@@ -1,0 +1,71 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - navigation [ref=e4]:
+      - generic [ref=e7]:
+        - link "🐸 ZetaFrog" [ref=e8] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e10]: 🐸
+          - generic [ref=e11]: ZetaFrog
+        - generic [ref=e12]:
+          - link "首页" [ref=e13] [cursor=pointer]:
+            - /url: /
+            - img [ref=e14]
+            - generic [ref=e17]: 首页
+          - link "青蛙" [ref=e18] [cursor=pointer]:
+            - /url: /my-frog
+            - img [ref=e19]
+            - generic [ref=e22]: 青蛙
+          - link "家园" [ref=e23] [cursor=pointer]:
+            - /url: /garden
+            - img [ref=e24]
+            - generic [ref=e27]: 家园
+          - link "纪念品" [ref=e28] [cursor=pointer]:
+            - /url: /souvenirs
+            - img [ref=e29]
+            - generic [ref=e33]: 纪念品
+          - link "旅行日记" [ref=e34] [cursor=pointer]:
+            - /url: /travel-history
+            - img [ref=e35]
+            - generic [ref=e37]: 旅行日记
+          - link "徽章" [ref=e38] [cursor=pointer]:
+            - /url: /badges
+            - img [ref=e39]
+            - generic [ref=e45]: 徽章
+        - button "连接中..." [disabled] [ref=e47]:
+          - generic [ref=e48]:
+            - img [ref=e49]
+            - text: 连接中...
+    - main [ref=e51]:
+      - generic [ref=e53]:
+        - generic [ref=e55]:
+          - generic [ref=e58]:
+            - img [ref=e63] [cursor=pointer]
+            - paragraph [ref=e82]: MockFrog
+          - generic [ref=e83]:
+            - heading "MockFrog" [level=1] [ref=e86]
+            - generic [ref=e87]:
+              - generic [ref=e88]: 🎂 2025/1/1
+              - generic [ref=e89]: ✈️ 0 次旅行
+              - generic [ref=e90]: 在家
+        - generic [ref=e91]:
+          - generic [ref=e93]:
+            - generic [ref=e94]:
+              - heading "👋 你好，旅行者！" [level=3] [ref=e95]
+              - paragraph [ref=e96]: 你正在访问 MockFrog 的个人主页
+            - generic [ref=e97]:
+              - generic [ref=e98]:
+                - generic [ref=e99]: 拥有者
+                - generic [ref=e100]: 0x1234...5678
+              - generic [ref=e101]:
+                - generic [ref=e102]: 当前状态
+                - generic [ref=e103]: 正在家中休息
+          - generic [ref=e104]:
+            - heading "📖 旅行日记" [level=2] [ref=e105]
+            - generic [ref=e106]:
+              - paragraph [ref=e107]: 还没有旅行记录
+              - paragraph [ref=e108]: 派 MockFrog 去冒险吧！
+    - contentinfo [ref=e109]:
+      - paragraph [ref=e110]: 🐸 ZetaFrog - Hop Across Chains, Collect Stories
+      - paragraph [ref=e111]: Built with ❤️ on ZetaChain
+  - generic "打开好友面板 (Alt+F)" [ref=e112] [cursor=pointer]:
+    - generic [ref=e113]: 🐸

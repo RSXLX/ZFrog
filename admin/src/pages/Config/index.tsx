@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, Descriptions, Button, message, Input, Space, Divider, Alert } from 'antd';
 import { ReloadOutlined, SaveOutlined } from '@ant-design/icons';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/error';
 
 interface ConfigData {
   rpc: {
@@ -21,6 +22,7 @@ const Config: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<ConfigData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchConfig();
@@ -31,33 +33,26 @@ const Config: React.FC = () => {
       setLoading(true);
       const response = await api.get('/api/admin/config');
       setConfig(response as unknown as ConfigData);
+      setLoadError(null);
     } catch (err) {
-      // 使用模拟数据
-      setConfig({
-        rpc: {
-          zetachain: 'https://zetachain-athens.g.allthatnode.com/archive/evm/***',
-          bscTestnet: 'https://bsc-testnet.g.allthatnode.com/full/evm/***',
-          ethSepolia: 'https://ethereum-sepolia.g.allthatnode.com/full/evm/***',
-        },
-        contracts: {
-          zetaFrogNFT: '0x660A6196A5bf3FbD8aE5EC3eED354A671b8ce04d',
-          omniTravel: '0x9A99AA350997bd7371512c958d51e4E067039766',
-          travel: '0x32cbe784c8Ac18df3Ee662d1239313448f467d98',
-          souvenir: '0xCE871f9F009f7Fa49f23f0EEE09977FfB7b4DbF5',
-        },
-      });
+      setConfig(null);
+      setLoadError(getApiErrorMessage(err, '加载系统配置失败'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
+    if (!config) {
+      message.error('当前无可保存配置');
+      return;
+    }
     try {
       setSaving(true);
       await api.put('/api/admin/config', config);
       message.success('配置保存成功');
     } catch (err) {
-      message.warning('后端 API 未实现，配置未保存');
+      message.error(getApiErrorMessage(err, '配置保存失败'));
     } finally {
       setSaving(false);
     }
@@ -99,14 +94,23 @@ const Config: React.FC = () => {
             <Button icon={<ReloadOutlined />} onClick={fetchConfig}>
               刷新
             </Button>
-            <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
+            <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving} disabled={!config}>
               保存配置
             </Button>
           </Space>
         }
       >
+        {loadError && (
+          <Alert
+            type="error"
+            showIcon
+            message="加载失败"
+            description={loadError}
+            style={{ marginBottom: 16 }}
+          />
+        )}
         {/* RPC 配置 */}
-        <Divider orientation="left">RPC 配置</Divider>
+        <Divider>RPC 配置</Divider>
         <Descriptions column={1} labelStyle={{ width: 150 }}>
           <Descriptions.Item label="ZetaChain Athens">
             <Input
@@ -132,7 +136,7 @@ const Config: React.FC = () => {
         </Descriptions>
 
         {/* 合约地址配置 */}
-        <Divider orientation="left">合约地址配置</Divider>
+        <Divider>合约地址配置</Divider>
         <Descriptions column={1} labelStyle={{ width: 150 }}>
           <Descriptions.Item label="ZetaFrogNFT">
             <Input

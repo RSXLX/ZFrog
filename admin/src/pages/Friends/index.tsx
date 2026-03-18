@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Space, message, Popconfirm } from 'antd';
+import { Card, Table, Tag, Button, message, Popconfirm, Alert } from 'antd';
 import { ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/error';
 
 interface FriendshipRecord {
   id: number;
@@ -25,6 +26,7 @@ const statusColors: Record<string, string> = {
 const Friends: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [friendships, setFriendships] = useState<FriendshipRecord[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchFriendships();
@@ -35,12 +37,10 @@ const Friends: React.FC = () => {
       setLoading(true);
       const response = await api.get('/api/admin/friends');
       setFriendships(response as unknown as FriendshipRecord[]);
+      setLoadError(null);
     } catch (err) {
-      // 模拟数据
-      setFriendships([
-        { id: 1, requesterId: 1, addresseeId: 2, requesterName: 'Frog #1', addresseeName: 'Frog #2', status: 'Accepted', affinityLevel: 3, groupTravelCount: 2, createdAt: '2026-01-12' },
-        { id: 2, requesterId: 3, addresseeId: 1, requesterName: 'Frog #3', addresseeName: 'Frog #1', status: 'Pending', affinityLevel: 1, groupTravelCount: 0, createdAt: '2026-01-14' },
-      ]);
+      setFriendships([]);
+      setLoadError(getApiErrorMessage(err, '加载好友关系失败'));
     } finally {
       setLoading(false);
     }
@@ -52,7 +52,7 @@ const Friends: React.FC = () => {
       message.success('删除成功');
       fetchFriendships();
     } catch (err) {
-      message.warning('后端 API 未实现');
+      message.error(getApiErrorMessage(err, '删除好友关系失败'));
     }
   };
 
@@ -103,6 +103,15 @@ const Friends: React.FC = () => {
         </Button>
       }
     >
+      {loadError && (
+        <Alert
+          type="error"
+          showIcon
+          message="加载失败"
+          description={loadError}
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <Table
         dataSource={friendships}
         columns={columns}

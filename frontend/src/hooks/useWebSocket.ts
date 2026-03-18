@@ -3,7 +3,10 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAccount } from 'wagmi';
 
-const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const SOCKET_URL =
+  import.meta.env.VITE_WS_URL ||
+  import.meta.env.VITE_BACKEND_URL ||
+  'http://localhost:3001';
 
 interface TravelStartedEvent {
   frogId: number;
@@ -51,7 +54,12 @@ interface UseWebSocketReturn {
   emit: (event: string, data: unknown) => void;
 }
 
-export function useWebSocket(): UseWebSocketReturn {
+interface UseWebSocketOptions {
+  enabled?: boolean;
+}
+
+export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketReturn {
+  const { enabled = true } = options;
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const { address } = useAccount();
@@ -59,6 +67,13 @@ export function useWebSocket(): UseWebSocketReturn {
 
   // 初始化连接
   useEffect(() => {
+    if (!enabled) {
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+      setIsConnected(false);
+      return;
+    }
+
     const socket = io(SOCKET_URL, {
       autoConnect: true,
       reconnection: true,
@@ -90,15 +105,19 @@ export function useWebSocket(): UseWebSocketReturn {
 
     return () => {
       socket.disconnect();
+      if (socketRef.current === socket) {
+        socketRef.current = null;
+      }
+      setIsConnected(false);
     };
-  }, []);
+  }, [enabled, address]);
 
   // 当钱包地址变化时重新订阅
   useEffect(() => {
-    if (socketRef.current && isConnected && address) {
+    if (enabled && socketRef.current && isConnected && address) {
       socketRef.current.emit('subscribe:wallet', address);
     }
-  }, [address, isConnected]);
+  }, [address, enabled, isConnected]);
 
   // 订阅青蛙事件
   const subscribeFrog = useCallback((frogId: number) => {

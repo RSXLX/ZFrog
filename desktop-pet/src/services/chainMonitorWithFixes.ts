@@ -325,8 +325,5 @@ export class ChainMonitorService {
 // Singleton instance
 export const chainMonitorService = new ChainMonitorService();
 
-// Export types
-export type { ChainEvent, EventCallback };
-
 // Default export
 export default chainMonitorService;

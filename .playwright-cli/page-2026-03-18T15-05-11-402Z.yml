@@ -1,0 +1,46 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - navigation [ref=e4]:
+      - generic [ref=e7]:
+        - link "🐸 ZetaFrog" [ref=e8] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e10]: 🐸
+          - generic [ref=e11]: ZetaFrog
+        - generic [ref=e12]:
+          - link "首页" [ref=e13] [cursor=pointer]:
+            - /url: /
+            - img [ref=e14]
+            - generic [ref=e17]: 首页
+          - link "青蛙" [ref=e18] [cursor=pointer]:
+            - /url: /my-frog
+            - img [ref=e19]
+            - generic [ref=e22]: 青蛙
+          - link "家园" [ref=e23] [cursor=pointer]:
+            - /url: /garden
+            - img [ref=e24]
+            - generic [ref=e27]: 家园
+          - link "纪念品" [ref=e28] [cursor=pointer]:
+            - /url: /souvenirs
+            - img [ref=e29]
+            - generic [ref=e33]: 纪念品
+          - link "旅行日记" [ref=e34] [cursor=pointer]:
+            - /url: /travel-history
+            - img [ref=e35]
+            - generic [ref=e37]: 旅行日记
+          - link "徽章" [ref=e38] [cursor=pointer]:
+            - /url: /badges
+            - img [ref=e39]
+            - generic [ref=e45]: 徽章
+        - button "连接中..." [disabled] [ref=e47]:
+          - generic [ref=e48]:
+            - img [ref=e49]
+            - text: 连接中...
+    - main [ref=e51]:
+      - generic [ref=e53]:
+        - paragraph [ref=e54]: Failed to fetch
+        - button "返回首页" [ref=e56]
+    - contentinfo [ref=e57]:
+      - paragraph [ref=e58]: 🐸 ZetaFrog - Hop Across Chains, Collect Stories
+      - paragraph [ref=e59]: Built with ❤️ on ZetaChain
+  - generic "打开好友面板 (Alt+F)" [ref=e60] [cursor=pointer]:
+    - generic [ref=e61]: 🐸

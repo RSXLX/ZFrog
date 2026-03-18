@@ -6,10 +6,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   QuietModeType,
-  QuietModeConfig,
+  type QuietModeConfig,
   quietModeManager,
-  BehaviorConfig,
-} from '../../../config/quietMode';
+  type BehaviorConfig,
+} from '../../config/quietMode';
 
 interface UseQuietModeIntegrationReturn {
   // Current state
@@ -50,7 +50,7 @@ export function useQuietModeIntegration(): UseQuietModeIntegrationReturn {
   
   // Subscribe to manager updates
   useEffect(() => {
-    const unsubscribe = quietModeManager.addListener((mode) => {
+    const unsubscribe = quietModeManager.addListener((mode: QuietModeConfig) => {
       setCurrentMode(mode);
       
       // Update focus timer if in focus mode

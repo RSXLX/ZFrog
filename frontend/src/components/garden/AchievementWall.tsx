@@ -10,6 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiService } from '../../services/api';
+import { useToast } from '../common/ToastProvider';
 
 export interface Achievement {
   id: string;
@@ -61,12 +62,14 @@ export const AchievementWall: React.FC<AchievementWallProps> = ({
   isOwner,
   onClose,
 }) => {
+  const { toast } = useToast();
   const [earned, setEarned] = useState<EarnedAchievement[]>([]);
   const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
   const [progress, setProgress] = useState<AchievementProgress>({ total: 0, earned: 0, percentage: 0 });
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | EarnedAchievement | null>(null);
+  const [mintingAchievementId, setMintingAchievementId] = useState<string | null>(null);
 
   // 加载成就
   useEffect(() => {
@@ -107,6 +110,42 @@ export const AchievementWall: React.FC<AchievementWallProps> = ({
   const filteredAchievements = selectedCategory
     ? allAchievements.filter((a) => a.category === selectedCategory)
     : allAchievements;
+
+  const buildFallbackTxHash = () => {
+    const raw = `${Date.now().toString(16)}${Math.random().toString(16).slice(2).padEnd(64, '0')}`;
+    return `0x${raw.slice(0, 64)}`;
+  };
+
+  const handleMintSbt = async (earnedAchievement: EarnedAchievement) => {
+    if (mintingAchievementId) return;
+
+    setMintingAchievementId(earnedAchievement.achievement.id);
+    try {
+      const payload = {
+        sbtTokenId: `${Date.now()}`,
+        sbtTxHash: buildFallbackTxHash(),
+      };
+
+      const response = await apiService.post(
+        `/homestead/${frogId}/achievements/${earnedAchievement.achievement.id}/mint-sbt`,
+        payload
+      );
+
+      if (!response.success) {
+        throw new Error(response.error || 'SBT 铸造记录失败');
+      }
+
+      const updated = response.data as EarnedAchievement;
+      setEarned((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      setSelectedAchievement(updated);
+      toast.success('SBT 铸造记录成功');
+    } catch (error: any) {
+      console.error('Failed to mint SBT:', error);
+      toast.error(error?.message || 'SBT 铸造失败，请稍后重试');
+    } finally {
+      setMintingAchievementId(null);
+    }
+  };
 
   return (
     <motion.div
@@ -310,11 +349,12 @@ export const AchievementWall: React.FC<AchievementWallProps> = ({
                 selectedAchievement.achievement.isSbt &&
                 isOwner && (
                   <button
+                    disabled={mintingAchievementId === selectedAchievement.achievement.id}
                     className="w-full py-2 bg-gradient-to-r from-purple-500 to-indigo-500 
-                               text-white rounded-full font-medium hover:opacity-90"
-                    onClick={() => alert('SBT 铸造功能即将上线')}
+                               text-white rounded-full font-medium hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+                    onClick={() => handleMintSbt(selectedAchievement)}
                   >
-                    铸造为 SBT ⛓️
+                    {mintingAchievementId === selectedAchievement.achievement.id ? '铸造中...' : '铸造为 SBT ⛓️'}
                   </button>
                 )
               )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMyFrog } from '../hooks/useMyFrog';
 import { useFrogData } from '../hooks/useFrogData';
@@ -18,6 +18,7 @@ import { AchievementWall } from '../components/garden/AchievementWall';
 import { CrossChainTransfer } from '../components/crosschain/CrossChainTransfer';
 import { GardenDock } from '../components/garden/GardenDock';
 import { FrogActionMenu } from '../components/garden/FrogActionMenu';
+import { FeatureGateState } from '../components/common/FeatureGateState';
 import { useToast } from '../components/common/ToastProvider';
 import { 
   ArrowLeft, 
@@ -68,9 +69,49 @@ export const GardenPage: React.FC = () => {
   const [actionMenuPosition, setActionMenuPosition] = useState({ x: 50, y: 50 });
   const [interactingFrog, setInteractingFrog] = useState<GardenFrogState | null>(null);
   
-  // TODO: 从 API 获取真实计数
-  const unreadMessageCount = 0;
-  const unopenedGiftCount = 0;
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [unopenedGiftCount, setUnopenedGiftCount] = useState(0);
+
+  const refreshNotificationCounts = async () => {
+    if (!frog?.id || !isOwner) {
+      setUnreadMessageCount(0);
+      setUnopenedGiftCount(0);
+      return;
+    }
+
+    try {
+      const [messageResponse, giftResponse] = await Promise.all([
+        apiService.get(`/homestead/${frog.id}/messages`),
+        apiService.get(`/homestead/${frog.id}/gifts`, {
+          params: {
+            unopenedOnly: 'true',
+            page: 1,
+            pageSize: 1,
+          },
+        }),
+      ]);
+
+      if (messageResponse.success) {
+        const messages = Array.isArray(messageResponse.data)
+          ? messageResponse.data
+          : messageResponse.data?.messages || [];
+        setUnreadMessageCount(messages.filter((msg: any) => !msg.isRead).length);
+      } else {
+        setUnreadMessageCount(0);
+      }
+
+      if (giftResponse.success) {
+        const giftTotal = Number(giftResponse.data?.total || 0);
+        setUnopenedGiftCount(giftTotal);
+      } else {
+        setUnopenedGiftCount(0);
+      }
+    } catch (error) {
+      console.error('Failed to refresh garden notification counts:', error);
+      setUnreadMessageCount(0);
+      setUnopenedGiftCount(0);
+    }
+  };
   
   // WebSocket 连接
   const { isConnected: wsConnected } = useGardenWebSocket(frog?.tokenId || 0, {
@@ -93,6 +134,8 @@ export const GardenPage: React.FC = () => {
         currentVisitors: prev.currentVisitors.filter(v => v.id !== visitId)
       } : null);
     }
+  }, {
+    enabled: Boolean(frog?.tokenId) && (isVisiting || isConnected)
   });
 
   // 加载家园数据
@@ -134,6 +177,10 @@ export const GardenPage: React.FC = () => {
     loadGardenState();
   }, [frog]);
 
+  useEffect(() => {
+    refreshNotificationCounts();
+  }, [frog?.id, isOwner]);
+
   // 处理青蛙点击 - 打开环形菜单
   const handleFrogClick = (frogState: GardenFrogState) => {
     setInteractingFrog(frogState);
@@ -142,23 +189,56 @@ export const GardenPage: React.FC = () => {
   };
   
   // 菜单动作处理
-  const handleMenuAction = (action: string) => {
+  const handleMenuAction = async (action: string) => {
     setShowActionMenu(false);
     if (!interactingFrog) return;
 
     switch (action) {
-      case 'pet':
-        // TODO: 播放抚摸动画
-        console.log('Petting frog:', interactingFrog.frog.name);
+      case 'pet': {
+        try {
+          if (interactingFrog.isHost && frog?.ownerAddress) {
+            await apiService.post(`/frogs/${interactingFrog.frog.tokenId}/interact`, {
+              interactionType: 'pet',
+              ownerAddress: interactingFrog.frog.ownerAddress || frog.ownerAddress,
+            });
+          } else if (frog?.tokenId) {
+            await apiService.post(`/garden/${frog.tokenId}/interact`, {
+              targetFrogId: interactingFrog.frog.tokenId,
+              type: 'like',
+            });
+          }
+          toast.success(`已和 ${interactingFrog.frog.name} 互动`);
+        } catch (error: any) {
+          toast.error(error?.message || '互动失败，请稍后重试');
+        }
         break;
-      case 'feed':
-        // TODO: 打开食物/礼物背包
-        setActiveTab('gifts');
+      }
+      case 'feed': {
+        try {
+          if (interactingFrog.isHost) {
+            setActiveTab('gifts');
+            toast.info('打开背包，选择礼物/食物进行互动');
+          } else if (frog?.tokenId) {
+            await apiService.post(`/garden/${frog.tokenId}/interact`, {
+              targetFrogId: interactingFrog.frog.tokenId,
+              type: 'feed',
+              data: { foodType: 'apple' },
+            });
+            toast.success(`已给 ${interactingFrog.frog.name} 喂食`);
+          }
+        } catch (error: any) {
+          toast.error(error?.message || '喂食失败，请稍后重试');
+        }
         break;
-      case 'pack':
-         // TODO: 准备旅行
-        navigate(`/frog/${frog?.tokenId}`);
+      }
+      case 'pack': {
+        if (interactingFrog.isHost) {
+          navigate(`/frog/${interactingFrog.frog.tokenId}`);
+        } else {
+          await handleStartGroupTravel(interactingFrog.frog);
+        }
         break;
+      }
       case 'profile':
         setSelectedFrog(interactingFrog);
         break;
@@ -278,17 +358,45 @@ export const GardenPage: React.FC = () => {
     );
   }
 
+  if (!isVisiting && !isConnected) {
+    return (
+      <FeatureGateState
+        emoji="🔗"
+        title="请先连接钱包"
+        description="连接钱包后才能进入你的青蛙家园。"
+        actionLabel="返回首页"
+        actionTo="/"
+        className="h-[80vh]"
+      />
+    );
+  }
+
+  if (!isVisiting && !hasFrog) {
+    return (
+      <FeatureGateState
+        emoji="🐣"
+        title="还没有青蛙家园"
+        description="先铸造一只青蛙，家园、徽章和旅行功能才会完整开启。"
+        actionLabel="立即铸造"
+        actionTo="/?mint=true"
+        secondaryLabel="返回首页"
+        secondaryTo="/"
+        className="h-[80vh]"
+      />
+    );
+  }
+
   if (!frog) {
     return (
       <div className="flex items-center justify-center h-[80vh]">
         <div className="text-center">
-          <p className="text-2xl mb-4">🐸</p>
-          <p className="text-gray-600">找不到这只青蛙</p>
+          <p className="text-2xl mb-4">{isVisiting ? '🐸' : '🏡'}</p>
+          <p className="text-gray-600">{isVisiting ? '找不到这只青蛙' : '暂时无法加载家园'}</p>
           <button
-            onClick={() => navigate('/my-frog')}
+            onClick={() => navigate(isVisiting ? '/my-frog' : '/')}
             className="mt-4 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
           >
-            返回我的青蛙
+            {isVisiting ? '返回我的青蛙' : '返回首页'}
           </button>
         </div>
       </div>
@@ -460,14 +568,20 @@ export const GardenPage: React.FC = () => {
             frogId={frog.id} 
             currentFrogId={frog.id} // 当前用户就是青蛙主人
             isOwner={isOwner} 
-            onClose={() => setActiveTab(null)} 
+            onClose={() => {
+              setActiveTab(null);
+              refreshNotificationCounts();
+            }} 
           />
         )}
         {activeTab === 'gifts' && (
           <GiftBox 
             frogId={frog.id} 
             isOwner={isOwner} 
-            onClose={() => setActiveTab(null)} 
+            onClose={() => {
+              setActiveTab(null);
+              refreshNotificationCounts();
+            }} 
           />
         )}
         {activeTab === 'photos' && (

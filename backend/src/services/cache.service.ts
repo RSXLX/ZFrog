@@ -6,6 +6,7 @@
  * 注意：如果 Redis 不可用，服务会降级为内存缓存
  */
 
+import Redis from 'ioredis';
 import { logger } from '../utils/logger';
 
 // 缓存配置
@@ -71,7 +72,7 @@ class MemoryCache {
  */
 export class CacheService {
   private memoryCache: MemoryCache;
-  private redisClient: any = null;
+  private redisClient: Redis | null = null;
   private useRedis = false;
   
   constructor() {
@@ -91,9 +92,10 @@ export class CacheService {
     }
     
     try {
-      // 动态导入 Redis 客户端
-      const { createClient } = await import('redis');
-      this.redisClient = createClient({ url: redisUrl });
+      this.redisClient = new Redis(redisUrl, {
+        lazyConnect: true,
+        maxRetriesPerRequest: 3,
+      });
       
       this.redisClient.on('error', (err: Error) => {
         logger.error('[CacheService] Redis error:', err);
@@ -137,7 +139,7 @@ export class CacheService {
       const serialized = JSON.stringify(value);
       
       if (this.useRedis && this.redisClient) {
-        await this.redisClient.setEx(key, ttlSeconds, serialized);
+        await this.redisClient.setex(key, ttlSeconds, serialized);
       } else {
         await this.memoryCache.set(key, serialized, ttlSeconds);
       }
@@ -169,7 +171,7 @@ export class CacheService {
       if (this.useRedis && this.redisClient) {
         const keys = await this.redisClient.keys(pattern);
         if (keys.length > 0) {
-          await this.redisClient.del(keys);
+          await this.redisClient.del(...keys);
         }
       } else {
         await this.memoryCache.delByPattern(pattern);

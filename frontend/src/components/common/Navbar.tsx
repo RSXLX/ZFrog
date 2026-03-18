@@ -26,7 +26,7 @@ export function Navbar() {
       <div className="absolute inset-0 bg-white/70 backdrop-blur-md border-b border-white/20 shadow-sm" />
       
       <div className="container mx-auto px-4 relative">
-        <div className="flex items-center justify-between h-16"> // Desktop Height
+        <div className="flex items-center justify-between h-16">
           {/* Logo Section */}
           <Link to="/" className="flex items-center gap-2 group">
             <div className="relative w-8 h-8 flex items-center justify-center bg-green-100/50 rounded-xl group-hover:bg-green-100 transition-colors">

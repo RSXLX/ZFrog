@@ -1,4 +1,4 @@
-import { ReactNode, useState, useCallback } from 'react';
+import { ReactNode, useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, X, AlertCircle, Info, Play, RotateCcw } from 'lucide-react';
 import { Button } from './Button';
@@ -201,4 +201,30 @@ function TestResultItem({ result }: { result: TestResult }) {
                 </button>
               )}
               {isExpanded && result.stackTrace && (
-                <pre className="mt
+                <pre className="mt-2 text-xs text-red-500 overflow-x-auto whitespace-pre-wrap">
+                  {result.stackTrace}
+                </pre>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Simple Loading Spinner Component for tests
+function LoadingSpinner({ size = 18 }: { size?: number }) {
+  return (
+    <motion.div
+      animate={{ rotate: 360 }}
+      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+      className="inline-block"
+    >
+      <div
+        className="rounded-full border-2 border-current border-t-transparent"
+        style={{ width: size, height: size }}
+      />
+    </motion.div>
+  );
+}

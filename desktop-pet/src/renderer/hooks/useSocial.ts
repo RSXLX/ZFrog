@@ -19,7 +19,7 @@ const defaultFriends: Friend[] = [
 
 export function useSocial() {
   const [friends, setFriends] = useState<Friend[]>(defaultFriends);
-  const [pendingRequests, setPendingRequests] = useState<number>(0);
+  const [pendingRequests] = useState<number>(0);
 
   // Load from storage
   useEffect(() => {

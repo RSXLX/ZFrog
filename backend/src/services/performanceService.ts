@@ -1,6 +1,6 @@
 import { Response, Request, NextFunction } from 'express';
 import { performance } from 'perf_hooks';
-import logger from '../utils/logger';
+import { logger } from '../utils/logger';
 
 // Performance monitoring middleware
 export const performanceMonitor = (req: Request, res: Response, next: NextFunction) => {

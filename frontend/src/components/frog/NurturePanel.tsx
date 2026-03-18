@@ -20,6 +20,7 @@ import { apiService } from '../../services/api';
 
 interface NurturePanelProps {
   frogId: number;
+  frogTokenId: number;
   ownerAddress: string;
 }
 
@@ -51,21 +52,23 @@ function LockedGame({ name, requiredLevel, currentLevel }: { name: string; requi
   );
 }
 
-export function NurturePanel({ frogId, ownerAddress }: NurturePanelProps) {
+export function NurturePanel({ frogId, frogTokenId, ownerAddress }: NurturePanelProps) {
   const [frogInfo, setFrogInfo] = useState<FrogInfo | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('status');
+  const [walletRefreshTrigger, setWalletRefreshTrigger] = useState(0);
 
   // 获取青蛙信息
   const fetchFrogInfo = async () => {
     try {
-      const response = await apiService.get(`/frogs/${frogId}`);
-      if (response.data) {
+      const response = await apiService.get(`/frogs/${frogTokenId}`);
+      if (response.success && response.data) {
+        const frogData = response.data;
         setFrogInfo({
-          level: response.data.level || 1,
-          canEvolve: response.data.canEvolve || false,
-          evolutionType: response.data.evolutionType || null,
-          energy: response.data.energy ?? 100,
-          isResting: response.data.isResting ?? false,
+          level: frogData.level || 1,
+          canEvolve: frogData.canEvolve || false,
+          evolutionType: frogData.evolutionType || null,
+          energy: frogData.energy ?? 100,
+          isResting: frogData.isResting ?? false,
         });
       }
     } catch (err) {
@@ -75,7 +78,12 @@ export function NurturePanel({ frogId, ownerAddress }: NurturePanelProps) {
 
   useEffect(() => {
     fetchFrogInfo();
-  }, [frogId]);
+  }, [frogTokenId]);
+
+  const handleNurtureUpdate = () => {
+    fetchFrogInfo();
+    setWalletRefreshTrigger((value) => value + 1);
+  };
 
   const tabs = [
     { id: 'status' as const, label: '状态', icon: Heart },
@@ -91,7 +99,7 @@ export function NurturePanel({ frogId, ownerAddress }: NurturePanelProps) {
       animate={{ opacity: 1 }}
     >
       {/* $LILY 钱包 */}
-      <LilyWallet ownerAddress={ownerAddress} />
+      <LilyWallet ownerAddress={ownerAddress} refreshTrigger={walletRefreshTrigger} />
 
       {/* Tab 切换 */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-2xl overflow-x-auto">
@@ -127,7 +135,7 @@ export function NurturePanel({ frogId, ownerAddress }: NurturePanelProps) {
           <StatusPanel
             frogId={frogId}
             ownerAddress={ownerAddress}
-            onStatusChange={fetchFrogInfo}
+            onStatusChange={handleNurtureUpdate}
           />
           
           {/* 游戏入口 */}
@@ -135,14 +143,14 @@ export function NurturePanel({ frogId, ownerAddress }: NurturePanelProps) {
             <GuessGame
               frogId={frogId}
               ownerAddress={ownerAddress}
-              onComplete={fetchFrogInfo}
+              onComplete={handleNurtureUpdate}
             />
             {/* Lv.3 解锁接虫子游戏 */}
             {(frogInfo?.level ?? 1) >= 3 ? (
               <CatchBugGame
                 frogId={frogId}
                 ownerAddress={ownerAddress}
-                onComplete={fetchFrogInfo}
+                onComplete={handleNurtureUpdate}
               />
             ) : (
               <LockedGame name="接虫子" requiredLevel={3} currentLevel={frogInfo?.level ?? 1} />
@@ -152,7 +160,7 @@ export function NurturePanel({ frogId, ownerAddress }: NurturePanelProps) {
               <LilyPadGame
                 frogId={frogId}
                 ownerAddress={ownerAddress}
-                onComplete={fetchFrogInfo}
+                onComplete={handleNurtureUpdate}
               />
             ) : (
               <LockedGame name="跳荷叶" requiredLevel={5} currentLevel={frogInfo?.level ?? 1} />
@@ -162,7 +170,7 @@ export function NurturePanel({ frogId, ownerAddress }: NurturePanelProps) {
               <MemoryGame
                 frogId={frogId}
                 ownerAddress={ownerAddress}
-                onComplete={fetchFrogInfo}
+                onComplete={handleNurtureUpdate}
               />
             ) : (
               <LockedGame name="记忆翻牌" requiredLevel={8} currentLevel={frogInfo?.level ?? 1} />
@@ -176,20 +184,20 @@ export function NurturePanel({ frogId, ownerAddress }: NurturePanelProps) {
               ownerAddress={ownerAddress}
               energy={frogInfo.energy}
               isResting={frogInfo.isResting}
-              onRestChange={fetchFrogInfo}
+              onRestChange={handleNurtureUpdate}
             />
           )}
         </div>
       )}
 
       {activeTab === 'tasks' && (
-        <TaskPanel ownerAddress={ownerAddress} />
+        <TaskPanel ownerAddress={ownerAddress} onClaimed={handleNurtureUpdate} />
       )}
 
       {activeTab === 'shop' && (
         <ShopPanel 
           ownerAddress={ownerAddress} 
-          onPurchase={fetchFrogInfo}
+          onPurchase={handleNurtureUpdate}
         />
       )}
 
@@ -199,7 +207,7 @@ export function NurturePanel({ frogId, ownerAddress }: NurturePanelProps) {
           canEvolve={frogInfo.canEvolve}
           currentType={frogInfo.evolutionType}
           level={frogInfo.level}
-          onEvolved={fetchFrogInfo}
+          onEvolved={handleNurtureUpdate}
         />
       )}
     </motion.div>
@@ -207,4 +215,3 @@ export function NurturePanel({ frogId, ownerAddress }: NurturePanelProps) {
 }
 
 export default NurturePanel;
-

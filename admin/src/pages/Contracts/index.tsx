@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Button, Table, Tag, Space, message, Modal, Input, Descriptions, Alert, Spin } from 'antd';
-import { ReloadOutlined, CheckCircleOutlined, SyncOutlined, CopyOutlined } from '@ant-design/icons';
+import { ReloadOutlined, CheckCircleOutlined, CopyOutlined } from '@ant-design/icons';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/error';
 
 interface ContractInfo {
   name: string;
@@ -25,6 +26,7 @@ const Contracts: React.FC = () => {
   const [verifying, setVerifying] = useState(false);
   const [contracts, setContracts] = useState<ContractInfo[]>([]);
   const [verifyResults, setVerifyResults] = useState<VerifyResult[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editContract, setEditContract] = useState<ContractInfo | null>(null);
   const [newAddress, setNewAddress] = useState('');
@@ -38,16 +40,10 @@ const Contracts: React.FC = () => {
       setLoading(true);
       const response = await api.get('/api/admin/contracts');
       setContracts(response as unknown as ContractInfo[]);
+      setLoadError(null);
     } catch (err) {
-      // 使用模拟数据
-      setContracts([
-        { name: 'ZetaFrogNFT', envKey: 'ZETAFROG_NFT_ADDRESS', address: '0x660A6196A5bf3FbD8aE5EC3eED354A671b8ce04d', isDeployed: true, network: 'ZetaChain Athens' },
-        { name: 'OmniTravel', envKey: 'OMNI_TRAVEL_ADDRESS', address: '0x9A99AA350997bd7371512c958d51e4E067039766', isDeployed: true, version: '1.0.0', network: 'ZetaChain Athens' },
-        { name: 'Travel', envKey: 'TRAVEL_CONTRACT_ADDRESS', address: '0x32cbe784c8Ac18df3Ee662d1239313448f467d98', isDeployed: true, version: '1.0.0', network: 'ZetaChain Athens' },
-        { name: 'SouvenirNFT', envKey: 'SOUVENIR_NFT_ADDRESS', address: '0xCE871f9F009f7Fa49f23f0EEE09977FfB7b4DbF5', isDeployed: true, network: 'ZetaChain Athens' },
-        { name: 'BSC Connector', envKey: 'BSC_CONNECTOR_ADDRESS', address: '0x1E8D44A6D21C29332a4528439d107Fa9e9aF4752', isDeployed: true, network: 'BSC Testnet' },
-        { name: 'Sepolia Connector', envKey: 'SEPOLIA_CONNECTOR_ADDRESS', address: '0x1c31e32A91dcF6f76D61fDef4Aa7B2eC047Cc7A9', isDeployed: true, network: 'Sepolia' },
-      ]);
+      setContracts([]);
+      setLoadError(getApiErrorMessage(err, '加载合约列表失败'));
     } finally {
       setLoading(false);
     }
@@ -56,19 +52,12 @@ const Contracts: React.FC = () => {
   const handleVerify = async () => {
     try {
       setVerifying(true);
-      const response = await api.get('/api/admin/contracts/verify');
-      setVerifyResults((response as { checks: VerifyResult[] }).checks);
+      const response = (await api.get('/api/admin/contracts/verify')) as unknown as { checks: VerifyResult[] };
+      setVerifyResults(response.checks || []);
       message.success('验证完成');
     } catch (err) {
-      // 模拟验证结果
-      setVerifyResults([
-        { name: 'ZetaFrogNFT.omniTravelContract', passed: true, message: '设置正确' },
-        { name: 'ZetaFrogNFT.travelContract', passed: true, message: '设置正确' },
-        { name: 'OmniTravel.supportedChains[97]', passed: true, message: 'BSC Testnet 已启用' },
-        { name: 'OmniTravel.supportedChains[11155111]', passed: true, message: 'Sepolia 已启用' },
-        { name: 'OmniTravel.testMode', passed: true, message: '测试模式已开启' },
-      ]);
-      message.info('使用模拟验证结果');
+      setVerifyResults([]);
+      message.error(getApiErrorMessage(err, '合约验证失败'));
     } finally {
       setVerifying(false);
     }
@@ -90,14 +79,17 @@ const Contracts: React.FC = () => {
       setEditModalVisible(false);
       fetchContracts();
     } catch (err) {
-      message.warning('后端 API 未实现，地址未更新');
-      setEditModalVisible(false);
+      message.error(getApiErrorMessage(err, '地址更新失败'));
     }
   };
 
-  const copyAddress = (address: string) => {
-    navigator.clipboard.writeText(address);
-    message.success('已复制地址');
+  const copyAddress = async (address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+      message.success('已复制地址');
+    } catch {
+      message.error('复制失败，请手动复制');
+    }
   };
 
   const columns = [
@@ -182,6 +174,15 @@ const Contracts: React.FC = () => {
           </Space>
         }
       >
+        {loadError && (
+          <Alert
+            type="error"
+            showIcon
+            message="加载失败"
+            description={loadError}
+            style={{ marginBottom: 16 }}
+          />
+        )}
         {loading ? (
           <div style={{ textAlign: 'center', padding: 40 }}>
             <Spin />

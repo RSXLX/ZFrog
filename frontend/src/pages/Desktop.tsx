@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FrogPet } from '../components/frog/FrogPet';
 import { FrogScene } from '../components/frog/FrogScene';
 import { ChainEventPanel, WhaleAlert, PriceAlert } from '../components/frog/ChainEventPanel';
 import { FeedingSystem, FoodShop } from '../components/frog/FeedingSystem';
@@ -10,6 +9,9 @@ import { useChainMonitor } from '../hooks/useChainMonitor';
 import { useFrogInteraction, FOOD_ITEMS } from '../hooks/useFrogInteraction';
 import { useFrogData } from '../hooks/useFrogData';
 import { FoodItem } from '../types/frogAnimation';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '../components/common/ToastProvider';
+import { apiService } from '../services/api';
 // TRAVEL_DESTINATIONS 将在组件内部定义
 
 // 旅行目的地配置
@@ -22,6 +24,8 @@ const TRAVEL_DESTINATIONS = [
 ];
 
 export function Desktop() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const { isConnected, address } = useWallet();
   const { whaleAlert, priceChange, clearAlerts } = useChainMonitor();
   const { frog: activeFrog, loading } = useFrogData(address);
@@ -58,6 +62,27 @@ export function Desktop() {
   const [showFoodReward, setShowFoodReward] = useState<FoodItem | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showWelcome, setShowWelcome] = useState(true);
+
+  const handleGroupTravel = async (companion: any) => {
+    if (!activeFrog) return;
+
+    try {
+      const response = await apiService.post('/travels/group', {
+        leaderId: activeFrog.tokenId,
+        companionId: companion.tokenId,
+        duration: 3600,
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || '发起结伴旅行失败');
+      }
+
+      toast.success(`${activeFrog.name} 和 ${companion.name} 已一起出发旅行`);
+      navigate(`/frog/${activeFrog.tokenId}`);
+    } catch (error: any) {
+      toast.error(error?.message || '发起结伴旅行失败');
+    }
+  };
   
   // 更新时间
   useEffect(() => {
@@ -147,12 +172,6 @@ export function Desktop() {
       ...prev,
       [food.id]: (prev[food.id as keyof typeof prev] || 0) + count,
     }));
-  };
-  
-  // 处理青蛙互动
-  const handleFrogInteract = (interaction: string) => {
-    // TODO: 实现青蛙互动的状态更新（如调用后端或更新本地状态）
-    console.log('青蛙互动:', interaction, activeFrog);
   };
   
   return (
@@ -272,10 +291,7 @@ export function Desktop() {
                 frogName={activeFrog.name}
                 isOwner={true}
                 showVisitorControls={true}
-                onGroupTravel={(companion) => {
-                  console.log(`结伴旅行: ${activeFrog.name} 和 ${companion.name}`);
-                  // TODO: 实现结伴旅行逻辑
-                }}
+                onGroupTravel={handleGroupTravel}
               />
             ) : (
               <div className="text-center">
@@ -320,17 +336,17 @@ export function Desktop() {
           <ActionButton 
             emoji="📖" 
             label="日记" 
-            onClick={() => console.log('打开日记')}
+            onClick={() => navigate('/travel-history')}
           />
           <ActionButton 
             emoji="🎁" 
             label="纪念品" 
-            onClick={() => console.log('查看纪念品')}
+            onClick={() => navigate('/souvenirs')}
           />
           <ActionButton 
             emoji="⚙️" 
             label="设置" 
-            onClick={() => console.log('打开设置')}
+            onClick={() => navigate('/my-frog')}
           />
         </div>
       </div>

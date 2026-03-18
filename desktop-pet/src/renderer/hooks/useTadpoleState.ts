@@ -10,8 +10,8 @@
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { Pet, PetAttributes, PetGene } from '../usePetEgg';
-import { TadpoleStage, TadpoleFeatures, WaterEnvironment } from '../../components/Tadpole/Tadpole';
+import type { Pet, PetAttributes, PetGene } from './usePetEgg';
+import type { TadpoleStage, TadpoleFeatures, WaterEnvironment } from '../components/Tadpole/Tadpole';
 
 // ==================== 类型定义 ====================
 
@@ -70,7 +70,7 @@ const getStageFromGrowth = (growth: number): TadpoleStage => {
 const calculateFeatures = (
   growth: number,
   gene: PetGene,
-  stage: TadpoleStage
+  _stage: TadpoleStage
 ): TadpoleFeatures => {
   // 尾巴长度随发育逐渐缩短
   let tailLength = 1;
@@ -118,13 +118,6 @@ export function useTadpoleState(initialPet?: Pet): UseTadpoleStateReturn {
   const growthRef = useRef(0);
   const interactionCount = useRef(0);
   
-  // 初始化
-  useEffect(() => {
-    if (initialPet) {
-      syncFromPet(initialPet);
-    }
-  }, []);
-  
   // 从宠物数据同步
   const syncFromPet = useCallback((pet: Pet) => {
     petRef.current = pet;
@@ -148,6 +141,13 @@ export function useTadpoleState(initialPet?: Pet): UseTadpoleStateReturn {
       }
     }
   }, []);
+
+  // 初始化
+  useEffect(() => {
+    if (initialPet) {
+      syncFromPet(initialPet);
+    }
+  }, [initialPet, syncFromPet]);
   
   // 导出为宠物数据
   const exportToPet = useCallback((): Partial<Pet> => {

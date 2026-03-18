@@ -190,7 +190,7 @@ export class TravelService extends EventEmitter {
         frog: true,
         souvenir: true,
         discoveries: {
-          orderBy: { timestamp: 'desc' },
+          orderBy: { createdAt: 'desc' },
         },
         statusMessages: {
           orderBy: { createdAt: 'desc' },
@@ -309,8 +309,7 @@ export class TravelService extends EventEmitter {
   } {
     return {
       isRunning: this.isRunning,
-      queueSize: Array.from(this.processingQueue.values())
-        .reduce((sum, arr) => sum + arr.length, 0),
+      queueSize: 0,
       l1CacheSize: 0, // TODO: expose from multiLevelCache
     };
   }
@@ -320,4 +319,4 @@ export class TravelService extends EventEmitter {
 export const travelService = TravelService.getInstance();
 
 // 类型导出
-export type { StartTravelInput, TravelResult, BatchTravel };
+export type { StartTravelInput, TravelResult };

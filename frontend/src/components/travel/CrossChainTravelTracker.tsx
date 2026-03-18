@@ -599,7 +599,7 @@ export function CrossChainTravelTracker({
         data={completionData}
         onViewDetails={() => {
           setShowCompletionModal(false);
-          navigate(`/travel-result/${travelId}`);
+          navigate(`/travel/${travelId}`);
         }}
         onStartNewTravel={() => {
           setShowCompletionModal(false);

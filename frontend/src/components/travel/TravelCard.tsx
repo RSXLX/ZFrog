@@ -10,9 +10,10 @@ import { ScaleOnHover } from '../common/animations/FadeIn';
 interface TravelCardProps {
   travel: Travel;
   index?: number;
+  onClick?: () => void;
 }
 
-export function TravelCard({ travel, index = 0 }: TravelCardProps) {
+export function TravelCard({ travel, index = 0, onClick }: TravelCardProps) {
   const navigate = useNavigate();
 
   const statusConfig = {
@@ -99,7 +100,7 @@ export function TravelCard({ travel, index = 0 }: TravelCardProps) {
             <Button
               variant="primary"
               fullWidth
-              onClick={() => navigate(`/travel/${travel.id}`)}
+              onClick={() => onClick?.() ?? navigate(`/travel-detail/${travel.id}`)}
               icon={<ArrowRight size={18} />}
               iconPosition="right"
             >

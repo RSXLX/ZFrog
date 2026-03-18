@@ -19,7 +19,6 @@ const defaultTasks: DailyTask[] = [
 
 export function useDailyTasks() {
   const [tasks, setTasks] = useState<DailyTask[]>(defaultTasks);
-  const [lastReset, setLastReset] = useState<string>('');
 
   // Load from storage
   useEffect(() => {
@@ -52,7 +51,6 @@ export function useDailyTasks() {
 
   const resetTasks = useCallback(() => {
     setTasks(defaultTasks);
-    setLastReset(new Date().toDateString());
   }, []);
 
   const completeTask = useCallback((taskId: string) => {

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Space, Modal, Form, Input, Select, InputNumber, message, Popconfirm } from 'antd';
+import { Card, Table, Tag, Button, Space, Modal, Form, Input, Select, InputNumber, message, Popconfirm, Alert } from 'antd';
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/error';
 
 interface BadgeRecord {
   id: string;
@@ -32,6 +33,7 @@ const Badges: React.FC = () => {
   const [badges, setBadges] = useState<BadgeRecord[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingBadge, setEditingBadge] = useState<BadgeRecord | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -43,13 +45,10 @@ const Badges: React.FC = () => {
       setLoading(true);
       const response = await api.get('/api/admin/badges');
       setBadges(response as unknown as BadgeRecord[]);
+      setLoadError(null);
     } catch (err) {
-      // 模拟数据
-      setBadges([
-        { id: '1', code: 'FIRST_TRIP', name: '首次旅行', description: '完成第一次旅行', icon: '🚀', unlockType: 'TRIP_COUNT', unlockCondition: { count: 1 }, rarity: 1, isHidden: false },
-        { id: '2', code: 'BSC_EXPLORER', name: 'BSC 探索者', description: '访问 BSC 测试网', icon: '🔶', unlockType: 'CHAIN_VISIT', unlockCondition: { chainId: 97 }, rarity: 2, isHidden: false },
-        { id: '3', code: 'MULTI_CHAIN_5', name: '跨链先锋', description: '完成 5 次跨链旅行', icon: '🌈', unlockType: 'MULTI_CHAIN', unlockCondition: { count: 5 }, rarity: 3, isHidden: false },
-      ]);
+      setBadges([]);
+      setLoadError(getApiErrorMessage(err, '加载徽章列表失败'));
     } finally {
       setLoading(false);
     }
@@ -76,16 +75,28 @@ const Badges: React.FC = () => {
       message.success('删除成功');
       fetchBadges();
     } catch (err) {
-      message.warning('后端 API 未实现');
+      message.error(getApiErrorMessage(err, '删除徽章失败'));
     }
   };
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+      let unlockCondition = {};
+      const rawCondition = String(values.unlockCondition || '').trim();
+
+      if (rawCondition) {
+        try {
+          unlockCondition = JSON.parse(rawCondition);
+        } catch {
+          message.error('解锁条件 JSON 格式错误');
+          return;
+        }
+      }
+
       const payload = {
         ...values,
-        unlockCondition: JSON.parse(values.unlockCondition || '{}'),
+        unlockCondition,
       };
 
       if (editingBadge) {
@@ -98,8 +109,7 @@ const Badges: React.FC = () => {
       setModalVisible(false);
       fetchBadges();
     } catch (err) {
-      message.warning('后端 API 未实现');
-      setModalVisible(false);
+      message.error(getApiErrorMessage(err, editingBadge ? '更新徽章失败' : '创建徽章失败'));
     }
   };
 
@@ -177,6 +187,15 @@ const Badges: React.FC = () => {
           </Space>
         }
       >
+        {loadError && (
+          <Alert
+            type="error"
+            showIcon
+            message="加载失败"
+            description={loadError}
+            style={{ marginBottom: 16 }}
+          />
+        )}
         <Table
           dataSource={badges}
           columns={columns}

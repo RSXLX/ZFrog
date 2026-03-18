@@ -3,13 +3,13 @@ import { Card, Row, Col, Statistic, Tag, Spin, Alert, Descriptions, Badge } from
 import {
   BugOutlined,
   RocketOutlined,
-  TrophyOutlined,
   TeamOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   SyncOutlined,
 } from '@ant-design/icons';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/error';
 
 interface DashboardData {
   stats: {
@@ -53,24 +53,8 @@ const Dashboard: React.FC = () => {
       setData(response as unknown as DashboardData);
       setError(null);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : '加载失败';
-      setError(errorMessage);
-      // 使用模拟数据
-      setData({
-        stats: {
-          totalFrogs: 0,
-          totalTravels: 0,
-          activeTravels: 0,
-          totalBadgesUnlocked: 0,
-          totalFriendships: 0,
-        },
-        services: {
-          backend: 'unhealthy',
-          database: 'disconnected',
-        },
-        chains: [],
-        contracts: [],
-      });
+      setError(getApiErrorMessage(err, '加载仪表盘失败'));
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -109,9 +93,9 @@ const Dashboard: React.FC = () => {
     <div>
       {error && (
         <Alert
-          message="加载警告"
-          description={`${error}，显示的是默认数据。请确保后端 Admin API 已实现。`}
-          type="warning"
+          message="加载失败"
+          description={error}
+          type="error"
           showIcon
           style={{ marginBottom: 24 }}
         />
@@ -223,7 +207,7 @@ const Dashboard: React.FC = () => {
             ))}
           </Row>
         ) : (
-          <span style={{ color: '#888' }}>暂无合约数据，请先实现后端 Admin API</span>
+          <span style={{ color: '#888' }}>暂无合约数据</span>
         )}
       </Card>
     </div>
