@@ -6,6 +6,7 @@ import lifeRoutes from './life.routes';
 import travelsRoutes from './travels.routes';
 import socialRoutes from './social.routes';
 import memoryRoutes from './memory.routes';
+import verifyRoutes from './verify.routes';
 
 const router = Router();
 
@@ -23,5 +24,6 @@ router.use('/life', lifeRoutes);
 router.use('/travels', travelsRoutes);
 router.use('/social', socialRoutes);
 router.use('/memory', memoryRoutes);
+router.use('/verify', verifyRoutes);
 
 export default router;

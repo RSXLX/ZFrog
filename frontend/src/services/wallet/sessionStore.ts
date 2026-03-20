@@ -8,6 +8,8 @@ export interface WalletSession {
   connector: string;           // 连接器类型: 'walletConnect' | 'injected' | 'coinbaseWallet'
   connectedAt: number;         // 连接时间戳
   lastActiveAt: number;        // 最后活跃时间
+  authToken?: string;          // V1 JWT
+  verifiedActions?: string[];  // World Verify 已通过动作
   metadata?: {
     name?: string;             // 钱包名称
     icon?: string;             // 钱包图标
@@ -24,6 +26,8 @@ interface SessionStoreState {
   clearSession: () => void;
   updateLastActive: () => void;
   setRestoring: (restoring: boolean) => void;
+  setAuthToken: (token: string | null) => void;
+  setVerifiedActions: (actions: string[]) => void;
   
   // Getters
   isSessionValid: () => boolean;
@@ -32,6 +36,18 @@ interface SessionStoreState {
 
 // 会话有效期：7 天
 const SESSION_VALIDITY_MS = 7 * 24 * 60 * 60 * 1000;
+const AUTH_TOKEN_KEYS = ['authToken', 'token', 'jwt', 'accessToken'] as const;
+
+function persistAuthToken(token: string | null) {
+  if (typeof window === 'undefined') return;
+  AUTH_TOKEN_KEYS.forEach((key) => {
+    if (token) {
+      window.localStorage.setItem(key, token);
+    } else {
+      window.localStorage.removeItem(key);
+    }
+  });
+}
 
 // 创建存储（支持 Electron 和浏览器）
 const storage = createJSONStorage(() => {
@@ -61,18 +77,24 @@ export const useSessionStore = create<SessionStoreState>()(
       isRestoring: false,
       
       saveSession: (session: WalletSession) => {
+        const prev = get().session;
         set({
           session: {
+            ...prev,
             ...session,
             connectedAt: session.connectedAt || Date.now(),
             lastActiveAt: Date.now(),
           },
         });
+        if (session.authToken) {
+          persistAuthToken(session.authToken);
+        }
         console.log('💾 Session saved:', session.address);
       },
       
       clearSession: () => {
         set({ session: null });
+        persistAuthToken(null);
         console.log('🗑️ Session cleared');
       },
       
@@ -90,6 +112,33 @@ export const useSessionStore = create<SessionStoreState>()(
       
       setRestoring: (restoring: boolean) => {
         set({ isRestoring: restoring });
+      },
+
+      setAuthToken: (token: string | null) => {
+        const { session } = get();
+        if (!session) {
+          persistAuthToken(token);
+          return;
+        }
+
+        set({
+          session: {
+            ...session,
+            authToken: token || undefined,
+          },
+        });
+        persistAuthToken(token);
+      },
+
+      setVerifiedActions: (actions: string[]) => {
+        const { session } = get();
+        if (!session) return;
+        set({
+          session: {
+            ...session,
+            verifiedActions: actions,
+          },
+        });
       },
       
       isSessionValid: () => {

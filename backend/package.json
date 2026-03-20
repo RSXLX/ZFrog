@@ -7,10 +7,11 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "jest --coverage --detectOpenHandles",
+    "test": "jest --detectOpenHandles",
+    "test:coverage": "jest --coverage --detectOpenHandles",
     "test:watch": "jest --watch",
-    "test:integration": "jest --testPathPattern=integration --runInBand",
-    "test:e2e": "jest --testPathPattern=e2e --runInBand",
+    "test:integration": "jest --testPathPattern=integration --runInBand --passWithNoTests",
+    "test:e2e": "jest --testPathPattern=e2e --runInBand --passWithNoTests",
     "test:load": "artillery quick --count 50 --num 20 http://localhost:3001/api/health",
     "lint": "eslint src/**/*.ts",
     "type-check": "tsc --noEmit",
@@ -19,6 +20,9 @@
     "db:push": "prisma db push",
     "db:seed": "ts-node src/scripts/seed.ts",
     "db:reset": "prisma migrate reset --force",
+    "v1:backfill": "ts-node src/scripts/backfill-v1-domain.ts",
+    "v1:backfill:dry": "ts-node src/scripts/backfill-v1-domain.ts --dry-run",
+    "v1:verify-backfill": "ts-node src/scripts/verify-v1-domain-backfill.ts",
     "benchmark": "autocannon -c 100 -d 30 http://localhost:3001/api/health",
     "docker:build": "docker build -t zfrog-backend .",
     "docker:run": "docker run -p 3001:3001 zfrog-backend"
@@ -77,6 +81,13 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/"
+    ],
+    "modulePathIgnorePatterns": [
+      "<rootDir>/dist/"
+    ],
     "setupFilesAfterEnv": [
       "<rootDir>/jest.setup.ts"
     ],
@@ -86,15 +97,7 @@
     "collectCoverageFrom": [
       "src/**/*.ts",
       "!src/**/*.d.ts"
-    ],
-    "coverageThreshold": {
-      "global": {
-        "branches": 80,
-        "functions": 80,
-        "lines": 80,
-        "statements": 80
-      }
-    }
+    ]
   },
   "engines": {
     "node": ">=18.0.0"

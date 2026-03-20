@@ -95,26 +95,39 @@ model Frog {
   rescuesDone        RescueRequest[]    @relation("RescuesDone") // 完成的救援
 
   // 🆕 V3.0 通知系统
-  notifications      Notification[]     // 通知列表
+  notifications Notification[] // 通知列表
 
   // 🆕 P5 繁殖系统
-  breedCooldownUntil DateTime?           // 繁殖冷却结束时间
-  parentFrogId1      Int?                // 父亲 ID (可为空表示初代)
-  parentFrogId2      Int?                // 母亲 ID
-  generation         Int    @default(0)  // 代数 (0=初代)
-  breedRequestsSent     BreedRequest[] @relation("BreedRequester")
-  breedRequestsReceived BreedRequest[] @relation("BreedPartner")
+  breedCooldownUntil     DateTime? // 繁殖冷却结束时间
+  parentFrogId1          Int? // 父亲 ID (可为空表示初代)
+  parentFrogId2          Int? // 母亲 ID
+  generation             Int            @default(0) // 代数 (0=初代)
+  breedRequestsSent      BreedRequest[] @relation("BreedRequester")
+  breedRequestsReceived  BreedRequest[] @relation("BreedPartner")
   offspringBreedRequests BreedRequest[] @relation("BreedOffspring")
 
   // 🆕 V4.0 冬眠系统
-  hibernationStatus  HibernationStatus @default(ACTIVE) // 冬眠状态
-  hibernatedAt       DateTime?                          // 进入冬眠的时间
-  blessingsReceived  Int               @default(0)     // 收到的祈福次数
+  hibernationStatus HibernationStatus @default(ACTIVE) // 冬眠状态
+  hibernatedAt      DateTime? // 进入冬眠的时间
+  blessingsReceived Int               @default(0) // 收到的祈福次数
 
   // 🆕 V4.0 家族 DAO 系统
-  familyId     Int?     // 所属家族 ID
-  family       Family?  @relation("FamilyMembers", fields: [familyId], references: [id])
-  ledFamilies  Family[] @relation("FamilyLeader") // 作为族长的家族
+  familyId    Int? // 所属家族 ID
+  family      Family?  @relation("FamilyMembers", fields: [familyId], references: [id])
+  ledFamilies Family[] @relation("FamilyLeader") // 作为族长的家族
+
+  // V1 核心域表
+  eggProfile                       EggProfile?
+  petState                         PetState?
+  soulProfile                      SoulProfile?
+  relationshipEvents               RelationshipEvent[] @relation("RelationshipEventFrog")
+  relationshipEventsAsActor        RelationshipEvent[] @relation("RelationshipEventActor")
+  relationshipEventsAsCounterparty RelationshipEvent[] @relation("RelationshipEventCounterparty")
+  ritualsAsFrog                    Ritual[]            @relation("RitualFrog")
+  ritualsAsTarget                  Ritual[]            @relation("RitualTarget")
+  memoryPalace                     MemoryPalace?
+  onchainMilestones                OnchainMilestone[]
+  domainEvents                     DomainEvent[]
 
   @@index([ownerAddress])
 }
@@ -190,17 +203,19 @@ model Travel {
   originalTargetAddress String?
 
   // 关联
-  frog            Frog                  @relation(fields: [frogId], references: [id])
-  souvenir        Souvenir?             @relation(fields: [souvenirId], references: [id])
-  observations    WalletObservation[]
-  groupTravel     GroupTravel? // 结伴旅行信息
-  statusMessages  TravelStatusMessage[] // 状态消息
-  discoveries     TravelDiscovery[] // 旅行发现
-  interactions    TravelInteraction[] // 跨链探索互动记录
-  visitorMessages VisitorMessage[] // 串门留言
-  photos          Photo[] // 🆕 旅行照片
-  feeds           TravelFeed[] // 🆕 V2.0 投喂记录
-  rescueRequest   RescueRequest? // 🆕 V2.0 救援请求
+  frog              Frog                  @relation(fields: [frogId], references: [id])
+  souvenir          Souvenir?             @relation(fields: [souvenirId], references: [id])
+  observations      WalletObservation[]
+  groupTravel       GroupTravel? // 结伴旅行信息
+  statusMessages    TravelStatusMessage[] // 状态消息
+  discoveries       TravelDiscovery[] // 旅行发现
+  interactions      TravelInteraction[] // 跨链探索互动记录
+  visitorMessages   VisitorMessage[] // 串门留言
+  photos            Photo[] // 🆕 旅行照片
+  feeds             TravelFeed[] // 🆕 V2.0 投喂记录
+  rescueRequest     RescueRequest? // 🆕 V2.0 救援请求
+  onchainMilestones OnchainMilestone[]
+  domainEvents      DomainEvent[]
 
   @@index([frogId])
   @@index([status])
@@ -209,6 +224,194 @@ model Travel {
   @@index([exploredBlock])
   @@index([isRandom])
   @@index([addressDiscoveredAt])
+}
+
+model AuthNonce {
+  id            String    @id @default(uuid())
+  walletAddress String
+  nonce         String
+  message       String
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([walletAddress, createdAt])
+  @@index([walletAddress, expiresAt])
+  @@index([walletAddress, usedAt])
+  @@map("auth_nonces")
+}
+
+model HumanVerification {
+  id            String   @id @default(uuid())
+  walletAddress String
+  action        String
+  signal        String?
+  nullifierHash String?  @unique
+  proof         Json
+  verified      Boolean  @default(true)
+  provider      String   @default("world")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([walletAddress, action])
+  @@index([action, createdAt])
+  @@map("human_verifications")
+}
+
+model EggProfile {
+  id           Int       @id @default(autoincrement())
+  frogId       Int       @unique
+  claimStatus  String    @default("HATCHED")
+  claimedAt    DateTime?
+  hatchReadyAt DateTime?
+  hatchedAt    DateTime?
+  imprintSeed  String?
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  frog Frog @relation(fields: [frogId], references: [id])
+
+  @@index([claimStatus])
+  @@map("egg_profiles")
+}
+
+model PetState {
+  id              Int       @id @default(autoincrement())
+  frogId          Int       @unique
+  lifeStage       String    @default("ACTIVE")
+  hunger          Int       @default(100)
+  happiness       Int       @default(100)
+  health          Int       @default(100)
+  energy          Int       @default(100)
+  cleanliness     Int       @default(100)
+  isSick          Boolean   @default(false)
+  isDormant       Boolean   @default(false)
+  lastCareAt      DateTime?
+  lastStateSyncAt DateTime  @default(now())
+  metadata        Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  frog Frog @relation(fields: [frogId], references: [id])
+
+  @@index([lifeStage])
+  @@map("pet_states")
+}
+
+model SoulProfile {
+  id          Int       @id @default(autoincrement())
+  frogId      Int       @unique
+  personality String?
+  imprintText String?
+  temperament Json?
+  bondedAt    DateTime?
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  frog Frog @relation(fields: [frogId], references: [id])
+
+  @@map("soul_profiles")
+}
+
+model RelationshipEvent {
+  id                 BigInt   @id @default(autoincrement())
+  frogId             Int
+  actorFrogId        Int?
+  counterpartyFrogId Int?
+  eventType          String
+  payload            Json?
+  occurredAt         DateTime @default(now())
+  createdAt          DateTime @default(now())
+
+  frog         Frog  @relation("RelationshipEventFrog", fields: [frogId], references: [id])
+  actor        Frog? @relation("RelationshipEventActor", fields: [actorFrogId], references: [id])
+  counterparty Frog? @relation("RelationshipEventCounterparty", fields: [counterpartyFrogId], references: [id])
+
+  @@index([frogId, occurredAt])
+  @@index([eventType, occurredAt])
+  @@map("relationship_events")
+}
+
+model Ritual {
+  id           BigInt    @id @default(autoincrement())
+  frogId       Int
+  targetFrogId Int?
+  ritualType   String
+  status       String    @default("PENDING")
+  payload      Json?
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  frog       Frog  @relation("RitualFrog", fields: [frogId], references: [id])
+  targetFrog Frog? @relation("RitualTarget", fields: [targetFrogId], references: [id])
+
+  @@index([frogId, ritualType])
+  @@index([status, createdAt])
+  @@index([targetFrogId])
+  @@map("rituals")
+}
+
+model MemoryPalace {
+  id         Int      @id @default(autoincrement())
+  frogId     Int      @unique
+  recapText  String?  @db.Text
+  timeline   Json?
+  highlights Json?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  frog Frog @relation(fields: [frogId], references: [id])
+
+  @@map("memory_palaces")
+}
+
+model OnchainMilestone {
+  id            BigInt   @id @default(autoincrement())
+  frogId        Int
+  travelId      Int?
+  milestoneType String
+  chainId       Int?
+  txHash        String?
+  blockNumber   BigInt?
+  payload       Json?
+  createdAt     DateTime @default(now())
+
+  frog   Frog    @relation(fields: [frogId], references: [id])
+  travel Travel? @relation(fields: [travelId], references: [id])
+
+  @@index([frogId, milestoneType, createdAt])
+  @@index([travelId])
+  @@map("onchain_milestones")
+}
+
+model DomainEvent {
+  id            BigInt   @id @default(autoincrement())
+  frogId        Int?
+  travelId      Int?
+  aggregateType String
+  aggregateId   String?
+  eventType     String
+  eventVersion  Int      @default(1)
+  payload       Json
+  occurredAt    DateTime @default(now())
+  requestId     String?
+  traceId       String?
+  source        String?
+  createdAt     DateTime @default(now())
+
+  frog   Frog?   @relation(fields: [frogId], references: [id])
+  travel Travel? @relation(fields: [travelId], references: [id])
+
+  @@index([eventType, occurredAt])
+  @@index([frogId, occurredAt])
+  @@index([travelId, occurredAt])
+  @@map("domain_events")
 }
 
 // 旅行发现 - 保存探索过程中发现的区块信息
@@ -398,14 +601,14 @@ model Friendship {
   lastTravelTogether DateTime? // 上次结伴时间
 
   // V3.0 亲密度系统
-  intimacy        Int       @default(0)    // 亲密度点数 0-100
-  intimacyLevel   Int       @default(1)    // 亲密度等级 1-5
+  intimacy        Int       @default(0) // 亲密度点数 0-100
+  intimacyLevel   Int       @default(1) // 亲密度等级 1-5
   lastInteraction DateTime? // 上次互动时间
 
   interactions FriendInteraction[]
   dailyLimits  DailyFriendInteraction[]
-  addressee    Frog                @relation("FriendshipAddressee", fields: [addresseeId], references: [id])
-  requester    Frog                @relation("FriendshipRequester", fields: [requesterId], references: [id])
+  addressee    Frog                     @relation("FriendshipAddressee", fields: [addresseeId], references: [id])
+  requester    Frog                     @relation("FriendshipRequester", fields: [requesterId], references: [id])
 
   @@unique([requesterId, addresseeId])
   @@index([status])
@@ -440,28 +643,28 @@ model DailyFriendInteraction {
   giftCount    Int      @default(0) // 送礼次数 (无上限)
   messageCount Int      @default(0) // 留言次数 (上限10)
   travelCount  Int      @default(0) // 结伴旅行 (上限1)
-  
+
   friendship Friendship @relation(fields: [friendshipId], references: [id])
-  
+
   @@unique([friendshipId, date])
   @@index([friendshipId])
 }
 
 // V3.0 通知系统
 model Notification {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   frogId    Int
-  type      String   // hunger_warning, sick, travel_complete, friend_gift, etc.
+  type      String // hunger_warning, sick, travel_complete, friend_gift, etc.
   title     String
   message   String
-  priority  String   @default("medium") // low, medium, high, urgent
-  isRead    Boolean  @default(false)
-  metadata  Json?    // 额外数据 (如好友信息)
-  createdAt DateTime @default(now())
+  priority  String    @default("medium") // low, medium, high, urgent
+  isRead    Boolean   @default(false)
+  metadata  Json? // 额外数据 (如好友信息)
+  createdAt DateTime  @default(now())
   readAt    DateTime?
-  
+
   frog Frog @relation(fields: [frogId], references: [id])
-  
+
   @@index([frogId, isRead])
   @@index([type])
   @@index([createdAt])
@@ -523,23 +726,23 @@ enum FrogStatus {
 
 // 🆕 V4.0 冬眠系统
 enum HibernationStatus {
-  ACTIVE   // 正常活跃
-  DROWSY   // 困倦 (72-96h 未交互)
+  ACTIVE // 正常活跃
+  DROWSY // 困倦 (72-96h 未交互)
   SLEEPING // 已冬眠 (>96h 未交互)
 }
 
 // 🆕 V4.0 家族 DAO 系统
 model Family {
-  id            Int       @id @default(autoincrement())
-  name          String    @unique   // 家族名称
-  leaderId      Int                 // 族长 Frog ID
-  leader        Frog      @relation("FamilyLeader", fields: [leaderId], references: [id])
-  members       Frog[]    @relation("FamilyMembers") // 家族成员
-  totemLevel    Int       @default(1)   // 图腾等级 1-10
-  totemProgress Int       @default(0)   // 当前等级进度 0-100
-  weeklyMileage Int       @default(0)   // 本周累计里程
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id            Int      @id @default(autoincrement())
+  name          String   @unique // 家族名称
+  leaderId      Int // 族长 Frog ID
+  leader        Frog     @relation("FamilyLeader", fields: [leaderId], references: [id])
+  members       Frog[]   @relation("FamilyMembers") // 家族成员
+  totemLevel    Int      @default(1) // 图腾等级 1-10
+  totemProgress Int      @default(0) // 当前等级进度 0-100
+  weeklyMileage Int      @default(0) // 本周累计里程
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 enum TravelStatus {
@@ -1474,48 +1677,47 @@ enum ShopCategory {
 // ========== P5 繁殖系统 ==========
 
 enum BreedStatus {
-  Pending   // 等待对方确认
-  Accepted  // 已接受，等待支付
-  Paid      // 已支付，等待执行
+  Pending // 等待对方确认
+  Accepted // 已接受，等待支付
+  Paid // 已支付，等待执行
   Completed // 繁殖完成
-  Rejected  // 已拒绝
+  Rejected // 已拒绝
   Cancelled // 已取消
-  Expired   // 已过期
+  Expired // 已过期
 }
 
 model BreedRequest {
-  id          Int         @id @default(autoincrement())
-  
+  id Int @id @default(autoincrement())
+
   // 发起方和配对方
   requesterId Int
   partnerId   Int
-  requester   Frog        @relation("BreedRequester", fields: [requesterId], references: [id])
-  partner     Frog        @relation("BreedPartner", fields: [partnerId], references: [id])
-  
+  requester   Frog @relation("BreedRequester", fields: [requesterId], references: [id])
+  partner     Frog @relation("BreedPartner", fields: [partnerId], references: [id])
+
   // 状态
-  status      BreedStatus @default(Pending)
-  
+  status BreedStatus @default(Pending)
+
   // 支付状态
-  requesterPaid Boolean   @default(false)
-  partnerPaid   Boolean   @default(false)
-  breedFee      Float     @default(5.0) // 总费用 ZETA
-  
+  requesterPaid Boolean @default(false)
+  partnerPaid   Boolean @default(false)
+  breedFee      Float   @default(5.0) // 总费用 ZETA
+
   // 生成的子代
-  offspringId   Int?      // 子代青蛙 ID
-  offspring     Frog?     @relation("BreedOffspring", fields: [offspringId], references: [id])
-  
+  offspringId Int? // 子代青蛙 ID
+  offspring   Frog? @relation("BreedOffspring", fields: [offspringId], references: [id])
+
   // 遗传信息 (用于生成子代)
-  offspringGenes Json?    // 预计算的遗传基因
-  
+  offspringGenes Json? // 预计算的遗传基因
+
   // 时间戳
-  createdAt   DateTime    @default(now())
+  createdAt   DateTime  @default(now())
   acceptedAt  DateTime?
   completedAt DateTime?
-  expiresAt   DateTime?   // 请求过期时间 (24小时)
-  
+  expiresAt   DateTime? // 请求过期时间 (24小时)
+
   @@unique([requesterId, partnerId, status]) // 避免重复请求
   @@index([status])
   @@index([requesterId])
   @@index([partnerId])
 }
-

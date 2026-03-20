@@ -10,6 +10,17 @@ export const ZETACHAIN_RPC_URLS = [
   'https://zetachain-testnet-evm.itrocket.net',
 ];
 
+const parseCsv = (value: string | undefined): string[] =>
+  (value || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+
+const parseBoolean = (value: string | undefined, fallback = false): boolean => {
+  if (value === undefined) return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+};
+
 export const config = {
   // Server
   PORT: parseInt(process.env.PORT || '3001'),
@@ -45,6 +56,12 @@ export const config = {
   
   // JWT (新增)
   JWT_SECRET: process.env.JWT_SECRET || 'zetafrog-default-secret-change-in-production',
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  AUTH_NONCE_TTL_SECONDS: parseInt(process.env.AUTH_NONCE_TTL_SECONDS || '600'),
+  ADMIN_ADDRESSES: parseCsv(process.env.ADMIN_ADDRESSES),
+  WORLD_VERIFY_ENABLED: parseBoolean(process.env.WORLD_VERIFY_ENABLED, false),
+  WORLD_VERIFY_PROVIDER: process.env.WORLD_VERIFY_PROVIDER || 'world',
+  WORLD_APP_ID: process.env.WORLD_APP_ID || '',
   
   // Chain
   CHAIN_ID: parseInt(process.env.CHAIN_ID || '7001'),

@@ -12,10 +12,12 @@ import { AppError } from './errorHandler';
 
 // JWT Token 载荷类型
 export interface JwtPayload {
-  address: string;         // 钱包地址
-  chainId?: number;        // 链 ID
-  iat?: number;            // 签发时间
-  exp?: number;            // 过期时间
+  address: string; // 钱包地址
+  walletAddress: string; // 规范化钱包地址（与 address 保持一致）
+  chainId?: number; // 链 ID
+  frogTokenId?: number | null; // 当前钱包绑定的青蛙 tokenId
+  iat?: number; // 签发时间
+  exp?: number; // 过期时间
 }
 
 // 扩展 Express Request 类型
@@ -28,16 +30,19 @@ declare global {
 }
 
 // JWT 密钥
-const JWT_SECRET = process.env.JWT_SECRET || 'zetafrog-secret-key-change-in-production';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const JWT_SECRET = config.JWT_SECRET || 'zetafrog-secret-key-change-in-production';
+const JWT_EXPIRES_IN = config.JWT_EXPIRES_IN || '7d';
 
 /**
  * 生成 JWT Token
  */
-export function generateToken(address: string, chainId?: number): string {
+export function generateToken(address: string, chainId?: number, frogTokenId?: number | null): string {
+  const normalizedAddress = address.toLowerCase();
   const payload = {
-    address: address.toLowerCase(),
+    address: normalizedAddress,
+    walletAddress: normalizedAddress,
     chainId,
+    frogTokenId: frogTokenId ?? null,
   };
   
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] });
@@ -50,6 +55,9 @@ export function verifyToken(token: string): JwtPayload {
   return jwt.verify(token, JWT_SECRET) as JwtPayload;
 }
 
+const isV1Request = (req: Request): boolean =>
+  req.originalUrl.startsWith('/api/v1') || req.path.startsWith('/api/v1');
+
 /**
  * 认证中间件 - 必须登录
  * 验证请求头中的 Bearer Token
@@ -59,16 +67,25 @@ export function authRequired(req: Request, res: Response, next: NextFunction): v
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      // 兼容旧的简单认证方式 (仅开发环境或过渡期)
-      if (process.env.NODE_ENV !== 'production' && req.query.address) {
-        req.user = { address: (req.query.address as string).toLowerCase() };
+      const allowDevFallback = process.env.NODE_ENV !== 'production' && !isV1Request(req);
+
+      // 兼容旧的简单认证方式 (仅开发环境或过渡期，且不包含 /api/v1)
+      if (allowDevFallback && req.query.address) {
+        const normalizedAddress = (req.query.address as string).toLowerCase();
+        req.user = {
+          address: normalizedAddress,
+          walletAddress: normalizedAddress,
+        };
         return next();
       }
-      if (process.env.NODE_ENV !== 'production') {
+      if (allowDevFallback) {
         const rawHeaderAddress = req.headers['x-wallet-address'] ?? req.headers['x-admin-address'];
         const headerAddress = Array.isArray(rawHeaderAddress) ? rawHeaderAddress[0] : rawHeaderAddress;
         if (typeof headerAddress === 'string' && headerAddress.startsWith('0x') && headerAddress.length === 42) {
-          req.user = { address: headerAddress.toLowerCase() };
+          req.user = {
+            address: headerAddress.toLowerCase(),
+            walletAddress: headerAddress.toLowerCase(),
+          };
           return next();
         }
       }
@@ -78,13 +95,19 @@ export function authRequired(req: Request, res: Response, next: NextFunction): v
     const token = authHeader.substring(7);
     
     // 兼容旧的直接传地址的方式 (仅非生产环境)
-    if (process.env.NODE_ENV !== 'production' && token.startsWith('0x') && token.length === 42) {
-       req.user = { address: token.toLowerCase() };
+    if (process.env.NODE_ENV !== 'production' && !isV1Request(req) && token.startsWith('0x') && token.length === 42) {
+       req.user = {
+        address: token.toLowerCase(),
+        walletAddress: token.toLowerCase(),
+      };
        return next();
     }
 
     const payload = verifyToken(token);
-    req.user = payload;
+    req.user = {
+      ...payload,
+      walletAddress: payload.walletAddress || payload.address.toLowerCase(),
+    };
     next();
   } catch (error: any) {
     if (error instanceof jwt.TokenExpiredError) {
@@ -152,9 +175,16 @@ export function authOptional(req: Request, res: Response, next: NextFunction): v
         token.startsWith('0x') &&
         token.length === 42
       ) {
-        req.user = { address: token.toLowerCase() };
+        req.user = {
+          address: token.toLowerCase(),
+          walletAddress: token.toLowerCase(),
+        };
       } else {
-        req.user = verifyToken(token);
+        const payload = verifyToken(token);
+        req.user = {
+          ...payload,
+          walletAddress: payload.walletAddress || payload.address.toLowerCase(),
+        };
       }
     }
     
