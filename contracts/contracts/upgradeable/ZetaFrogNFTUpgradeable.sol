@@ -67,6 +67,9 @@ contract ZetaFrogNFTUpgradeable is
         string name,
         uint256 timestamp
     );
+    event EggClaimed(address indexed owner, uint256 indexed tokenId, uint256 timestamp);
+    event SoulImprinted(uint256 indexed tokenId, bytes32 indexed imprintHash, uint256 timestamp);
+    event FrogHatched(address indexed owner, uint256 indexed tokenId, uint256 timestamp);
     event LevelUp(uint256 indexed tokenId, uint256 newLevel, uint256 timestamp);
     event FrogStatusUpdated(uint256 indexed tokenId, FrogStatus status);
     event FrogMigrated(uint256 indexed tokenId, address indexed owner, string name);
@@ -319,6 +322,34 @@ contract ZetaFrogNFTUpgradeable is
     }
 
     /**
+     * @notice Emit life-cycle milestone events from authorized backend contracts.
+     * @dev milestoneType: 1=EggClaimed, 2=SoulImprinted, 3=FrogHatched
+     */
+    function emitLifeMilestone(
+        uint256 tokenId,
+        uint8 milestoneType,
+        bytes32 dataHash
+    ) external whenNotPaused onlyTravelContract {
+        address owner = _ownerOf(tokenId);
+        require(owner != address(0), "Frog does not exist");
+
+        if (milestoneType == 1) {
+            emit EggClaimed(owner, tokenId, block.timestamp);
+            return;
+        }
+        if (milestoneType == 2) {
+            emit SoulImprinted(tokenId, dataHash, block.timestamp);
+            return;
+        }
+        if (milestoneType == 3) {
+            emit FrogHatched(owner, tokenId, block.timestamp);
+            return;
+        }
+
+        revert("Invalid milestone type");
+    }
+
+    /**
      * @notice Add experience to a frog
      */
     function addExperience(uint256 tokenId, uint256 xpAmount)
@@ -383,7 +414,7 @@ contract ZetaFrogNFTUpgradeable is
      * @notice Get contract version
      */
     function version() external pure returns (string memory) {
-        return "2.1.0";
+        return "2.2.0";
     }
 
     // ============ Required Overrides ============

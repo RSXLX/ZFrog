@@ -95,6 +95,36 @@ export class WorldVerifyService {
 
     return rows.map((row) => row.action);
   }
+
+  async requireVerification(
+    verificationId: string,
+    walletAddress: string,
+    action?: string
+  ): Promise<void> {
+    const normalizedAddress = normalizeWalletAddress(walletAddress);
+    const verification = await prisma.humanVerification.findUnique({
+      where: { id: verificationId },
+      select: {
+        id: true,
+        walletAddress: true,
+        action: true,
+        verified: true,
+      },
+    });
+
+    if (!verification) {
+      throw new AppError(404, 'verificationId not found', 'NOT_FOUND');
+    }
+    if (!verification.verified) {
+      throw new AppError(403, 'verification is not valid', 'FORBIDDEN');
+    }
+    if (verification.walletAddress.toLowerCase() !== normalizedAddress) {
+      throw new AppError(403, 'verification does not belong to walletAddress', 'FORBIDDEN');
+    }
+    if (action && verification.action !== action) {
+      throw new AppError(403, `verification action mismatch: expected ${action}`, 'FORBIDDEN');
+    }
+  }
 }
 
 export const worldVerifyService = new WorldVerifyService();
