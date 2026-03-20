@@ -14,6 +14,8 @@ import { startStatusCron } from './services/status-cron.job';
 import { initializeShop } from './services/shop.service';
 import { initializeWebSocket, setIO } from './websocket';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
+import { authRequired, adminRequired } from './middlewares/auth.middleware';
+import { requestIdMiddleware } from './utils/request-id';
 
 import frogRoutes from './api/routes/frog.routes';
 import travelRoutes from './api/routes/travel.routes';
@@ -41,6 +43,7 @@ import taskRoutes from './api/routes/task.routes'; // 🆕 宠物蛋系统 - 每
 import shopRoutes from './api/routes/shop.routes'; // 🆕 宠物蛋系统 - 商店
 import breedRoutes from './api/routes/breed.routes'; // 🆕 P5 繁殖系统
 import hibernationRoutes from './api/routes/hibernation.routes'; // 🆕 冬眠系统
+import v1Routes from './api/routes/v1';
 
 
 const app = express();
@@ -52,18 +55,20 @@ const io = initializeWebSocket(httpServer);
 // Middleware
 app.use(helmet());
 app.use(cors({ 
-  origin: [config.FRONTEND_URL, 'http://localhost:5174', 'http://localhost:3002'],
+  origin: [config.FRONTEND_URL, 'http://localhost:3002', 'http://localhost:5174', 'http://localhost:5175'],
   credentials: true 
 }));
 app.use(express.json());
+app.use(requestIdMiddleware);
 
 // Request logging middleware
 app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path}`);
+  logger.info(`${req.method} ${req.path}`, { requestId: req.requestId });
   next();
 });
 
 // Routes
+app.use('/api/v1', v1Routes);
 app.use('/api/frogs', frogRoutes);
 app.use('/api/travels', travelRoutes);
 app.use('/api/friends', friendsRoutes);
@@ -83,7 +88,7 @@ app.use('/api/communities', communityRoutes); // 🆕 社区系统
 app.use('/api/frogs', interactionRoutes); // 🆕 喂食/互动系统 (挂载到 /api/frogs 下)
 app.use('/api/frogs/appearance', appearanceRoutes); // 🆕 个性化外观系统
 app.use('/api/address', addressRoutes); // 🆕 V2.0 地址分析
-app.use('/api/admin', adminRoutes); // 🆕 管理员控制台
+app.use('/api/admin', authRequired, adminRequired, adminRoutes); // 🆕 管理员控制台
 app.use('/api/group-travel', groupTravelRoutes); // 🆕 结伴旅行 V2.0
 app.use('/api/nurture', nurtureRoutes); // 🆕 宠物蛋系统 - 养成操作
 app.use('/api/tasks', taskRoutes); // 🆕 宠物蛋系统 - 每日任务
@@ -100,6 +105,7 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/api/health',
+      healthV1: '/api/v1/health',
       frogs: '/api/frogs/:tokenId',
       travels: '/api/travels/:frogId',
     },

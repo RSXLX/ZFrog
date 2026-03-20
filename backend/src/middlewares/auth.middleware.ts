@@ -64,13 +64,21 @@ export function authRequired(req: Request, res: Response, next: NextFunction): v
         req.user = { address: (req.query.address as string).toLowerCase() };
         return next();
       }
-      throw new AppError(401, '未提供认证令牌');
+      if (process.env.NODE_ENV !== 'production') {
+        const rawHeaderAddress = req.headers['x-wallet-address'] ?? req.headers['x-admin-address'];
+        const headerAddress = Array.isArray(rawHeaderAddress) ? rawHeaderAddress[0] : rawHeaderAddress;
+        if (typeof headerAddress === 'string' && headerAddress.startsWith('0x') && headerAddress.length === 42) {
+          req.user = { address: headerAddress.toLowerCase() };
+          return next();
+        }
+      }
+      throw new AppError(401, '未提供认证令牌', 'UNAUTHORIZED');
     }
     
     const token = authHeader.substring(7);
     
-    // 兼容旧的直接传地址的方式 (如果 token 看起来像地址)
-    if (token.startsWith('0x') && token.length === 42) {
+    // 兼容旧的直接传地址的方式 (仅非生产环境)
+    if (process.env.NODE_ENV !== 'production' && token.startsWith('0x') && token.length === 42) {
        req.user = { address: token.toLowerCase() };
        return next();
     }
@@ -80,16 +88,51 @@ export function authRequired(req: Request, res: Response, next: NextFunction): v
     next();
   } catch (error: any) {
     if (error instanceof jwt.TokenExpiredError) {
-      next(new AppError(401, 'Token 已过期，请重新登录'));
+      next(new AppError(401, 'Token 已过期，请重新登录', 'TOKEN_EXPIRED'));
     } else if (error instanceof jwt.JsonWebTokenError) {
-      next(new AppError(401, '无效的 Token'));
+      next(new AppError(401, '无效的 Token', 'INVALID_TOKEN'));
     } else if (error instanceof AppError) {
       next(error);
     } else {
-      logger.error('Auth middleware error:', error);
-      next(new AppError(401, '认证失败'));
+      logger.error('Auth middleware error:', {
+        requestId: req.requestId,
+        error,
+      });
+      next(new AppError(401, '认证失败', 'AUTH_FAILED'));
     }
   }
+}
+
+let hasWarnedMissingAdminAllowlist = false;
+
+/**
+ * 管理员中间件
+ * 需要在 authRequired 之后使用
+ */
+export function adminRequired(req: Request, res: Response, next: NextFunction): void {
+  if (!req.user?.address) {
+    return next(new AppError(401, '需要登录', 'UNAUTHORIZED'));
+  }
+
+  const allowlist = config.ADMIN_ADDRESSES || [];
+  const address = req.user.address.toLowerCase();
+
+  if (allowlist.length === 0) {
+    if (config.NODE_ENV !== 'production') {
+      if (!hasWarnedMissingAdminAllowlist) {
+        logger.warn('[Auth] ADMIN_ADDRESSES 未配置，非生产环境允许访问管理员接口');
+        hasWarnedMissingAdminAllowlist = true;
+      }
+      return next();
+    }
+    return next(new AppError(403, '管理员白名单未配置', 'ADMIN_ALLOWLIST_MISSING'));
+  }
+
+  if (!allowlist.includes(address)) {
+    return next(new AppError(403, '需要管理员权限', 'FORBIDDEN'));
+  }
+
+  return next();
 }
 
 /**
@@ -103,8 +146,12 @@ export function authOptional(req: Request, res: Response, next: NextFunction): v
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
       
-      // 兼容旧方式
-      if (token.startsWith('0x') && token.length === 42) {
+      // 兼容旧方式（仅非生产环境）
+      if (
+        process.env.NODE_ENV !== 'production' &&
+        token.startsWith('0x') &&
+        token.length === 42
+      ) {
         req.user = { address: token.toLowerCase() };
       } else {
         req.user = verifyToken(token);
@@ -126,7 +173,7 @@ export function authOptional(req: Request, res: Response, next: NextFunction): v
 export function ownershipRequired(addressParam: string = 'address') {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      return next(new AppError(401, '需要登录'));
+      return next(new AppError(401, '需要登录', 'UNAUTHORIZED'));
     }
     
     const targetAddress = (
@@ -136,11 +183,11 @@ export function ownershipRequired(addressParam: string = 'address') {
     ) as string;
     
     if (!targetAddress) {
-      return next(new AppError(400, '缺少地址参数'));
+      return next(new AppError(400, '缺少地址参数', 'INVALID_INPUT'));
     }
     
     if (req.user.address.toLowerCase() !== targetAddress.toLowerCase()) {
-      return next(new AppError(403, '您没有权限访问此资源'));
+      return next(new AppError(403, '您没有权限访问此资源', 'FORBIDDEN'));
     }
     
     next();
@@ -155,7 +202,7 @@ export function frogOwnershipRequired(frogIdParam: string = 'frogId') {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
-        return next(new AppError(401, '需要登录'));
+        return next(new AppError(401, '需要登录', 'UNAUTHORIZED'));
       }
       
       const frogId = parseInt(
@@ -165,7 +212,7 @@ export function frogOwnershipRequired(frogIdParam: string = 'frogId') {
       );
       
       if (isNaN(frogId)) {
-        return next(new AppError(400, '无效的青蛙 ID'));
+        return next(new AppError(400, '无效的青蛙 ID', 'INVALID_INPUT'));
       }
       
       // 动态导入 prisma 避免循环依赖
@@ -177,11 +224,11 @@ export function frogOwnershipRequired(frogIdParam: string = 'frogId') {
       });
       
       if (!frog) {
-        return next(new AppError(404, '青蛙不存在'));
+        return next(new AppError(404, '青蛙不存在', 'NOT_FOUND'));
       }
       
       if (frog.ownerAddress.toLowerCase() !== req.user.address.toLowerCase()) {
-        return next(new AppError(403, '您不是这只青蛙的主人'));
+        return next(new AppError(403, '您不是这只青蛙的主人', 'FORBIDDEN'));
       }
       
       next();
@@ -195,6 +242,7 @@ export function frogOwnershipRequired(frogIdParam: string = 'frogId') {
 export const auth = {
   required: authRequired,
   optional: authOptional,
+  adminRequired,
   ownershipRequired,
   frogOwnershipRequired,
 };
