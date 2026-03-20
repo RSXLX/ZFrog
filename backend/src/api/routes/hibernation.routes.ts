@@ -1,18 +1,24 @@
 /**
- * 🌙 冬眠系统路由
- * 
+ * 🌙 冬眠系统路由（兼容旧路径）
+ *
  * 路由:
- * - GET  /api/frog/:frogId/hibernation - 获取冬眠状态
- * - GET  /api/frog/:frogId/hibernation/revival-cost - 获取唤醒费用
- * - POST /api/frog/:frogId/hibernation/revive - 唤醒青蛙
- * - POST /api/frog/:frogId/hibernation/bless - 祈福
+ * - GET  /api/frog/:frogId/hibernation
+ * - GET  /api/frog/:frogId/hibernation/revival-cost
+ * - POST /api/frog/:frogId/hibernation/revive
+ * - POST /api/frog/:frogId/hibernation/bless
  */
 
 import { Router, Request, Response } from 'express';
-import { hibernationService } from '../../services/hibernation.service';
-import { prisma } from '../../database';
+import { dormancyService } from '../../modules/life/dormancy.service';
+import { lifeCommandService } from '../../modules/life/life.command';
+import { lifeQueryService } from '../../modules/life/life.query';
 
 const router = Router();
+
+const parseFrogId = (raw: string): number => {
+  const frogId = Number(raw);
+  return Number.isInteger(frogId) ? frogId : NaN;
+};
 
 /**
  * GET /api/frog/:frogId/hibernation
@@ -20,37 +26,23 @@ const router = Router();
  */
 router.get('/:frogId/hibernation', async (req: Request, res: Response) => {
   try {
-    const frogId = parseInt(req.params.frogId);
-    
+    const frogId = parseFrogId(req.params.frogId);
     if (isNaN(frogId)) {
       return res.status(400).json({ error: '无效的青蛙 ID' });
     }
-    
-    const frog = await prisma.frog.findUnique({
-      where: { id: frogId },
-      select: {
-        hibernationStatus: true,
-        hibernatedAt: true,
-        blessingsReceived: true,
-        level: true,
-      },
-    });
-    
-    if (!frog) {
-      return res.status(404).json({ error: '青蛙不存在' });
-    }
-    
-    // 如果正在沉睡，计算唤醒费用
-    let revivalCost = null;
-    if (frog.hibernationStatus === 'SLEEPING' && frog.hibernatedAt) {
-      const costInfo = await hibernationService.getRevivalCostWithDiscount(frogId);
-      revivalCost = costInfo;
-    }
-    
+
+    await lifeCommandService.syncDormancyStatus({ frogId });
+    const life = await lifeQueryService.getLifeByFrogId(frogId);
+    const revivalCost =
+      life.hibernationStatus === 'SLEEPING'
+        ? await dormancyService.getRevivalCostWithDiscount(frogId)
+        : null;
+
     return res.json({
-      status: frog.hibernationStatus,
-      hibernatedAt: frog.hibernatedAt?.toISOString() || null,
-      blessingsReceived: frog.blessingsReceived || 0,
+      status: life.hibernationStatus,
+      isDormant: life.isDormant,
+      mood: life.mood,
+      blessingsReceived: revivalCost?.blessings || 0,
       revivalCost,
     });
   } catch (error) {
@@ -65,13 +57,12 @@ router.get('/:frogId/hibernation', async (req: Request, res: Response) => {
  */
 router.get('/:frogId/hibernation/revival-cost', async (req: Request, res: Response) => {
   try {
-    const frogId = parseInt(req.params.frogId);
-    
+    const frogId = parseFrogId(req.params.frogId);
     if (isNaN(frogId)) {
       return res.status(400).json({ error: '无效的青蛙 ID' });
     }
-    
-    const costInfo = await hibernationService.getRevivalCostWithDiscount(frogId);
+
+    const costInfo = await dormancyService.getRevivalCostWithDiscount(frogId);
     return res.json(costInfo);
   } catch (error) {
     console.error('获取唤醒费用失败:', error);
@@ -85,13 +76,12 @@ router.get('/:frogId/hibernation/revival-cost', async (req: Request, res: Respon
  */
 router.post('/:frogId/hibernation/revive', async (req: Request, res: Response) => {
   try {
-    const frogId = parseInt(req.params.frogId);
-    
+    const frogId = parseFrogId(req.params.frogId);
     if (isNaN(frogId)) {
       return res.status(400).json({ success: false, message: '无效的青蛙 ID' });
     }
-    
-    const result = await hibernationService.reviveFrog(frogId);
+
+    const result = await dormancyService.reviveDormant(frogId);
     return res.json(result);
   } catch (error) {
     console.error('唤醒失败:', error);
@@ -105,14 +95,19 @@ router.post('/:frogId/hibernation/revive', async (req: Request, res: Response) =
  */
 router.post('/:frogId/hibernation/bless', async (req: Request, res: Response) => {
   try {
-    const targetFrogId = parseInt(req.params.frogId);
-    const { blesserFrogId } = req.body;
-    
-    if (isNaN(targetFrogId) || isNaN(parseInt(blesserFrogId))) {
+    const targetFrogId = parseFrogId(req.params.frogId);
+    const { blesserFrogId, verificationId } = req.body;
+    const parsedBlesserFrogId = Number(blesserFrogId);
+
+    if (isNaN(targetFrogId) || !Number.isInteger(parsedBlesserFrogId) || parsedBlesserFrogId <= 0) {
       return res.status(400).json({ success: false, message: '无效的参数' });
     }
-    
-    const result = await hibernationService.blessFrog(parseInt(blesserFrogId), targetFrogId);
+
+    const result = await lifeCommandService.blessDormant({
+      blesserFrogId: parsedBlesserFrogId,
+      targetFrogId,
+      verificationId: typeof verificationId === 'string' ? verificationId : undefined,
+    });
     return res.json(result);
   } catch (error) {
     console.error('祈福失败:', error);

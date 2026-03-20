@@ -5,10 +5,10 @@
 
 import { Router } from 'express';
 import { prisma } from '../../database';
-import frogStatusService from '../../services/frog-status.service';
 import { recordTaskProgress } from '../../services/daily-task.service';
 import lilyService from '../../services/lily.service';
-import { checkTravelRequirements } from '../../services/travel-status.service';
+import { lifeCommandService } from '../../modules/life/life.command';
+import { lifeQueryService } from '../../modules/life/life.query';
 import { logger } from '../../utils/logger';
 
 const router = Router();
@@ -33,11 +33,34 @@ router.get('/:frogId/status', async (req, res) => {
       return res.status(400).json({ error: 'Invalid frog ID' });
     }
 
-    const status = await frogStatusService.calculateFrogStatus(frogId);
+    const life = await lifeQueryService.getLifeByFrogId(frogId);
+    const warnings: string[] = [];
+    const dangers: string[] = [];
+    if (life.hunger <= 10) dangers.push('hunger');
+    else if (life.hunger <= 30) warnings.push('hunger');
+    if (life.cleanliness <= 20) dangers.push('cleanliness');
+    else if (life.cleanliness <= 40) warnings.push('cleanliness');
+    if (life.health <= 15) dangers.push('health');
+    else if (life.health <= 40) warnings.push('health');
+    if (life.energy <= 5) dangers.push('energy');
+    else if (life.energy <= 20) warnings.push('energy');
+    if (life.happiness <= 10) dangers.push('happiness');
+    else if (life.happiness <= 30) warnings.push('happiness');
     
     res.json({
       success: true,
-      data: status,
+      data: {
+        hunger: life.hunger,
+        happiness: life.happiness,
+        cleanliness: life.cleanliness,
+        health: life.health,
+        energy: life.energy,
+        isSick: life.isSick,
+        needsClean: life.needsClean,
+        warnings,
+        dangers,
+        lastStatusUpdate: life.lastStateSyncAt,
+      },
     });
   } catch (error: any) {
     logger.error('[Nurture] Error getting frog status:', error);
@@ -85,7 +108,13 @@ router.post('/:frogId/feed', async (req, res) => {
     }
 
     // 执行喂食
-    const effects = await frogStatusService.feedFrog(frogId, foodType);
+    const effects = await lifeCommandService.feed({
+      frogId,
+      walletAddress: frog.ownerAddress,
+      foodType,
+      quantity: 1,
+      source: 'legacy_nurture_feed',
+    });
     await recordProgress(frog.ownerAddress, 'feed');
 
     res.json({
@@ -128,7 +157,11 @@ router.post('/:frogId/clean', async (req, res) => {
 
     // 执行清洁
     const beforeCleanliness = frog.cleanliness;
-    const effects = await frogStatusService.cleanFrog(frogId);
+    const effects = await lifeCommandService.clean({
+      frogId,
+      walletAddress: frog.ownerAddress,
+      source: 'legacy_nurture_clean',
+    });
 
     // 如果之前需要清洁，给予奖励
     let reward = 0;
@@ -218,7 +251,13 @@ router.post('/:frogId/play/guess', async (req, res) => {
     // 幸福度增加
     const happinessGain = isCorrect ? 10 : 5;
     const beforeHappiness = frog.happiness;
-    const happinessResult = await frogStatusService.playWithFrog(frogId, happinessGain);
+    const happinessResult = await lifeCommandService.play({
+      frogId,
+      walletAddress: frog.ownerAddress,
+      gameType: 'guess',
+      happinessGainOverride: happinessGain,
+      source: 'legacy_nurture_guess',
+    });
 
     // 发放奖励
     let newBalance = balanceInfo.balance;
@@ -355,7 +394,14 @@ router.post('/:frogId/play/catch-bug', async (req, res) => {
     // 幸福度增加
     const happinessGain = 15;
     const beforeHappiness = frog.happiness;
-    const happinessResult = await frogStatusService.playWithFrog(frogId, happinessGain);
+    const happinessResult = await lifeCommandService.play({
+      frogId,
+      walletAddress: frog.ownerAddress,
+      gameType: 'catch_bug',
+      score,
+      happinessGainOverride: happinessGain,
+      source: 'legacy_nurture_catch_bug',
+    });
 
     // 发放奖励
     let newBalance = balanceInfo.balance;
@@ -427,7 +473,11 @@ router.post('/:frogId/heal', async (req, res) => {
     // 执行治疗
     const beforeHealth = frog.health;
     const beforeSick = frog.isSick;
-    const effects = await frogStatusService.healFrog(frogId);
+    const effects = await lifeCommandService.heal({
+      frogId,
+      walletAddress: frog.ownerAddress,
+      source: 'legacy_nurture_heal',
+    });
 
     res.json({
       success: true,
@@ -462,7 +512,45 @@ router.get('/:frogId/travel-check', async (req, res) => {
       return res.status(400).json({ error: 'Invalid frog ID' });
     }
 
-    const result = await checkTravelRequirements(frogId);
+    const life = await lifeQueryService.getLifeByFrogId(frogId);
+    const failedRequirements: string[] = [];
+    const warnings: string[] = [];
+
+    if (life.isSick) {
+      failedRequirements.push('青蛙生病了，需要先治疗');
+    }
+    if (life.needsClean || life.cleanliness < 30) {
+      failedRequirements.push('青蛙需要先清洁');
+    }
+    if (life.hunger < 30) {
+      failedRequirements.push(`饥饿度不足 (${life.hunger}/30)`);
+    } else if (life.hunger < 45) {
+      warnings.push('饥饿度较低，建议先喂食');
+    }
+    if (life.happiness < 20) {
+      failedRequirements.push(`快乐度不足 (${life.happiness}/20)`);
+    }
+    if (life.health < 40) {
+      failedRequirements.push(`健康度不足 (${life.health}/40)`);
+    } else if (life.health < 60) {
+      warnings.push('健康度较低，旅途可能有风险');
+    }
+    if (life.energy < 20) {
+      failedRequirements.push(`活力值不足 (${life.energy}/20)`);
+    }
+
+    const result = {
+      canTravel: failedRequirements.length === 0,
+      failedRequirements,
+      warnings,
+      currentStatus: {
+        hunger: life.hunger,
+        happiness: life.happiness,
+        health: life.health,
+        energy: life.energy,
+        cleanliness: life.cleanliness,
+      },
+    };
     
     res.json({
       success: true,
@@ -637,7 +725,14 @@ router.post('/:frogId/play/lily-pad', async (req, res) => {
     // 幸福度增加
     const happinessGain = 20;
     const beforeHappiness = frog.happiness;
-    const happinessResult = await frogStatusService.playWithFrog(frogId, happinessGain);
+    const happinessResult = await lifeCommandService.play({
+      frogId,
+      walletAddress: frog.ownerAddress,
+      gameType: 'lily_pad',
+      score,
+      happinessGainOverride: happinessGain,
+      source: 'legacy_nurture_lily_pad',
+    });
 
     // 发放奖励
     const balanceInfo = await lilyService.getBalance(frog.ownerAddress);
@@ -712,7 +807,14 @@ router.post('/:frogId/play/memory', async (req, res) => {
     // 幸福度增加
     const happinessGain = 15;
     const beforeHappiness = frog.happiness;
-    const happinessResult = await frogStatusService.playWithFrog(frogId, happinessGain);
+    const happinessResult = await lifeCommandService.play({
+      frogId,
+      walletAddress: frog.ownerAddress,
+      gameType: 'memory',
+      score: typeof score === 'number' ? score : undefined,
+      happinessGainOverride: happinessGain,
+      source: 'legacy_nurture_memory',
+    });
 
     // 发放奖励
     const balanceInfo = await lilyService.getBalance(frog.ownerAddress);
@@ -760,12 +862,13 @@ router.get('/:frogId/rest-status', async (req, res) => {
 
     const frog = await prisma.frog.findUnique({
       where: { id: frogId },
-      select: { isResting: true, restingSince: true, energy: true },
+      select: { isResting: true, restingSince: true },
     });
     
     if (!frog) {
       return res.status(404).json({ error: 'Frog not found' });
     }
+    const life = await lifeQueryService.getLifeByFrogId(frogId);
 
     // 检查是否为夜间时段
     const hour = new Date().getHours();
@@ -780,10 +883,10 @@ router.get('/:frogId/rest-status', async (req, res) => {
       data: {
         isResting: frog.isResting ?? false,
         restingSince: frog.restingSince,
-        energy: frog.energy,
+        energy: life.energy,
         isNightTime,
         estimatedRecovery,
-        canRest: (frog.energy ?? 100) < 100,
+        canRest: life.energy < 100,
       },
     });
   } catch (error: any) {
@@ -804,34 +907,14 @@ router.post('/:frogId/rest/start', async (req, res) => {
       return res.status(400).json({ error: 'Invalid frog ID' });
     }
 
-    const frog = await prisma.frog.findUnique({
-      where: { id: frogId },
-      select: { isResting: true, energy: true },
-    });
-    
-    if (!frog) {
-      return res.status(404).json({ error: 'Frog not found' });
-    }
-
-    if (frog.isResting) {
-      return res.status(400).json({ error: '青蛙已经在休息中' });
-    }
-
-    if ((frog.energy ?? 100) >= 100) {
-      return res.status(400).json({ error: '活力值已满，无需休息' });
-    }
-
-    await prisma.frog.update({
-      where: { id: frogId },
-      data: {
-        isResting: true,
-        restingSince: new Date(),
-      },
+    const result = await lifeCommandService.startRest({
+      frogId,
+      source: 'legacy_nurture_rest_start',
     });
 
     res.json({
       success: true,
-      message: '青蛙开始休息了 💤',
+      message: result.message,
     });
   } catch (error: any) {
     logger.error('[Nurture] Error starting rest:', error);
@@ -851,44 +934,16 @@ router.post('/:frogId/rest/end', async (req, res) => {
       return res.status(400).json({ error: 'Invalid frog ID' });
     }
 
-    const frog = await prisma.frog.findUnique({
-      where: { id: frogId },
-      select: { isResting: true, restingSince: true, energy: true },
-    });
-    
-    if (!frog) {
-      return res.status(404).json({ error: 'Frog not found' });
-    }
-
-    if (!frog.isResting) {
-      return res.status(400).json({ error: '青蛙没有在休息' });
-    }
-
-    // 计算恢复量
-    let energyGain = 30;
-    if (frog.restingSince) {
-      const restDuration = Date.now() - new Date(frog.restingSince).getTime();
-      const hours = restDuration / (1000 * 60 * 60);
-      // 每小时恢复10点，最多恢复50点
-      energyGain = Math.min(50, Math.floor(hours * 10) + 20);
-    }
-
-    const newEnergy = Math.min(100, (frog.energy ?? 0) + energyGain);
-
-    await prisma.frog.update({
-      where: { id: frogId },
-      data: {
-        isResting: false,
-        restingSince: null,
-        energy: newEnergy,
-      },
+    const result = await lifeCommandService.endRest({
+      frogId,
+      source: 'legacy_nurture_rest_end',
     });
 
     res.json({
       success: true,
-      energyGain,
-      newEnergy,
-      message: `青蛙醒来了！活力恢复 +${energyGain} ☀️`,
+      energyGain: result.energyGain,
+      newEnergy: result.state.energy,
+      message: result.message,
     });
   } catch (error: any) {
     logger.error('[Nurture] Error ending rest:', error);

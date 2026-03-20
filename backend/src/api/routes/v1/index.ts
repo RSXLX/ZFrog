@@ -20,6 +20,7 @@ router.get('/health', (req, res) =>
 
 router.use('/auth', authRoutes);
 router.use('/frogs', frogsRoutes);
+router.use('/frogs', lifeRoutes);
 router.use('/life', lifeRoutes);
 router.use('/travels', travelsRoutes);
 router.use('/social', socialRoutes);

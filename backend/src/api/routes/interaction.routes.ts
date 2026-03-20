@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { prisma } from '../../database';
 import { logger } from '../../utils/logger';
+import { lifeCommandService } from '../../modules/life/life.command';
+import { lifeQueryService } from '../../modules/life/life.query';
 
 const router = Router();
 
@@ -33,32 +35,23 @@ router.get('/:tokenId/status', async (req, res) => {
       return res.status(400).json({ error: 'Invalid tokenId' });
     }
 
+    const life = await lifeQueryService.getLifeByTokenId(tokenId);
     const frog = await prisma.frog.findUnique({
       where: { tokenId },
       select: {
-        id: true,
-        tokenId: true,
-        name: true,
-        hunger: true,
-        happiness: true,
         lastFedAt: true,
-        lastInteractedAt: true,
       },
     });
-
-    if (!frog) {
-      return res.status(404).json({ error: 'Frog not found' });
-    }
 
     res.json({
       success: true,
       data: {
-        tokenId: frog.tokenId,
-        name: frog.name,
-        hunger: frog.hunger,
-        happiness: frog.happiness,
-        lastFedAt: frog.lastFedAt?.toISOString() || null,
-        lastInteractedAt: frog.lastInteractedAt?.toISOString() || null,
+        tokenId: life.tokenId,
+        name: life.name,
+        hunger: life.hunger,
+        happiness: life.happiness,
+        lastFedAt: frog?.lastFedAt?.toISOString() || null,
+        lastInteractedAt: life.lastInteractedAt,
       },
     });
   } catch (error) {
@@ -113,30 +106,16 @@ router.post('/:tokenId/feed', async (req, res) => {
 
     const foodConfig = FOOD_CONFIG[foodType];
 
-    // 更新青蛙状态和库存 (事务)
-    const result = await prisma.$transaction(async (tx) => {
-      // 扣减库存
-      await tx.foodInventory.update({
-        where: { id: inventoryItem.id },
-        data: { quantity: { decrement: 1 } },
-      });
-
-      // 更新青蛙状态
-      const updatedFrog = await tx.frog.update({
-        where: { tokenId },
-        data: {
-          hunger: { increment: Math.min(foodConfig.energy, 100 - frog.hunger) },
-          happiness: { increment: Math.min(foodConfig.happiness, 100 - frog.happiness) },
-          lastFedAt: new Date(),
-        },
-        select: {
-          hunger: true,
-          happiness: true,
-          lastFedAt: true,
-        },
-      });
-
-      return updatedFrog;
+    await prisma.foodInventory.update({
+      where: { id: inventoryItem.id },
+      data: { quantity: { decrement: 1 } },
+    });
+    const result = await lifeCommandService.feed({
+      frogId: frog.id,
+      walletAddress: ownerAddress,
+      foodType,
+      quantity: 1,
+      source: 'legacy_interaction_feed',
     });
 
     logger.info(`Frog ${tokenId} fed with ${foodType}, hunger: ${result.hunger}, happiness: ${result.happiness}`);
@@ -146,7 +125,7 @@ router.post('/:tokenId/feed', async (req, res) => {
       data: {
         hunger: result.hunger,
         happiness: result.happiness,
-        lastFedAt: result.lastFedAt?.toISOString(),
+        lastFedAt: new Date().toISOString(),
         foodUsed: {
           type: foodType,
           name: foodConfig.name,
@@ -198,17 +177,12 @@ router.post('/:tokenId/interact', async (req, res) => {
 
     const config = INTERACTION_CONFIG[interactionType];
 
-    // 更新青蛙状态
-    const updatedFrog = await prisma.frog.update({
-      where: { tokenId },
-      data: {
-        happiness: { increment: Math.min(config.happinessBonus, 100 - frog.happiness) },
-        lastInteractedAt: new Date(),
-      },
-      select: {
-        happiness: true,
-        lastInteractedAt: true,
-      },
+    const updatedFrog = await lifeCommandService.play({
+      frogId: frog.id,
+      walletAddress: ownerAddress,
+      gameType: interactionType,
+      happinessGainOverride: config.happinessBonus,
+      source: 'legacy_interaction_interact',
     });
 
     logger.info(`Frog ${tokenId} interacted with (${interactionType}), happiness: ${updatedFrog.happiness}`);
@@ -217,7 +191,7 @@ router.post('/:tokenId/interact', async (req, res) => {
       success: true,
       data: {
         happiness: updatedFrog.happiness,
-        lastInteractedAt: updatedFrog.lastInteractedAt?.toISOString(),
+        lastInteractedAt: new Date().toISOString(),
         interactionType,
         happinessGiven: config.happinessBonus,
       },
