@@ -36,6 +36,7 @@ reviewer: Codex
 5. `2026-03-21`：`cross-chain` 剩余主路由完成委托（started/arrived/completed/status/visiting/active/sync/discoveries）到 travel.command/query，并补 cross-chain delegation e2e。
 6. `2026-03-21`：`cross-chain` 对 `omniTravelService` 的直接依赖下沉到 `travel` 模块内部 adapter，旧 websocket 事件补齐与 `travel-state-machine` 对齐（status/currentStage/progress），并新增 e2e + contract integration 回归。
 7. `2026-03-21`：`V1-I08` 开始推进，已新增 `web3` 模块（frog-wallet.service / onchain-milestone.service / frog-wallet.query），并接入 `/api/v1/frogs/:frogId/wallet` 与 `/api/v1/frogs/:frogId/milestones`。
+8. `2026-03-21`：`egg/soul/hatch` 的里程碑写入统一走 `onchainMilestoneService.record`，并统一产出 `OnchainMilestoneRecorded` domain event。
 
 ---
 

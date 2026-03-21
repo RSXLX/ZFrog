@@ -29,6 +29,12 @@ export interface RecordOnchainMilestoneInput {
   payload?: Prisma.InputJsonValue | null;
 }
 
+export interface RecordOnchainMilestoneOptions {
+  tx?: Prisma.TransactionClient;
+  requestId?: string;
+  source?: string;
+}
+
 const toReadModel = (row: {
   id: bigint;
   frogId: number;
@@ -53,8 +59,12 @@ const toReadModel = (row: {
 });
 
 export class OnchainMilestoneService {
-  async record(input: RecordOnchainMilestoneInput): Promise<OnchainMilestoneReadModel> {
-    const created = await prisma.onchainMilestone.create({
+  async record(
+    input: RecordOnchainMilestoneInput,
+    options?: RecordOnchainMilestoneOptions
+  ): Promise<OnchainMilestoneReadModel> {
+    const db = options?.tx || prisma;
+    const created = await db.onchainMilestone.create({
       data: {
         frogId: input.frogId,
         travelId: input.travelId ?? null,
@@ -66,6 +76,28 @@ export class OnchainMilestoneService {
             ? BigInt(input.blockNumber)
             : input.blockNumber ?? null,
         payload: input.payload ?? Prisma.JsonNull,
+      },
+    });
+
+    await db.domainEvent.create({
+      data: {
+        frogId: input.frogId,
+        travelId: input.travelId ?? null,
+        aggregateType: 'Web3',
+        aggregateId: String(input.frogId),
+        eventType: 'OnchainMilestoneRecorded',
+        payload: {
+          milestoneId: created.id.toString(),
+          milestoneType: input.milestoneType,
+          chainId: input.chainId ?? null,
+          txHash: input.txHash ?? null,
+          blockNumber:
+            typeof input.blockNumber === 'number'
+              ? String(input.blockNumber)
+              : input.blockNumber?.toString() || null,
+        },
+        requestId: options?.requestId,
+        source: options?.source || 'onchain-milestone.service',
       },
     });
 

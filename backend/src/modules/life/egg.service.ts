@@ -3,6 +3,7 @@ import { prisma } from '../../database';
 import { AppError } from '../../middlewares/errorHandler';
 import { normalizeWalletAddress } from '../identity/nonce.service';
 import { worldVerifyService } from '../identity/world-verify.service';
+import { onchainMilestoneService } from '../web3/onchain-milestone.service';
 
 const HATCH_STATUS_INCUBATING = 'INCUBATING';
 
@@ -149,8 +150,8 @@ export class EggService {
         },
       });
 
-      await tx.onchainMilestone.create({
-        data: {
+      await onchainMilestoneService.record(
+        {
           frogId: frog.id,
           milestoneType: 'EGG_CLAIMED',
           chainId: null,
@@ -160,7 +161,12 @@ export class EggService {
             verificationId,
           },
         },
-      });
+        {
+          tx,
+          requestId: input.requestId,
+          source: 'egg.service',
+        }
+      );
 
       await tx.domainEvent.create({
         data: {

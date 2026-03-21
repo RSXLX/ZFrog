@@ -1,6 +1,7 @@
 import { prisma } from '../../database';
 import { AppError } from '../../middlewares/errorHandler';
 import { normalizeWalletAddress } from '../identity/nonce.service';
+import { onchainMilestoneService } from '../web3/onchain-milestone.service';
 
 interface HatchInput {
   frogId: number;
@@ -95,15 +96,20 @@ export class HatchService {
         },
       });
 
-      await tx.onchainMilestone.create({
-        data: {
+      await onchainMilestoneService.record(
+        {
           frogId: frog.id,
           milestoneType: 'HATCHED',
           payload: {
             source: input.source || 'unknown',
           },
         },
-      });
+        {
+          tx,
+          requestId: input.requestId,
+          source: 'hatch.service',
+        }
+      );
 
       await tx.domainEvent.create({
         data: {

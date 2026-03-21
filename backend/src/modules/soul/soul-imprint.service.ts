@@ -1,6 +1,7 @@
 import { prisma } from '../../database';
 import { AppError } from '../../middlewares/errorHandler';
 import { normalizeWalletAddress } from '../identity/nonce.service';
+import { onchainMilestoneService } from '../web3/onchain-milestone.service';
 
 interface SoulImprintInput {
   frogId: number;
@@ -115,8 +116,8 @@ export class SoulImprintService {
         },
       });
 
-      await tx.onchainMilestone.create({
-        data: {
+      await onchainMilestoneService.record(
+        {
           frogId: frog.id,
           milestoneType: 'SOUL_IMPRINTED',
           payload: {
@@ -125,7 +126,12 @@ export class SoulImprintService {
             evolutionBias,
           },
         },
-      });
+        {
+          tx,
+          requestId: input.requestId,
+          source: 'soul-imprint.service',
+        }
+      );
 
       await tx.domainEvent.create({
         data: {
@@ -146,15 +152,20 @@ export class SoulImprintService {
       });
 
       if (shouldUnlockHatch) {
-        await tx.onchainMilestone.create({
-          data: {
+        await onchainMilestoneService.record(
+          {
             frogId: frog.id,
             milestoneType: 'HATCH_UNLOCKED',
             payload: {
               by: 'SOUL_IMPRINT',
             },
           },
-        });
+          {
+            tx,
+            requestId: input.requestId,
+            source: 'soul-imprint.service',
+          }
+        );
 
         await tx.domainEvent.create({
           data: {
