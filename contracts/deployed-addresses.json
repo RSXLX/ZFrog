@@ -7,7 +7,11 @@
     "souvenir": "0xCE871f9F009f7Fa49f23f0EEE09977FfB7b4DbF5",
     "deployedAt": "2026-02-05T05:30:00.000Z",
     "note": "ZetaFrogNFT upgraded to v2.1.0 with adminResetHasMinted",
-    "omniTravelOld": "0x7e85A33380f6994e510F884238f37827B25e50d5"
+    "omniTravelOld": "0x7e85A33380f6994e510F884238f37827B25e50d5",
+    "erc6551Registry": "0x44C450F69770bB9c4329310Ad43468E90439fC03",
+    "erc6551AccountImplementation": "0x4A4808f9974BAC43845a275B27381B6acD8823Cd",
+    "erc6551Salt": "0",
+    "erc6551UpdatedAt": "2026-03-21T08:11:54.045Z"
   },
   "bscTestnet": {
     "frogConnector": "0x1E8D44A6D21C29332a4528439d107Fa9e9aF4752",

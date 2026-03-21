@@ -54,7 +54,7 @@ async function main() {
   const networkName = hre.network.name;
   const chainId = Number((await ethers.provider.getNetwork()).chainId);
   const salt = parseSalt(process.env.ERC6551_SALT);
-  const shouldWriteEnv = process.argv.includes('--write-env');
+  const shouldWriteEnv = process.argv.includes('--write-env') || process.env.WRITE_ENV === '1';
 
   console.log('='.repeat(64));
   console.log('Deploy ERC-6551 Registry + Account Implementation');
@@ -130,7 +130,7 @@ async function main() {
   console.log(`ERC6551_REGISTRY_ADDRESS=${registryAddress}`);
   console.log(`ERC6551_ACCOUNT_IMPLEMENTATION=${accountImplementationAddress}`);
   console.log(`ERC6551_SALT=${salt}`);
-  console.log('\nUse --write-env to auto-update contracts/.env and backend/.env');
+  console.log('\nUse WRITE_ENV=1 to auto-update contracts/.env and backend/.env');
 }
 
 main()
