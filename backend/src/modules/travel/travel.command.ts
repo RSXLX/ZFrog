@@ -3,6 +3,7 @@ import { isAddress } from 'ethers';
 import { CHAIN_ID_TO_KEY, CHAIN_KEYS, ChainKey, SUPPORTED_CHAINS } from '../../config/chains';
 import { prisma } from '../../database';
 import { AppError } from '../../middlewares/errorHandler';
+import { logger } from '../../utils/logger';
 import { normalizeWalletAddress } from '../identity/nonce.service';
 import { notifyTravelStarted } from '../../websocket';
 import {
@@ -14,7 +15,10 @@ import { travelEventService } from './travel-events';
 import { travelFeedService } from '../../services/travel/travel-feed.service';
 import { rescueService } from '../../services/travel/rescue.service';
 import { groupTravelService } from '../../services/group-travel.service';
-import { omniTravelService } from '../../services/omni-travel.service';
+import {
+  omniTravelCommandAdapter,
+  omniTravelQueryAdapter,
+} from './adapters/omni-travel.adapter';
 
 type Tx = Prisma.TransactionClient;
 
@@ -115,6 +119,14 @@ interface MarkCrossChainCompletedInput {
   returnMessageId: string;
   xpEarned?: number;
   txHash: string;
+}
+
+interface StartLegacyCrossChainTravelInput {
+  frogId: number | string;
+  tokenId: number | string;
+  targetChainId: number | string;
+  duration: number | string;
+  ownerAddress: string;
 }
 
 const normalizeTravelType = (raw?: string): NormalizedTravelType => {
@@ -231,9 +243,71 @@ const getOwnedFrog = async (tx: Tx, frogId: number, walletAddress: string) => {
   return frog;
 };
 
+const toPositiveInt = (value: number | string, field: string): number => {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new AppError(400, `${field} must be a positive integer`, 'INVALID_INPUT');
+  }
+  return parsed;
+};
+
+const parseLegacyCrossChainStartInput = (
+  input: StartLegacyCrossChainTravelInput
+): {
+  frogId: number;
+  tokenId: number;
+  targetChainId: number;
+  duration: number;
+  ownerAddress: string;
+} => {
+  if (!input.ownerAddress || !String(input.ownerAddress).trim()) {
+    throw new AppError(400, 'ownerAddress is required', 'INVALID_INPUT');
+  }
+
+  return {
+    frogId: toPositiveInt(input.frogId, 'frogId'),
+    tokenId: toPositiveInt(input.tokenId, 'tokenId'),
+    targetChainId: toPositiveInt(input.targetChainId, 'targetChainId'),
+    duration: toPositiveInt(input.duration, 'duration'),
+    ownerAddress: String(input.ownerAddress).trim(),
+  };
+};
+
 export class TravelCommandServiceV1 {
+  async startLegacyCrossChainTravel(input: StartLegacyCrossChainTravelInput): Promise<StartTravelResult> {
+    const parsed = parseLegacyCrossChainStartInput(input);
+    const eligibility = await omniTravelQueryAdapter.canStartCrossChainTravel(
+      parsed.tokenId,
+      parsed.targetChainId
+    );
+
+    if (!eligibility.canStart) {
+      if (eligibility.reason === 'Travel_Just_Started') {
+        logger.info(
+          `[Travel] Detected 'Travel_Just_Started' on-chain state for token ${parsed.tokenId}; allowing record creation`
+        );
+      } else {
+        const reason = eligibility.reason || 'Cross-chain travel is not eligible';
+        throw new AppError(400, reason, 'INVALID_INPUT');
+      }
+    }
+
+    return this.startTravel({
+      frogId: parsed.frogId,
+      walletAddress: parsed.ownerAddress,
+      travelType: 'cross_chain',
+      targetChain: parsed.targetChainId,
+      duration: parsed.duration,
+      source: 'legacy_cross_chain_travel',
+    });
+  }
+
   async markCrossChainStarted(input: MarkCrossChainStartedInput): Promise<void> {
-    await omniTravelService.onCrossChainTravelStarted(input.travelId, input.messageId, input.txHash);
+    await omniTravelCommandAdapter.onCrossChainTravelStarted(
+      input.travelId,
+      input.messageId,
+      input.txHash
+    );
 
     const travel = await prisma.travel.findUnique({
       where: { id: input.travelId },
@@ -266,7 +340,7 @@ export class TravelCommandServiceV1 {
 
   async markCrossChainArrived(input: MarkCrossChainArrivedInput): Promise<void> {
     const arrival = input.arrivalTime || new Date();
-    await omniTravelService.onFrogArrivedAtTarget(input.tokenId, input.messageId, arrival);
+    await omniTravelCommandAdapter.onFrogArrivedAtTarget(input.tokenId, input.messageId, arrival);
 
     const travel = await prisma.travel.findFirst({
       where: {
@@ -302,7 +376,7 @@ export class TravelCommandServiceV1 {
   }
 
   async markCrossChainCompleted(input: MarkCrossChainCompletedInput): Promise<void> {
-    await omniTravelService.onCrossChainTravelCompleted(
+    await omniTravelCommandAdapter.onCrossChainTravelCompleted(
       input.tokenId,
       input.returnMessageId,
       input.xpEarned || 0,
@@ -346,7 +420,7 @@ export class TravelCommandServiceV1 {
   }
 
   async syncCrossChainState(tokenId: number): Promise<void> {
-    await omniTravelService.syncCrossChainTravelState(tokenId);
+    await omniTravelCommandAdapter.syncCrossChainTravelState(tokenId);
   }
 
   async startGroupTravel(input: StartGroupTravelInput): Promise<{

@@ -15,7 +15,7 @@ import { ChainKey, CHAIN_ID_TO_KEY, getChainConfig } from '../config/chains';
 import { travelP0Service } from '../services/travel/travel-p0.service';
 import { NFTImageOrchestratorService } from '../services/nft-image-orchestrator.service';
 import { badgeService } from '../services/badge/badge.service';
-import { notifyTravelProgress, notifyFriendInteraction } from '../websocket';
+import { notifyTravelCompleted, notifyTravelProgress, notifyFriendInteraction } from '../websocket';
 // 🆕 V2.0 服务
 import { addressAnalysisService } from '../services/travel/address-analysis.service';
 import { affinityService } from '../services/friend/affinity.service';
@@ -786,8 +786,7 @@ class TravelProcessor {
                 }
                 
                 if (this.io && travel.groupTravel.companion) {
-                    this.io.to(`frog:${travel.groupTravel.companion.tokenId}`).emit('travel:completed', {
-                        frogId: travel.groupTravel.companion.tokenId,
+                    notifyTravelCompleted(travel.groupTravel.companion.tokenId, {
                         travelId,
                         isGroupTravel: true,
                         leaderFrog: frog.name,
@@ -826,14 +825,13 @@ class TravelProcessor {
             }
 
             if (this.io) {
-                this.io.to(`frog:${frog.tokenId}`).emit('travel:completed', {
-                  frogId: frog.tokenId,
-                  travelId,
-                  journalHash,
-                  souvenirId,
-                  chainId,
-                  chainName: chainConfig.displayName,
-                  discoveredAddress: isRandom ? targetWallet : null,
+                notifyTravelCompleted(frog.tokenId, {
+                    travelId,
+                    journalHash,
+                    souvenirId,
+                    chainId,
+                    chainName: chainConfig.displayName,
+                    discoveredAddress: isRandom ? targetWallet : null,
                 });
             }
 

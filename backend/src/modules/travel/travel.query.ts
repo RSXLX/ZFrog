@@ -6,7 +6,11 @@ import { toTravelMachineState } from './travel-state-machine';
 import { travelQueryService } from '../../services/travel/travel-query.service';
 import { rescueService } from '../../services/travel/rescue.service';
 import { travelFeedService } from '../../services/travel/travel-feed.service';
-import { omniTravelService } from '../../services/omni-travel.service';
+import {
+  CrossChainOnChainStatus,
+  CrossChainVisitingStatus,
+  omniTravelQueryAdapter,
+} from './adapters/omni-travel.adapter';
 
 type TravelWithRelations = Prisma.TravelGetPayload<{
   include: {
@@ -277,15 +281,15 @@ const toReadModel = (travel: TravelWithRelations): TravelReadModel => {
 
 export class TravelQueryServiceV1 {
   getSupportedCrossChains(): { chainId: number; name: string; chainType: string }[] {
-    return omniTravelService.getSupportedChains();
+    return omniTravelQueryAdapter.getSupportedChains();
   }
 
   async canStartCrossChainTravel(tokenId: number, targetChainId: number): Promise<unknown> {
-    return omniTravelService.canStartCrossChainTravel(tokenId, targetChainId);
+    return omniTravelQueryAdapter.canStartCrossChainTravel(tokenId, targetChainId);
   }
 
   async getCrossChainStatus(tokenId: number): Promise<{
-    onChain: unknown;
+    onChain: CrossChainOnChainStatus;
     database: {
       id: number;
       status: string;
@@ -294,7 +298,7 @@ export class TravelQueryServiceV1 {
       targetChain: string;
     } | null;
   }> {
-    const onChain = await omniTravelService.getCrossChainTravelStatus(tokenId);
+    const onChain = await omniTravelQueryAdapter.getCrossChainTravelStatus(tokenId);
     const database = await prisma.travel.findFirst({
       where: {
         frog: { tokenId },
@@ -324,8 +328,11 @@ export class TravelQueryServiceV1 {
     };
   }
 
-  async getCrossChainVisitingStatus(tokenId: number, targetChainId: number): Promise<unknown> {
-    return omniTravelService.checkVisitingFrogOnChain(tokenId, targetChainId);
+  async getCrossChainVisitingStatus(
+    tokenId: number,
+    targetChainId: number
+  ): Promise<CrossChainVisitingStatus> {
+    return omniTravelQueryAdapter.checkVisitingFrogOnChain(tokenId, targetChainId);
   }
 
   async getActiveCrossChainTravels(): Promise<
@@ -340,7 +347,7 @@ export class TravelQueryServiceV1 {
       endTime: Date;
     }>
   > {
-    const travels = await omniTravelService.getActiveCrossChainTravels();
+    const travels = await omniTravelQueryAdapter.getActiveCrossChainTravels();
     return travels.map((t) => ({
       id: t.id,
       frogTokenId: t.frog.tokenId,

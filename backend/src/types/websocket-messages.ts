@@ -4,6 +4,7 @@
  * TypeScript interfaces for WebSocket messages between backend and frontend
  * for cross-chain frog travel events
  */
+import type { TravelApiStage, TravelApiStatus } from '../modules/travel/travel-state-machine';
 
 // ========== Client -> Server Events ==========
 
@@ -34,6 +35,9 @@ export interface CrossChainStartedMessage {
     targetChainId: number;
     messageId: string;
     duration: number;
+    status: TravelApiStatus;
+    currentStage: TravelApiStage;
+    progress: number;
     timestamp: number;
   };
 }
@@ -48,6 +52,9 @@ export interface CrossChainArrivedMessage {
     chain: string;
     blockNumber: number;
     gasPrice: string;
+    status: TravelApiStatus;
+    currentStage: TravelApiStage;
+    progress: number;
     timestamp: number;
   };
 }
@@ -85,9 +92,12 @@ export interface CrossChainStatusMessage {
   event: 'crosschain:status';
   data: {
     tokenId: number;
-    stage: 'locking' | 'crossing' | 'exploring' | 'returning' | 'unlocking';
+    stage: TravelApiStage;
+    legacyStage?: string;
+    status: TravelApiStatus;
+    currentStage: TravelApiStage;
     message: string;
-    progress?: number;
+    progress: number;
     timestamp: number;
   };
 }
@@ -102,6 +112,9 @@ export interface CrossChainCompletedMessage {
     returnMessageId: string;
     totalDiscoveries: number;
     totalXp: number;
+    status: TravelApiStatus;
+    currentStage: TravelApiStage;
+    progress: number;
     journal?: {
       title: string;
       content: string;
@@ -119,11 +132,27 @@ export type CrossChainWebSocketMessage =
   | CrossChainStatusMessage
   | CrossChainCompletedMessage;
 
+export interface TravelStateMessage {
+  event: 'travel:state';
+  data: {
+    tokenId: number;
+    frogId: number;
+    travelId?: number;
+    status: TravelApiStatus;
+    currentStage: TravelApiStage;
+    progress: number;
+    message?: string;
+    legacyStage?: string;
+    timestamp: number;
+    [key: string]: any;
+  };
+}
+
 // ========== Helper Types ==========
 
 export type DiscoveryType = 'treasure' | 'landmark' | 'encounter' | 'wisdom' | 'rare';
 
-export type CrossChainStage = 'locking' | 'crossing' | 'exploring' | 'returning' | 'unlocking';
+export type CrossChainStage = TravelApiStage;
 
 export interface Discovery {
   id: string;

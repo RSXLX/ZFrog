@@ -4,6 +4,7 @@ import { Server, Socket } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import { config } from '../config';
 import { logger } from '../utils/logger';
+import type { TravelApiStage, TravelApiStatus } from '../modules/travel/travel-state-machine';
 
 interface SocketData {
     walletAddress?: string;
@@ -39,12 +40,146 @@ interface TravelResult {
     xpEarned?: number;
     badges?: string[];
     totalDiscoveries?: number;
+    [key: string]: unknown;
+}
+
+interface TravelStateSnapshot {
+    travelId?: number;
+    status: TravelApiStatus;
+    currentStage: TravelApiStage;
+    progress: number;
+    message?: string;
 }
 
 let io: Server | null = null;
 
 // 在线状态管理
 const onlineFrogs = new Map<number, Set<string>>(); // frogId -> Set of socketIds
+
+const TRAVEL_STATUS_VALUES: TravelApiStatus[] = [
+    'PENDING',
+    'ACTIVE',
+    'PROCESSING',
+    'COMPLETED',
+    'CANCELLED',
+    'FAILED',
+];
+
+const TRAVEL_STAGE_VALUES: TravelApiStage[] = [
+    'PREPARING',
+    'DEPARTING',
+    'CROSSING',
+    'ARRIVING',
+    'OBSERVING',
+    'RETURNING',
+    'INTERACTING',
+    'STRANDED',
+    'COMPLETED',
+];
+
+const LEGACY_STAGE_TO_MACHINE: Record<string, TravelStateSnapshot> = {
+    LOCKING: { status: 'PENDING', currentStage: 'PREPARING', progress: 0 },
+    CROSSING_OUT: { status: 'ACTIVE', currentStage: 'CROSSING', progress: 20 },
+    ON_TARGET_CHAIN: { status: 'ACTIVE', currentStage: 'OBSERVING', progress: 50 },
+    CROSSING_BACK: { status: 'ACTIVE', currentStage: 'RETURNING', progress: 80 },
+    UNLOCKED: { status: 'COMPLETED', currentStage: 'COMPLETED', progress: 100 },
+    locking: { status: 'PENDING', currentStage: 'PREPARING', progress: 0 },
+    crossing: { status: 'ACTIVE', currentStage: 'CROSSING', progress: 20 },
+    exploring: { status: 'ACTIVE', currentStage: 'OBSERVING', progress: 50 },
+    returning: { status: 'ACTIVE', currentStage: 'RETURNING', progress: 80 },
+    unlocking: { status: 'PROCESSING', currentStage: 'INTERACTING', progress: 95 },
+};
+
+const isTravelApiStatus = (value: string): value is TravelApiStatus =>
+    TRAVEL_STATUS_VALUES.includes(value as TravelApiStatus);
+
+const isTravelApiStage = (value: string): value is TravelApiStage =>
+    TRAVEL_STAGE_VALUES.includes(value as TravelApiStage);
+
+const clampProgress = (value: number): number =>
+    Math.max(0, Math.min(100, Math.round(value)));
+
+const resolveProgress = (input: number | undefined, fallback: number): number =>
+    typeof input === 'number' && Number.isFinite(input) ? clampProgress(input) : fallback;
+
+const resolveLegacyState = (legacyStage: string, progress?: number): TravelStateSnapshot => {
+    const mapped = LEGACY_STAGE_TO_MACHINE[legacyStage];
+    if (mapped) {
+        return {
+            ...mapped,
+            progress: resolveProgress(progress, mapped.progress),
+        };
+    }
+
+    return {
+        status: 'ACTIVE',
+        currentStage: 'OBSERVING',
+        progress: resolveProgress(progress, 50),
+    };
+};
+
+const resolveExplicitState = (
+    status: string | undefined,
+    currentStage: string | undefined,
+    progress: number | undefined,
+    fallback: TravelStateSnapshot
+): TravelStateSnapshot => {
+    const resolvedStatus = status && isTravelApiStatus(status) ? status : fallback.status;
+    const resolvedStage = currentStage && isTravelApiStage(currentStage) ? currentStage : fallback.currentStage;
+
+    return {
+        status: resolvedStatus,
+        currentStage: resolvedStage,
+        progress: resolveProgress(progress, fallback.progress),
+    };
+};
+
+const emitTravelState = (
+    frogId: number,
+    state: TravelStateSnapshot,
+    timestamp: number,
+    extras: Record<string, unknown> = {}
+): void => {
+    if (!io) {
+        return;
+    }
+
+    io.to(`frog:${frogId}`).emit('travel:state', {
+        frogId,
+        tokenId: frogId,
+        ...extras,
+        travelId: state.travelId,
+        status: state.status,
+        currentStage: state.currentStage,
+        progress: state.progress,
+        message: state.message,
+        timestamp,
+    });
+};
+
+const emitLegacyStageUpdate = (
+    tokenId: number,
+    state: TravelStateSnapshot,
+    timestamp: number,
+    message?: string,
+    legacyStage?: string
+): void => {
+    if (!io) {
+        return;
+    }
+
+    io.to(`frog:${tokenId}`).emit('travel:stageUpdate', {
+        tokenId,
+        travelId: state.travelId,
+        stage: state.currentStage,
+        status: state.status,
+        currentStage: state.currentStage,
+        progress: state.progress,
+        message,
+        legacyStage,
+        timestamp,
+    });
+};
 
 export function initializeWebSocket(server: HttpServer): Server {
     io = new Server(server, {
@@ -166,32 +301,100 @@ export function initializeWebSocket(server: HttpServer): Server {
 // 通知函数
 export function notifyTravelStarted(frogId: number, travelData: TravelData): void {
     if (io) {
+        const timestamp = Date.now();
+        const state = resolveExplicitState(
+            travelData.status,
+            'PREPARING',
+            0,
+            { status: 'PENDING', currentStage: 'PREPARING', progress: 0, travelId: travelData.travelId }
+        );
+
         io.to(`frog:${frogId}`).emit('travel:started', {
             frogId,
             ...travelData,
-            timestamp: Date.now()
+            status: state.status,
+            currentStage: state.currentStage,
+            progress: state.progress,
+            timestamp
         });
+
+        emitTravelState(
+            frogId,
+            {
+                ...state,
+                travelId: travelData.travelId,
+            },
+            timestamp
+        );
+
+        emitLegacyStageUpdate(
+            frogId,
+            {
+                ...state,
+                travelId: travelData.travelId,
+            },
+            timestamp,
+            '旅行已开始',
+            'travel:started'
+        );
+
         logger.info(`Notified travel:started for frog ${frogId}`);
     }
 }
 
 export function notifyTravelProgress(frogId: number, progress: TravelProgress): void {
     if (io) {
+        const timestamp = Date.now();
+        const phaseState: Record<TravelProgress['phase'], TravelStateSnapshot> = {
+            observing: { status: 'ACTIVE', currentStage: 'OBSERVING', progress: 40 },
+            generating_story: { status: 'PROCESSING', currentStage: 'INTERACTING', progress: 75 },
+            uploading: { status: 'PROCESSING', currentStage: 'INTERACTING', progress: 85 },
+            minting: { status: 'PROCESSING', currentStage: 'INTERACTING', progress: 95 },
+        };
+
+        const fallback = phaseState[progress.phase] || phaseState.observing;
+        const state: TravelStateSnapshot = {
+            status: fallback.status,
+            currentStage: fallback.currentStage,
+            progress: resolveProgress(progress.percentage, fallback.progress),
+        };
+
         io.to(`frog:${frogId}`).emit('travel:progress', {
             frogId,
             ...progress,
-            timestamp: Date.now()
+            status: state.status,
+            currentStage: state.currentStage,
+            progress: state.progress,
+            timestamp
         });
+
+        emitTravelState(frogId, state, timestamp);
+        emitLegacyStageUpdate(frogId, state, timestamp, progress.message, progress.phase);
     }
 }
 
 export function notifyTravelCompleted(frogId: number, result: TravelResult): void {
     if (io) {
+        const timestamp = Date.now();
+        const state: TravelStateSnapshot = {
+            travelId: typeof result.travelId === 'number' ? result.travelId : undefined,
+            status: 'COMPLETED',
+            currentStage: 'COMPLETED',
+            progress: 100,
+        };
+
         io.to(`frog:${frogId}`).emit('travel:completed', {
             frogId,
             ...result,
-            timestamp: Date.now()
+            status: state.status,
+            currentStage: state.currentStage,
+            progress: state.progress,
+            timestamp
         });
+
+        emitTravelState(frogId, state, timestamp, { ...result });
+        emitLegacyStageUpdate(frogId, state, timestamp, '旅行完成', 'travel:completed');
+
         logger.info(`Notified travel:completed for frog ${frogId}`);
     }
 }
@@ -407,11 +610,31 @@ export function notifyCrossChainTravelStarted(tokenId: number, data: {
     duration: number;
 }): void {
     if (io) {
+        const timestamp = Date.now();
+        const state: TravelStateSnapshot = {
+            travelId: data.travelId,
+            status: 'ACTIVE',
+            currentStage: 'CROSSING',
+            progress: 20,
+            message: '跨链旅行已出发',
+        };
+
         io.to(`frog:${tokenId}`).emit('crosschain:started', {
             tokenId,
             ...data,
-            timestamp: Date.now()
+            status: state.status,
+            currentStage: state.currentStage,
+            progress: state.progress,
+            timestamp
         });
+
+        emitTravelState(tokenId, state, timestamp, {
+            messageId: data.messageId,
+            targetChainId: data.targetChainId,
+            duration: data.duration,
+        });
+        emitLegacyStageUpdate(tokenId, state, timestamp, state.message, 'CROSSING_OUT');
+
         logger.info(`Notified crosschain:started for frog ${tokenId}`);
     }
 }
@@ -425,11 +648,30 @@ export function notifyCrossChainArrival(tokenId: number, data: {
     gasPrice: string;
 }): void {
     if (io) {
+        const timestamp = Date.now();
+        const state: TravelStateSnapshot = {
+            status: 'ACTIVE',
+            currentStage: 'OBSERVING',
+            progress: 50,
+            message: '抵达目标链，开始探索',
+        };
+
         io.to(`frog:${tokenId}`).emit('crosschain:arrived', {
             tokenId,
             ...data,
-            timestamp: Date.now()
+            status: state.status,
+            currentStage: state.currentStage,
+            progress: state.progress,
+            timestamp
         });
+
+        emitTravelState(tokenId, state, timestamp, {
+            chain: data.chain,
+            blockNumber: data.blockNumber,
+            gasPrice: data.gasPrice,
+        });
+        emitLegacyStageUpdate(tokenId, state, timestamp, state.message, 'ON_TARGET_CHAIN');
+
         logger.info(`Notified crosschain:arrived for frog ${tokenId} at ${data.chain}`);
     }
 }
@@ -467,11 +709,31 @@ export function notifyCrossChainTravelCompleted(tokenId: number, data: {
     journal?: any;
 }): void {
     if (io) {
+        const timestamp = Date.now();
+        const state: TravelStateSnapshot = {
+            status: 'COMPLETED',
+            currentStage: 'COMPLETED',
+            progress: 100,
+            message: '跨链旅行完成',
+        };
+
         io.to(`frog:${tokenId}`).emit('crosschain:completed', {
             tokenId,
             ...data,
-            timestamp: Date.now()
+            status: state.status,
+            currentStage: state.currentStage,
+            progress: state.progress,
+            timestamp
         });
+
+        emitTravelState(tokenId, state, timestamp, {
+            returnMessageId: data.returnMessageId,
+            totalDiscoveries: data.totalDiscoveries,
+            totalXp: data.totalXp,
+            journal: data.journal,
+        });
+        emitLegacyStageUpdate(tokenId, state, timestamp, state.message, 'UNLOCKED');
+
         logger.info(`Notified crosschain:completed for frog ${tokenId}`);
     }
 }
@@ -485,11 +747,30 @@ export function notifyCrossChainStatus(tokenId: number, status: {
     progress?: number;
 }): void {
     if (io) {
+        const timestamp = Date.now();
+        const mapped = resolveLegacyState(status.stage, status.progress);
+
         io.to(`frog:${tokenId}`).emit('crosschain:status', {
             tokenId,
-            ...status,
-            timestamp: Date.now()
+            stage: mapped.currentStage,
+            legacyStage: status.stage,
+            status: mapped.status,
+            currentStage: mapped.currentStage,
+            progress: mapped.progress,
+            message: status.message,
+            timestamp
         });
+
+        emitTravelState(
+            tokenId,
+            {
+                ...mapped,
+                message: status.message,
+            },
+            timestamp,
+            { legacyStage: status.stage }
+        );
+        emitLegacyStageUpdate(tokenId, { ...mapped }, timestamp, status.message, status.stage);
     }
 }
 
@@ -524,12 +805,36 @@ export function notifyTravelStageUpdate(tokenId: number, data: {
     message?: string;
 }): void {
     if (io) {
+        const timestamp = Date.now();
+        const fallback = resolveLegacyState(data.stage, data.progress);
+        const explicit = resolveExplicitState(undefined, data.stage, data.progress, fallback);
+        const state: TravelStateSnapshot = {
+            travelId: data.travelId,
+            status: explicit.status,
+            currentStage: explicit.currentStage,
+            progress: explicit.progress,
+            message: data.message,
+        };
+
         io.to(`frog:${tokenId}`).emit('travel:stageUpdate', {
             tokenId,
-            ...data,
-            timestamp: Date.now()
+            travelId: data.travelId,
+            stage: state.currentStage,
+            legacyStage: data.stage,
+            status: state.status,
+            currentStage: state.currentStage,
+            progress: state.progress,
+            message: data.message,
+            timestamp
         });
-        logger.info(`Notified travel:stageUpdate for frog ${tokenId}: stage=${data.stage}, progress=${data.progress}`);
+
+        emitTravelState(tokenId, state, timestamp, {
+            legacyStage: data.stage,
+        });
+
+        logger.info(
+            `Notified travel:stageUpdate for frog ${tokenId}: stage=${state.currentStage}, progress=${state.progress}`
+        );
     }
 }
 
@@ -587,4 +892,3 @@ export function notifyStatusWarning(frogId: number, warning: {
         logger.info(`Notified status:warning for frog ${frogId}, type=${warning.type}, value=${warning.currentValue}`);
     }
 }
-

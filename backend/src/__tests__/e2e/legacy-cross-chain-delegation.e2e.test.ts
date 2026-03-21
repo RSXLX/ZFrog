@@ -7,7 +7,7 @@ import { travelQueryServiceV1 } from '../../modules/travel/travel.query';
 
 jest.mock('../../modules/travel/travel.command', () => ({
   travelCommandServiceV1: {
-    startTravel: jest.fn(),
+    startLegacyCrossChainTravel: jest.fn(),
     markCrossChainStarted: jest.fn(),
     markCrossChainArrived: jest.fn(),
     markCrossChainCompleted: jest.fn(),
@@ -51,7 +51,7 @@ describe('Legacy Cross-Chain Route Delegation E2E', () => {
       canStart: true,
     } as any);
 
-    mockCommand.startTravel.mockResolvedValue({
+    mockCommand.startLegacyCrossChainTravel.mockResolvedValue({
       travelId: 101,
       status: 'PENDING',
       currentStage: 'PREPARING',
@@ -126,12 +126,12 @@ describe('Legacy Cross-Chain Route Delegation E2E', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
-    expect(mockQuery.canStartCrossChainTravel).toHaveBeenCalledWith(1, 97);
-    expect(mockCommand.startTravel).toHaveBeenCalledWith(
+    expect(mockQuery.canStartCrossChainTravel).not.toHaveBeenCalled();
+    expect(mockCommand.startLegacyCrossChainTravel).toHaveBeenCalledWith(
       expect.objectContaining({
         frogId: 1,
-        travelType: 'cross_chain',
-        targetChain: 97,
+        tokenId: 1,
+        targetChainId: 97,
       })
     );
   });

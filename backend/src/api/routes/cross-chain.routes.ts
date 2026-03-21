@@ -6,6 +6,7 @@
 
 import { Router, Request, Response } from 'express';
 import { logger } from '../../utils/logger';
+import { AppError } from '../../middlewares/errorHandler';
 import { travelCommandServiceV1 } from '../../modules/travel/travel.command';
 import { travelQueryServiceV1 } from '../../modules/travel/travel.query';
 
@@ -60,40 +61,12 @@ router.get('/can-travel/:tokenId', async (req: Request, res: Response) => {
  */
 router.post('/travel', async (req: Request, res: Response) => {
   try {
-    const { frogId, tokenId, targetChainId, duration, ownerAddress } = req.body;
-
-    if (!frogId || !tokenId || !targetChainId || !duration || !ownerAddress) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required fields',
-      });
-    }
-
-    // Verify eligibility against existing on-chain gate via unified travel.query.
-    const eligibility = await travelQueryServiceV1.canStartCrossChainTravel(Number(tokenId), Number(targetChainId)) as {
-      canStart: boolean;
-      reason?: string;
-    };
-    if (!eligibility.canStart) {
-      // FIX: If travel just started on-chain (but not in DB), allow creation
-      if (eligibility.reason === 'Travel_Just_Started') {
-         logger.info(`[Travel] Detected 'Just Started' on-chain travel for token ${tokenId}. Allowing record creation.`);
-         // Proceed...
-      } else {
-        return res.status(400).json({
-          success: false,
-          error: eligibility.reason,
-        });
-      }
-    }
-
-    const result = await travelCommandServiceV1.startTravel({
-      frogId: Number(frogId),
-      walletAddress: String(ownerAddress),
-      travelType: 'cross_chain',
-      targetChain: Number(targetChainId),
-      duration: Number(duration),
-      source: 'legacy_cross_chain_travel',
+    const result = await travelCommandServiceV1.startLegacyCrossChainTravel({
+      frogId: req.body?.frogId,
+      tokenId: req.body?.tokenId,
+      targetChainId: req.body?.targetChainId,
+      duration: req.body?.duration,
+      ownerAddress: req.body?.ownerAddress,
     });
 
     res.json({
@@ -108,6 +81,13 @@ router.post('/travel', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
     logger.error('Error creating cross-chain travel:', error);
     res.status(500).json({
       success: false,

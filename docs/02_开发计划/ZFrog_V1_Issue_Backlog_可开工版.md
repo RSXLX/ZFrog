@@ -34,6 +34,7 @@ reviewer: Codex
 3. `2026-03-21`：旧入口开始切流，`/api/travels/start`、`/api/travels/start-p0`、`/api/cross-chain/travel` 已委托统一 travel.command。
 4. `2026-03-21`：旧 `travel/group/rescue` 写路径继续收敛到 `travel.command`，旧 `history/stats/active/group/feeds/rescue` 读取路径继续收敛到 `travel.query`，并补 legacy delegation e2e。
 5. `2026-03-21`：`cross-chain` 剩余主路由完成委托（started/arrived/completed/status/visiting/active/sync/discoveries）到 travel.command/query，并补 cross-chain delegation e2e。
+6. `2026-03-21`：`cross-chain` 对 `omniTravelService` 的直接依赖下沉到 `travel` 模块内部 adapter，旧 websocket 事件补齐与 `travel-state-machine` 对齐（status/currentStage/progress），并新增 e2e + contract integration 回归。
 
 ---
 
@@ -71,7 +72,7 @@ Version 1 必须采用 **并行引入 -> 切流 -> 退役** 的迁移方式。
 | `V1-I04` | 建立 V1 核心数据表并完成回填脚本 | BE Owner | `V1-I02` | `已完成` |
 | `V1-I05` | Egg Claim / Soul Imprint / Hatch 后端主链路 | BE Owner | `V1-I03`, `V1-I04` | `已完成` |
 | `V1-I06` | Life Engine 收敛 interaction / nurture / hibernation | BE Owner | `V1-I04` | `已完成` |
-| `V1-I07` | 统一 Travel 主状态机与 V1 旅行接口 | BE Owner | `V1-I02`, `V1-I04` | `进行中` |
+| `V1-I07` | 统一 Travel 主状态机与 V1 旅行接口 | BE Owner | `V1-I02`, `V1-I04` | `已完成` |
 | `V1-I08` | Frog Wallet 接入与链上里程碑聚合 | Contract Owner | `V1-I07` | `未开始` |
 | `V1-I09` | Memory Palace Lite 与 AI Recap 出栈 | AI Owner | `V1-I05`, `V1-I07`, `V1-I08` | `未开始` |
 | `V1-I10` | Web 端 API Client 重构与主路由切换 | FE Owner | `V1-I02`, `V1-I03` | `未开始` |
@@ -718,7 +719,7 @@ Request:
 
 ---
 
-## V1-I07 统一 Travel 主状态机与 V1 旅行接口（进行中）
+## V1-I07 统一 Travel 主状态机与 V1 旅行接口（已完成）
 
 ### 主负责人
 
