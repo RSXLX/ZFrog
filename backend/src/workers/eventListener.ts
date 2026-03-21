@@ -9,6 +9,7 @@ import { logger } from '../utils/logger';
 import { TRAVEL_ABI, ZETAFROG_ABI } from '../config/contracts';
 import { travelP0Service } from '../services/travel/travel-p0.service';
 import { ChainKey } from '../config/chains';
+import { onchainMilestoneService } from '../modules/web3/onchain-milestone.service';
 
 
 
@@ -36,6 +37,53 @@ class EventListener {
             transport: http(config.ZETACHAIN_RPC_URL),
         });
         this.lastProcessedBlock = BigInt(0);
+    }
+
+    private async recordOnchainMilestoneForEvent(input: {
+        frogId: number;
+        milestoneType: string;
+        log?: any;
+        travelId?: number | null;
+        payload?: Record<string, unknown>;
+    }) {
+        try {
+            const txHash = typeof input.log?.transactionHash === 'string' ? input.log.transactionHash : null;
+
+            if (txHash) {
+                const existing = await prisma.onchainMilestone.findFirst({
+                    where: {
+                        frogId: input.frogId,
+                        milestoneType: input.milestoneType,
+                        txHash,
+                    },
+                });
+
+                if (existing) {
+                    return;
+                }
+            }
+
+            await onchainMilestoneService.record(
+                {
+                    frogId: input.frogId,
+                    travelId: input.travelId ?? null,
+                    milestoneType: input.milestoneType,
+                    chainId: Number.isInteger(config.CHAIN_ID) ? config.CHAIN_ID : null,
+                    txHash,
+                    blockNumber: input.log?.blockNumber ?? null,
+                    payload: input.payload as any,
+                },
+                {
+                    source: 'event-listener',
+                }
+            );
+        } catch (error) {
+            logger.error('[EventListener] Failed to ingest onchain milestone:', {
+                frogId: input.frogId,
+                milestoneType: input.milestoneType,
+                error,
+            });
+        }
     }
 
     async start() {
@@ -167,6 +215,42 @@ class EventListener {
                 await this.handleLevelUp(log);
             }
 
+            // 监听 EggClaimed 事件
+            const eggClaimedLogs = await this.publicClient.getLogs({
+                address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+                event: parseAbiItem('event EggClaimed(address indexed owner, uint256 indexed tokenId, uint256 timestamp)'),
+                fromBlock,
+                toBlock: currentBlock,
+            });
+
+            for (const log of eggClaimedLogs) {
+                await this.handleEggClaimed(log);
+            }
+
+            // 监听 SoulImprinted 事件
+            const soulImprintedLogs = await this.publicClient.getLogs({
+                address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+                event: parseAbiItem('event SoulImprinted(uint256 indexed tokenId, bytes32 indexed imprintHash, uint256 timestamp)'),
+                fromBlock,
+                toBlock: currentBlock,
+            });
+
+            for (const log of soulImprintedLogs) {
+                await this.handleSoulImprinted(log);
+            }
+
+            // 监听 FrogHatched 事件
+            const frogHatchedLogs = await this.publicClient.getLogs({
+                address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+                event: parseAbiItem('event FrogHatched(address indexed owner, uint256 indexed tokenId, uint256 timestamp)'),
+                fromBlock,
+                toBlock: currentBlock,
+            });
+
+            for (const log of frogHatchedLogs) {
+                await this.handleFrogHatched(log);
+            }
+
             // P1 Fix: 监听 CrossChainTravelStarted 事件 - 从 OmniTravel 合约监听
             const crossChainLogs = await this.publicClient.getLogs({
                 address: config.OMNI_TRAVEL_ADDRESS as `0x${string}`,
@@ -246,6 +330,39 @@ class EventListener {
             },
         });
 
+        // 监听 EggClaimed
+        this.publicClient.watchEvent({
+            address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+            event: parseAbiItem('event EggClaimed(address indexed owner, uint256 indexed tokenId, uint256 timestamp)'),
+            onLogs: async (logs: any) => {
+                for (const log of logs) {
+                    await this.handleEggClaimed(log);
+                }
+            },
+        });
+
+        // 监听 SoulImprinted
+        this.publicClient.watchEvent({
+            address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+            event: parseAbiItem('event SoulImprinted(uint256 indexed tokenId, bytes32 indexed imprintHash, uint256 timestamp)'),
+            onLogs: async (logs: any) => {
+                for (const log of logs) {
+                    await this.handleSoulImprinted(log);
+                }
+            },
+        });
+
+        // 监听 FrogHatched
+        this.publicClient.watchEvent({
+            address: config.ZETAFROG_NFT_ADDRESS as `0x${string}`,
+            event: parseAbiItem('event FrogHatched(address indexed owner, uint256 indexed tokenId, uint256 timestamp)'),
+            onLogs: async (logs: any) => {
+                for (const log of logs) {
+                    await this.handleFrogHatched(log);
+                }
+            },
+        });
+
         // 监听 SouvenirMinted
         this.publicClient.watchEvent({
             address: config.SOUVENIR_NFT_ADDRESS as `0x${string}`,
@@ -278,6 +395,12 @@ class EventListener {
         try {
             const ownerLower = (owner as string).toLowerCase();
             const tokenIdNum = Number(tokenId);
+            const milestonePayload = {
+                owner: ownerLower,
+                tokenId: tokenIdNum,
+                name: (name as string) || '',
+                timestamp: Number(timestamp),
+            };
 
             // 先检查是否已存在该 tokenId 的 frog
             const existingByTokenId = await prisma.frog.findUnique({
@@ -306,6 +429,13 @@ class EventListener {
                     data: { ownerAddress: ownerLower },
                 });
                 logger.info(`Frog ${tokenIdNum} owner updated to ${ownerLower}`);
+
+                await this.recordOnchainMilestoneForEvent({
+                    frogId: existingByTokenId.id,
+                    milestoneType: 'FROG_MINTED',
+                    log,
+                    payload: milestonePayload,
+                });
                 return;
             }
 
@@ -327,7 +457,7 @@ class EventListener {
                 });
 
                 // 创建新蛙
-                await prisma.frog.create({
+                const createdFrog = await prisma.frog.create({
                     data: {
                         tokenId: tokenIdNum,
                         name: name as string,
@@ -340,11 +470,18 @@ class EventListener {
                     },
                 });
                 logger.info(`Frog ${tokenIdNum} created (replaced orphaned frog)`);
+
+                await this.recordOnchainMilestoneForEvent({
+                    frogId: createdFrog.id,
+                    milestoneType: 'FROG_MINTED',
+                    log,
+                    payload: milestonePayload,
+                });
                 return;
             }
 
             // 正常创建新蛙
-            await prisma.frog.create({
+            const createdFrog = await prisma.frog.create({
                 data: {
                     tokenId: tokenIdNum,
                     name: name as string,
@@ -358,6 +495,13 @@ class EventListener {
             });
 
             logger.info(`Frog ${tokenIdNum} saved in database`);
+
+            await this.recordOnchainMilestoneForEvent({
+                frogId: createdFrog.id,
+                milestoneType: 'FROG_MINTED',
+                log,
+                payload: milestonePayload,
+            });
 
         } catch (error) {
             logger.error(`Error handling FrogMinted event:`, error);
@@ -393,6 +537,20 @@ class EventListener {
 
             if (existingTravel) {
                 logger.info(`Travel already exists for frog ${tokenId} (ID: ${existingTravel.id}, status: ${existingTravel.status})`);
+                await this.recordOnchainMilestoneForEvent({
+                    frogId: frog.id,
+                    travelId: existingTravel.id,
+                    milestoneType: 'TRAVEL_STARTED',
+                    log,
+                    payload: {
+                        tokenId: Number(tokenId),
+                        targetWallet: (targetWallet as string).toLowerCase(),
+                        targetChainId: Number(targetChainId),
+                        startTime: Number(startTime),
+                        endTime: Number(endTime),
+                        isRandom: Boolean(isRandom),
+                    },
+                });
                 return;
             }
 
@@ -418,6 +576,21 @@ class EventListener {
             });
 
             logger.info(`Travel started for frog ${tokenId} to chain ${targetChainId} (isRandom: ${isRandom})`);
+
+            await this.recordOnchainMilestoneForEvent({
+                frogId: frog.id,
+                travelId: travel.id,
+                milestoneType: 'TRAVEL_STARTED',
+                log,
+                payload: {
+                    tokenId: Number(tokenId),
+                    targetWallet: (targetWallet as string).toLowerCase(),
+                    targetChainId: Number(targetChainId),
+                    startTime: Number(startTime),
+                    endTime: Number(endTime),
+                    isRandom: Boolean(isRandom),
+                },
+            });
 
             // 通知前端更新状态
             try {
@@ -528,6 +701,21 @@ class EventListener {
                         }
                     });
                 }
+
+                await this.recordOnchainMilestoneForEvent({
+                    frogId: frog.id,
+                    travelId: existingTravel.id,
+                    milestoneType: 'CROSS_CHAIN_TRAVEL_STARTED',
+                    log,
+                    payload: {
+                        tokenId: Number(tokenId),
+                        owner: (owner as string).toLowerCase(),
+                        targetChainId: Number(targetChainId),
+                        messageId: messageId as string,
+                        startTime: Number(startTime),
+                        maxDuration: Number(maxDuration),
+                    },
+                });
                 return;
             }
 
@@ -560,6 +748,21 @@ class EventListener {
             });
 
             logger.info(`[P1 Fix] Auto-created cross-chain travel ${travel.id} for frog ${tokenId} to chain ${targetChainId}`);
+
+            await this.recordOnchainMilestoneForEvent({
+                frogId: frog.id,
+                travelId: travel.id,
+                milestoneType: 'CROSS_CHAIN_TRAVEL_STARTED',
+                log,
+                payload: {
+                    tokenId: Number(tokenId),
+                    owner: (owner as string).toLowerCase(),
+                    targetChainId: Number(targetChainId),
+                    messageId: messageId as string,
+                    startTime: Number(startTime),
+                    maxDuration: Number(maxDuration),
+                },
+            });
 
             // Notify frontend
             try {
@@ -655,6 +858,19 @@ class EventListener {
                 }
             }
 
+            await this.recordOnchainMilestoneForEvent({
+                frogId: frog.id,
+                travelId: activeTravel?.id ?? null,
+                milestoneType: 'TRAVEL_COMPLETED',
+                log,
+                payload: {
+                    tokenId: Number(tokenId),
+                    journalHash: journalHash as string,
+                    souvenirId: Number(souvenirId || 0),
+                    timestamp: Number(timestamp),
+                },
+            });
+
             logger.info(`Travel completed for frog ${tokenId}`);
 
         } catch (error) {
@@ -698,6 +914,17 @@ class EventListener {
                 });
             }
 
+            await this.recordOnchainMilestoneForEvent({
+                frogId: frog.id,
+                travelId: activeTravel?.id ?? null,
+                milestoneType: 'TRAVEL_CANCELLED',
+                log,
+                payload: {
+                    tokenId: Number(tokenId),
+                    timestamp: Number(timestamp),
+                },
+            });
+
             logger.info(`Travel cancelled for frog ${tokenId}`);
 
         } catch (error) {
@@ -719,6 +946,17 @@ class EventListener {
             await prisma.frog.update({
                 where: { id: frog.id },
                 data: { level: Number(newLevel) },
+            });
+
+            await this.recordOnchainMilestoneForEvent({
+                frogId: frog.id,
+                milestoneType: 'LEVEL_UP',
+                log,
+                payload: {
+                    tokenId: Number(tokenId),
+                    newLevel: Number(newLevel),
+                    timestamp: Number(timestamp),
+                },
             });
 
             logger.info(`Frog ${tokenId} leveled up to ${newLevel}`);
@@ -787,8 +1025,126 @@ class EventListener {
                 }
             }
 
+            await this.recordOnchainMilestoneForEvent({
+                frogId: frog.id,
+                milestoneType: 'SOUVENIR_MINTED',
+                log,
+                payload: {
+                    souvenirId: Number(souvenirId),
+                    frogTokenId: Number(frogId),
+                    owner: (owner as string).toLowerCase(),
+                    rarity: Number(rarity),
+                    name: name as string,
+                },
+            });
+
         } catch (error) {
             logger.error(`Error handling SouvenirMinted event:`, error);
+        }
+    }
+
+    private async handleEggClaimed(log: any) {
+        const { owner, tokenId, timestamp } = log.args;
+        logger.info(`EggClaimed: tokenId=${tokenId}, owner=${owner}`);
+
+        try {
+            let frog = await prisma.frog.findUnique({
+                where: { tokenId: Number(tokenId) },
+            });
+
+            if (!frog) {
+                await this.syncFrog(Number(tokenId));
+                frog = await prisma.frog.findUnique({
+                    where: { tokenId: Number(tokenId) },
+                });
+            }
+
+            if (!frog) {
+                return;
+            }
+
+            await this.recordOnchainMilestoneForEvent({
+                frogId: frog.id,
+                milestoneType: 'EGG_CLAIMED',
+                log,
+                payload: {
+                    tokenId: Number(tokenId),
+                    owner: (owner as string).toLowerCase(),
+                    timestamp: Number(timestamp),
+                },
+            });
+        } catch (error) {
+            logger.error('Error handling EggClaimed event:', error);
+        }
+    }
+
+    private async handleSoulImprinted(log: any) {
+        const { tokenId, imprintHash, timestamp } = log.args;
+        logger.info(`SoulImprinted: tokenId=${tokenId}, imprintHash=${imprintHash}`);
+
+        try {
+            let frog = await prisma.frog.findUnique({
+                where: { tokenId: Number(tokenId) },
+            });
+
+            if (!frog) {
+                await this.syncFrog(Number(tokenId));
+                frog = await prisma.frog.findUnique({
+                    where: { tokenId: Number(tokenId) },
+                });
+            }
+
+            if (!frog) {
+                return;
+            }
+
+            await this.recordOnchainMilestoneForEvent({
+                frogId: frog.id,
+                milestoneType: 'SOUL_IMPRINTED',
+                log,
+                payload: {
+                    tokenId: Number(tokenId),
+                    imprintHash: imprintHash as string,
+                    timestamp: Number(timestamp),
+                },
+            });
+        } catch (error) {
+            logger.error('Error handling SoulImprinted event:', error);
+        }
+    }
+
+    private async handleFrogHatched(log: any) {
+        const { owner, tokenId, timestamp } = log.args;
+        logger.info(`FrogHatched: tokenId=${tokenId}, owner=${owner}`);
+
+        try {
+            let frog = await prisma.frog.findUnique({
+                where: { tokenId: Number(tokenId) },
+            });
+
+            if (!frog) {
+                await this.syncFrog(Number(tokenId));
+                frog = await prisma.frog.findUnique({
+                    where: { tokenId: Number(tokenId) },
+                });
+            }
+
+            if (!frog) {
+                return;
+            }
+
+            await this.recordOnchainMilestoneForEvent({
+                frogId: frog.id,
+                milestoneType: 'HATCHED',
+                log,
+                payload: {
+                    tokenId: Number(tokenId),
+                    owner: (owner as string).toLowerCase(),
+                    timestamp: Number(timestamp),
+                },
+            });
+        } catch (error) {
+            logger.error('Error handling FrogHatched event:', error);
         }
     }
 
