@@ -3,6 +3,9 @@ import { prisma } from '../../database';
 import { AppError } from '../../middlewares/errorHandler';
 import { normalizeWalletAddress } from '../identity/nonce.service';
 import { toTravelMachineState } from './travel-state-machine';
+import { travelQueryService } from '../../services/travel/travel-query.service';
+import { rescueService } from '../../services/travel/rescue.service';
+import { travelFeedService } from '../../services/travel/travel-feed.service';
 
 type TravelWithRelations = Prisma.TravelGetPayload<{
   include: {
@@ -128,6 +131,23 @@ export interface TravelReadModel {
   errorMessage: string | null;
 }
 
+export interface TravelHistoryReadModel {
+  travels: unknown[];
+  total: number;
+  hasMore: boolean;
+}
+
+export interface TravelStatsReadModel {
+  totalTrips: number;
+  bscTrips: number;
+  ethTrips: number;
+  zetaTrips: number;
+  totalDiscoveries: number;
+  rareFinds: number;
+  totalFrogs: number;
+  recentTravel: unknown | null;
+}
+
 const parseJournal = (raw: string | null): ParsedJournal | null => {
   if (!raw) {
     return null;
@@ -232,6 +252,96 @@ const toReadModel = (travel: TravelWithRelations): TravelReadModel => {
 };
 
 export class TravelQueryServiceV1 {
+  async getLegacyHistory(params: {
+    walletAddress: string;
+    frogTokenId?: number;
+    limit?: number;
+    offset?: number;
+  }): Promise<TravelHistoryReadModel> {
+    const result = await travelQueryService.getTravelHistory({
+      address: normalizeWalletAddress(params.walletAddress),
+      frogId: params.frogTokenId,
+      limit: params.limit,
+      offset: params.offset,
+    });
+    return {
+      travels: result.travels,
+      total: result.total,
+      hasMore: result.hasMore,
+    };
+  }
+
+  async getLegacyStats(params: {
+    walletAddress: string;
+    frogTokenId?: number;
+  }): Promise<TravelStatsReadModel> {
+    const stats = await travelQueryService.getTravelStats(
+      normalizeWalletAddress(params.walletAddress),
+      params.frogTokenId
+    );
+    return {
+      totalTrips: stats.totalTrips,
+      bscTrips: stats.bscTrips,
+      ethTrips: stats.ethTrips,
+      zetaTrips: stats.zetaTrips,
+      totalDiscoveries: stats.totalDiscoveries,
+      rareFinds: stats.rareFinds,
+      totalFrogs: stats.totalFrogs,
+      recentTravel: stats.recentTravel,
+    };
+  }
+
+  async getLegacyTravelsByTokenId(frogTokenId: number): Promise<unknown[]> {
+    const frog = await prisma.frog.findUnique({
+      where: { tokenId: frogTokenId },
+      select: { ownerAddress: true },
+    });
+
+    if (!frog) {
+      throw new AppError(404, 'Frog not found', 'NOT_FOUND');
+    }
+
+    const history = await travelQueryService.getTravelHistory({
+      address: frog.ownerAddress,
+      frogId: frogTokenId,
+      limit: 200,
+      offset: 0,
+    });
+    return history.travels;
+  }
+
+  async getLegacyActiveTravel(frogTokenId: number): Promise<unknown | null> {
+    return travelQueryService.getActiveTravel(frogTokenId);
+  }
+
+  async getGroupTravelByTravelId(travelId: number): Promise<unknown> {
+    const groupTravel = await prisma.groupTravel.findUnique({
+      where: { travelId },
+      include: {
+        leader: true,
+        companion: true,
+        travel: true,
+      },
+    });
+
+    if (!groupTravel) {
+      throw new AppError(404, 'Group travel not found', 'NOT_FOUND');
+    }
+    return groupTravel;
+  }
+
+  async getPublicRescueRequests(limit = 20): Promise<unknown[]> {
+    return rescueService.getPublicRequests(limit);
+  }
+
+  async getFriendRescueRequests(frogId: number): Promise<unknown[]> {
+    return rescueService.getFriendRequests(frogId);
+  }
+
+  async getTravelFeeds(travelId: number): Promise<unknown[]> {
+    return travelFeedService.getFeedHistory(travelId);
+  }
+
   async getTravel(input: TravelQueryInput): Promise<TravelReadModel> {
     const travel = await prisma.travel.findUnique({
       where: { id: input.travelId },

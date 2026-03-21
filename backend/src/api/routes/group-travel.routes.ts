@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { groupTravelService } from '../../services/group-travel.service';
 import { parseNonNegativeInt, parsePositiveInt } from '../../utils/validation';
 import { logger } from '../../utils/logger';
-import { prisma } from '../../database';
 import { travelCommandServiceV1 } from '../../modules/travel/travel.command';
 
 const router = Router();
@@ -114,7 +113,7 @@ router.post('/confirm', async (req, res) => {
       });
     }
 
-    const result = await groupTravelService.confirmGroupTravel({
+    const result = await travelCommandServiceV1.confirmGroupTravel({
       txHash,
       leaderTokenId: parsedLeaderId,
       companionTokenId: parsedCompanionId,
@@ -154,33 +153,15 @@ router.post('/complete', async (req, res) => {
 
     const xp = parsePositiveInt(xpReward) || 50;
 
-    const result = await groupTravelService.completeGroupTravel(crossChainMessageId, xp);
-
-    const groupTravel = await prisma.groupTravel.findUnique({
-      where: { crossChainMessageId },
-      include: {
-        leader: {
-          select: {
-            ownerAddress: true,
-          },
-        },
-      },
+    const result = await travelCommandServiceV1.completeGroupTravel({
+      crossChainMessageId,
+      xpReward: xp,
     });
 
-    let unifiedTravel = null;
-    if (groupTravel?.travelId && groupTravel.leader?.ownerAddress) {
-      unifiedTravel = await travelCommandServiceV1.completeTravel({
-        travelId: groupTravel.travelId,
-        walletAddress: groupTravel.leader.ownerAddress,
-        source: 'legacy_group_travel_complete',
-      });
-    }
-
     res.json({
-      ...result,
+      success: result.success,
       data: {
-        ...(result as any).data,
-        unifiedTravel,
+        unifiedTravel: result.unifiedTravel,
       },
     });
 

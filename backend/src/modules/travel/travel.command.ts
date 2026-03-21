@@ -11,6 +11,9 @@ import {
   toTravelMachineState,
 } from './travel-state-machine';
 import { travelEventService } from './travel-events';
+import { travelFeedService } from '../../services/travel/travel-feed.service';
+import { rescueService } from '../../services/travel/rescue.service';
+import { groupTravelService } from '../../services/group-travel.service';
 
 type Tx = Prisma.TransactionClient;
 
@@ -57,6 +60,41 @@ interface CompleteTravelResult {
   progress: number;
   souvenirId: number | null;
   completedAt: string | null;
+}
+
+interface StartGroupTravelInput {
+  leaderTokenId: number;
+  companionTokenId: number;
+  targetChain?: string | number;
+  duration?: number;
+  source?: string;
+  requestId?: string;
+}
+
+interface FeedTravelInput {
+  travelId: number;
+  feederId: number;
+  feedType?: string;
+}
+
+interface RescueInput {
+  requestId: number;
+  rescuerId: number;
+}
+
+interface ConfirmGroupTravelInput {
+  txHash: string;
+  leaderTokenId: number;
+  companionTokenId: number;
+  targetChainId: number;
+  duration: number;
+  crossChainMessageId: string;
+  provisionsUsed?: string;
+}
+
+interface CompleteGroupTravelInput {
+  crossChainMessageId: string;
+  xpReward?: number;
 }
 
 const normalizeTravelType = (raw?: string): NormalizedTravelType => {
@@ -174,6 +212,210 @@ const getOwnedFrog = async (tx: Tx, frogId: number, walletAddress: string) => {
 };
 
 export class TravelCommandServiceV1 {
+  async startGroupTravel(input: StartGroupTravelInput): Promise<{
+    travelId: number;
+    groupTravelId: number;
+    leader: { id: number; name: string };
+    companion: { id: number; name: string };
+    targetChain: string;
+    chainId: number;
+  }> {
+    if (input.leaderTokenId === input.companionTokenId) {
+      throw new AppError(400, 'Leader and companion must be different frogs', 'INVALID_INPUT');
+    }
+
+    const chain = resolveChain(input.targetChain);
+    const duration = resolveDuration(input.duration);
+    const now = new Date();
+    const endTime = new Date(now.getTime() + duration * 1000);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const [leaderFrog, companionFrog] = await Promise.all([
+        tx.frog.findUnique({
+          where: { tokenId: input.leaderTokenId },
+        }),
+        tx.frog.findUnique({
+          where: { tokenId: input.companionTokenId },
+        }),
+      ]);
+
+      if (!leaderFrog || !companionFrog) {
+        throw new AppError(404, 'One or both frogs not found', 'NOT_FOUND');
+      }
+
+      if (leaderFrog.status !== FrogStatus.Idle) {
+        throw new AppError(409, `${leaderFrog.name} 正在旅行中，无法再次出发`, 'CONFLICT');
+      }
+      if (companionFrog.status !== FrogStatus.Idle) {
+        throw new AppError(409, `${companionFrog.name} 正在旅行中，无法一起出发`, 'CONFLICT');
+      }
+
+      const friendship = await tx.friendship.findFirst({
+        where: {
+          OR: [
+            { requesterId: leaderFrog.id, addresseeId: companionFrog.id },
+            { requesterId: companionFrog.id, addresseeId: leaderFrog.id },
+          ],
+          status: 'Accepted',
+        },
+      });
+
+      if (!friendship) {
+        throw new AppError(403, '只有好友才能一起结伴旅行', 'FORBIDDEN');
+      }
+
+      const travel = await tx.travel.create({
+        data: {
+          frogId: leaderFrog.id,
+          targetWallet: ZERO_ADDRESS,
+          targetChain: chain.chainType,
+          chainId: chain.chainId,
+          isRandom: true,
+          isCrossChain: false,
+          startTime: now,
+          endTime,
+          duration,
+          status: TravelStatus.Active,
+          currentStage: TravelStage.DEPARTING,
+          progress: 0,
+        },
+      });
+
+      const groupTravel = await tx.groupTravel.create({
+        data: {
+          leaderId: leaderFrog.id,
+          companionId: companionFrog.id,
+          travelId: travel.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      await tx.frog.updateMany({
+        where: { id: { in: [leaderFrog.id, companionFrog.id] } },
+        data: { status: FrogStatus.Traveling },
+      });
+
+      await tx.friendInteraction.create({
+        data: {
+          friendshipId: friendship.id,
+          actorId: leaderFrog.id,
+          type: 'Travel',
+          message: `${leaderFrog.name} 和 ${companionFrog.name} 一起踏上了冒险之旅！`,
+          metadata: {
+            groupTravelId: groupTravel.id,
+            travelId: travel.id,
+            chainId: chain.chainId,
+          },
+        },
+      });
+
+      await travelEventService.append(tx, {
+        frogId: leaderFrog.id,
+        travelId: travel.id,
+        eventType: 'TravelStarted',
+        payload: {
+          travelType: 'group',
+          targetChain: chain.key,
+          chainId: chain.chainId,
+          companionFrogId: companionFrog.id,
+          duration,
+        },
+        requestId: input.requestId,
+        source: input.source || 'legacy_group_travel_start',
+      });
+
+      return {
+        travelId: travel.id,
+        groupTravelId: groupTravel.id,
+        leader: {
+          id: leaderFrog.tokenId,
+          name: leaderFrog.name,
+        },
+        companion: {
+          id: companionFrog.tokenId,
+          name: companionFrog.name,
+        },
+        targetChain: chain.key,
+        chainId: chain.chainId,
+      };
+    });
+
+    return result;
+  }
+
+  async feedTravel(input: FeedTravelInput): Promise<{
+    success: boolean;
+    timeReduced: number;
+    newEndTime: Date;
+    message: string;
+    xpEarned?: number;
+    reputationEarned?: number;
+  }> {
+    return travelFeedService.feedTravel(input.travelId, input.feederId, input.feedType || 'energy');
+  }
+
+  async performRescue(input: RescueInput): Promise<{
+    success: boolean;
+    message: string;
+    xpEarned?: number;
+    reputationEarned?: number;
+  }> {
+    return rescueService.performRescue(input.requestId, input.rescuerId);
+  }
+
+  async confirmGroupTravel(input: ConfirmGroupTravelInput): Promise<{
+    success: boolean;
+    data?: {
+      travelId: number;
+      groupTravelId: number;
+    };
+    error?: string;
+  }> {
+    return groupTravelService.confirmGroupTravel({
+      txHash: input.txHash,
+      leaderTokenId: input.leaderTokenId,
+      companionTokenId: input.companionTokenId,
+      targetChainId: input.targetChainId,
+      duration: input.duration,
+      crossChainMessageId: input.crossChainMessageId,
+      provisionsUsed: input.provisionsUsed || '0',
+    });
+  }
+
+  async completeGroupTravel(input: CompleteGroupTravelInput): Promise<{
+    success: boolean;
+    unifiedTravel: CompleteTravelResult | null;
+  }> {
+    const result = await groupTravelService.completeGroupTravel(input.crossChainMessageId, input.xpReward || 50);
+
+    const groupTravel = await prisma.groupTravel.findUnique({
+      where: { crossChainMessageId: input.crossChainMessageId },
+      include: {
+        leader: {
+          select: { ownerAddress: true },
+        },
+      },
+    });
+
+    if (!groupTravel?.travelId || !groupTravel.leader?.ownerAddress) {
+      return {
+        success: result.success,
+        unifiedTravel: null,
+      };
+    }
+
+    const unifiedTravel = await this.completeTravel({
+      travelId: groupTravel.travelId,
+      walletAddress: groupTravel.leader.ownerAddress,
+      source: 'legacy_group_travel_complete',
+    });
+
+    return {
+      success: result.success,
+      unifiedTravel,
+    };
+  }
+
   async startTravel(input: StartTravelInput): Promise<StartTravelResult> {
     const normalizedType = normalizeTravelType(input.travelType);
     const normalizedWallet = normalizeWalletAddress(input.walletAddress);

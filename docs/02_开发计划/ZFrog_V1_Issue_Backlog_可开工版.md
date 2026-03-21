@@ -32,6 +32,7 @@ reviewer: Codex
 1. `2026-03-21`：`V1-I01` ~ `V1-I06` 已完成并通过主链路验证。
 2. `2026-03-21`：`V1-I07` 已进入开发中，已落地 V1 travel module（state machine / command / query / events）和 `/api/v1/travels` 主接口。
 3. `2026-03-21`：旧入口开始切流，`/api/travels/start`、`/api/travels/start-p0`、`/api/cross-chain/travel` 已委托统一 travel.command。
+4. `2026-03-21`：旧 `travel/group/rescue` 写路径继续收敛到 `travel.command`，旧 `history/stats/active/group/feeds/rescue` 读取路径继续收敛到 `travel.query`，并补 legacy delegation e2e。
 
 ---
 

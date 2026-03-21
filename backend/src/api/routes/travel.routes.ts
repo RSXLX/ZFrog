@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { prisma } from '../../database';
-import { TravelStatus } from '@prisma/client';
 import { explorationService } from '../../services/travel/exploration.service';
 import { ChainKey, SUPPORTED_CHAINS, getRandomTargetChain, getChainKey } from '../../config/chains';
 import { travelProcessor } from '../../workers/travelProcessor';
@@ -44,96 +43,21 @@ router.get('/history', async (req, res) => {
                 error: 'Address is required' 
             });
         }
-
-        // 首先获取该用户的所有青蛙
-        const userFrogs = await prisma.frog.findMany({
-            where: {
-                ownerAddress: (address as string).toLowerCase()
-            },
-            select: { id: true, tokenId: true }
+        
+        const parsedFrogId = frogId ? parseInt(frogId as string, 10) : undefined;
+        const data = await travelQueryServiceV1.getLegacyHistory({
+            walletAddress: address as string,
+            frogTokenId: Number.isNaN(parsedFrogId as number) ? undefined : parsedFrogId,
+            limit,
+            offset,
         });
 
-        if (userFrogs.length === 0) {
-            return res.json({
-                success: true,
-                data: {
-                    travels: [],
-                    total: 0,
-                    hasMore: false
-                }
-            });
-        }
-
-        // 构建查询条件 - 使用青蛙ID列表
-        const frogIds = userFrogs.map(f => f.id);
-        const whereClause: any = {
-            frogId: { in: frogIds }
-        };
-
-        // 如果指定了青蛙 ID，增加筛选条件
-        if (frogId) {
-            const parsedFrogId = parseInt(frogId as string);
-            const targetFrog = userFrogs.find(f => f.tokenId === parsedFrogId);
-            if (targetFrog) {
-                whereClause.frogId = targetFrog.id;
-            } else {
-                // 如果指定的青蛙不属于该用户，返回空结果
-                return res.json({
-                    success: true,
-                    data: {
-                        travels: [],
-                        total: 0,
-                        hasMore: false
-                    }
-                });
-            }
-        }
-
-        // 获取该用户所有青蛙的旅行记录
-        const travels = await prisma.travel.findMany({
-            where: whereClause,
-            include: {
-                frog: true,
-                souvenir: true,
-            },
-            orderBy: { createdAt: 'desc' },
-            skip: offset,
-            take: limit,
-        });
-
-        // 获取总数
-        const total = await prisma.travel.count({
-            where: whereClause
-        });
-
-        // 解析日记内容同时处理 BigInt
-        const travelsParsed = travels.map(travel => {
-            let journal = null;
-            try {
-                if (travel.journalContent) {
-                    journal = JSON.parse(travel.journalContent);
-                }
-            } catch (e) {
-                console.warn('Failed to parse journal for travel', travel.id, e);
-                journal = { 
-                    title: '旅行回顾',
-                    content: travel.journalContent,
-                    mood: 'happy',
-                    highlights: []
-                };
-            }
-            return {
-                ...travel,
-                exploredBlock: travel.exploredBlock?.toString(),
-                journal
-            };
-        });
         res.json({
             success: true,
             data: stringifyBigInt({
-                travels: travelsParsed,
-                total,
-                hasMore: offset + limit < total
+                travels: data.travels,
+                total: data.total,
+                hasMore: data.hasMore,
             })
         });
         
@@ -168,125 +92,18 @@ router.get('/stats', async (req, res) => {
                 error: 'Address is required' 
             });
         }
-
-        // 获取该用户所有青蛙
-        const frogs = await prisma.frog.findMany({
-            where: {
-                ownerAddress: (address as string).toLowerCase()
-            }
-        });
-
-        // 如果指定了具体青蛙，则只统计该青蛙的数据
-        let frogIds = frogs.map(f => f.id);
-        const requestFrogId = req.query.frogId;
         
-        if (requestFrogId && requestFrogId !== 'all') {
-            const targetFrog = frogs.find(f => f.tokenId === parseInt(requestFrogId as string));
-            if (targetFrog) {
-                frogIds = [targetFrog.id];
-            } else {
-                // 如果请求的青蛙不在用户列表中，返回空数据
-                return res.json({
-                    success: true,
-                    data: {
-                        totalTrips: 0,
-                        bscTrips: 0,
-                        ethTrips: 0,
-                        zetaTrips: 0,
-                        totalDiscoveries: 0,
-                        rareFinds: 0,
-                        totalFrogs: frogs.length,
-                        recentTravel: null
-                    }
-                });
-            }
-        }
-
-        // 统计数据 - 按链分类统计
-        const [totalTravels, bscTravels, ethTravels, zetaTravels] = await Promise.all([
-            prisma.travel.count({
-                where: { frogId: { in: frogIds } }
-            }),
-            prisma.travel.count({
-                where: { 
-                    frogId: { in: frogIds },
-                    chainId: 97 // BSC Testnet
-                }
-            }),
-            prisma.travel.count({
-                where: { 
-                    frogId: { in: frogIds },
-                    chainId: 11155111 // Ethereum Sepolia
-                }
-            }),
-            prisma.travel.count({
-                where: { 
-                    frogId: { in: frogIds },
-                    chainId: 7001 // ZetaChain Athens
-                }
-            })
-        ]);
-
-        // 获取所有已完成的旅行，用于计算发现数据
-        const completedTravels = await prisma.travel.findMany({
-            where: { 
-                frogId: { in: frogIds },
-                status: 'Completed'
-            },
-            include: {
-                souvenir: true
-            }
-        });
-
-        // 计算总发现和稀有发现
-        let totalDiscoveries = 0;
-        let rareFinds = 0;
-        
-        completedTravels.forEach(travel => {
-            // 从 exploredSnapshot 中获取发现数据
-            const snapshot = travel.exploredSnapshot as any;
-            if (snapshot?.discoveries) {
-                totalDiscoveries += snapshot.discoveries.length;
-                rareFinds += snapshot.discoveries.filter((d: any) => d.rarity >= 3).length;
-            }
-            
-            // 从纪念品中计算稀有发现
-            if (travel.souvenir) {
-                const rarity = travel.souvenir.rarity as string;
-                if (['Rare', 'Epic', 'Legendary'].includes(rarity)) {
-                    rareFinds++;
-                }
-            }
-        });
-
-        // 获取最近的旅行
-        const recentTravel = await prisma.travel.findFirst({
-            where: { 
-                frogId: { in: frogIds },
-                status: 'Completed'
-            },
-            include: {
-                frog: true
-            },
-            orderBy: { completedAt: 'desc' }
+        const requestFrogId = req.query.frogId as string | undefined;
+        const parsedFrogId =
+            requestFrogId && requestFrogId !== 'all' ? parseInt(requestFrogId, 10) : undefined;
+        const data = await travelQueryServiceV1.getLegacyStats({
+            walletAddress: address as string,
+            frogTokenId: Number.isNaN(parsedFrogId as number) ? undefined : parsedFrogId,
         });
 
         res.json({
             success: true,
-            data: stringifyBigInt({
-                totalTrips: totalTravels,
-                bscTrips: bscTravels,
-                ethTrips: ethTravels,
-                zetaTrips: zetaTravels,
-                totalDiscoveries,
-                rareFinds,
-                totalFrogs: frogs.length,
-                recentTravel: recentTravel ? {
-                    id: recentTravel.id,
-                    frogName: recentTravel.frog.name,
-                    completedAt: recentTravel.completedAt
-                } : null
-            })
+            data: stringifyBigInt(data),
         });
         
     } catch (error) {
@@ -305,42 +122,12 @@ router.get('/stats', async (req, res) => {
 router.get('/:frogId', async (req, res) => {
     try {
         const frogId = parseInt(req.params.frogId);
-        
-        const travels = await prisma.travel.findMany({
-            where: { 
-                frog: {
-                    tokenId: frogId
-                }
-            },
-            orderBy: { createdAt: 'desc' },
-            include: {
-                souvenir: true,
-            },
-        });
-        
-        const travelsParsed = travels.map(travel => {
-            let journal = null;
-            try {
-                if (travel.journalContent) {
-                    journal = JSON.parse(travel.journalContent);
-                }
-            } catch (e) {
-                // 如果解析失败，说明可能是旧格式的纯文本
-                journal = { 
-                    title: '旅行回顾',
-                    content: travel.journalContent,
-                    mood: 'happy',
-                    highlights: []
-                };
-            }
-            return {
-                ...travel,
-                exploredBlock: travel.exploredBlock?.toString(),
-                journal
-            };
-        });
-        
-        res.json(stringifyBigInt(travelsParsed));
+        if (isNaN(frogId)) {
+            return res.status(400).json({ error: 'Invalid frog ID' });
+        }
+
+        const travels = await travelQueryServiceV1.getLegacyTravelsByTokenId(frogId);
+        res.json(stringifyBigInt(travels));
         
     } catch (error) {
         console.error('Error fetching travels:', error);
@@ -355,39 +142,22 @@ router.get('/:frogId', async (req, res) => {
 router.get('/:frogId/active', async (req, res) => {
     try {
         const frogId = parseInt(req.params.frogId);
-        const now = new Date();
-        
-        const activeTravel = await prisma.travel.findFirst({
-            where: {
-                frog: {
-                    tokenId: frogId
-                },
-                status: {
-                    in: [TravelStatus.Active, TravelStatus.Processing],
-                },
-                // endTime: { gt: now }  // 移除时间限制
-            },
-        });
+        if (isNaN(frogId)) {
+            return res.status(400).json({ success: false, error: 'Invalid frog ID' });
+        }
+
+        const activeTravel = await travelQueryServiceV1.getLegacyActiveTravel(frogId);
         
         if (!activeTravel) {
             logger.info(`[TravelAPI] No active travel found for frog tokenId=${frogId}`);
             return res.json({ success: true, data: null });
         }
-        
-        // 计算剩余时间
-        const remainingMs = activeTravel.endTime.getTime() - Date.now();
-        const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
-        
+
         res.json({
             success: true,
             data: stringifyBigInt({
                 ...activeTravel,
-                exploredBlock: activeTravel.exploredBlock?.toString(),
-                remainingSeconds,
-                progress: Math.min(100, Math.floor(
-                    (Date.now() - activeTravel.startTime.getTime()) /
-                    (activeTravel.endTime.getTime() - activeTravel.startTime.getTime()) * 100
-                )),
+                exploredBlock: (activeTravel as any).exploredBlock?.toString?.() || (activeTravel as any).exploredBlock,
             })
         });
         
@@ -740,7 +510,10 @@ router.post('/start', async (req, res) => {
             travelType: normalizedType,
             targetChain,
             targetAddress,
-            duration: Number.isNaN(parsedDuration as number) ? undefined : parsedDuration,
+            duration:
+                Number.isNaN(parsedDuration as number) || parsedDuration === undefined
+                    ? 60
+                    : parsedDuration,
             source: 'legacy_travel_start',
         });
 
@@ -985,118 +758,33 @@ router.post('/group', async (req, res) => {
             });
         }
         
-        // 根据 tokenId 查找两只青蛙
-        const [leaderFrog, companionFrog] = await Promise.all([
-            prisma.frog.findUnique({ where: { tokenId: parsedLeaderId } }),
-            prisma.frog.findUnique({ where: { tokenId: parsedCompanionId } })
-        ]);
-        
-        if (!leaderFrog || !companionFrog) {
-            return res.status(404).json({ 
-                success: false, 
-                error: 'One or both frogs not found' 
-            });
-        }
-        
-        // 验证两只青蛙都处于 Idle 状态
-        if (leaderFrog.status !== 'Idle') {
-            return res.status(400).json({ 
-                success: false, 
-                error: `${leaderFrog.name} 正在旅行中，无法再次出发` 
-            });
-        }
-        
-        if (companionFrog.status !== 'Idle') {
-            return res.status(400).json({ 
-                success: false, 
-                error: `${companionFrog.name} 正在旅行中，无法一起出发` 
-            });
-        }
-        
-        // 验证两只青蛙是好友
-        const friendship = await prisma.friendship.findFirst({
-            where: {
-                OR: [
-                    { requesterId: leaderFrog.id, addresseeId: companionFrog.id },
-                    { requesterId: companionFrog.id, addresseeId: leaderFrog.id }
-                ],
-                status: 'Accepted'
-            }
+        const result = await travelCommandServiceV1.startGroupTravel({
+            leaderTokenId: parsedLeaderId,
+            companionTokenId: parsedCompanionId,
+            targetChain: targetChain || 7001,
+            duration: travelDuration,
+            source: 'legacy_travel_group_start',
         });
-        
-        if (!friendship) {
-            return res.status(403).json({ 
-                success: false, 
-                error: '只有好友才能一起结伴旅行' 
+
+        const createdTravel = await prisma.travel.findUnique({
+            where: { id: result.travelId },
+            include: { frog: true },
+        });
+        if (createdTravel) {
+            travelProcessor.processTravel(createdTravel).catch((error: any) => {
+                logger.error(`Failed to process group travel ${createdTravel.id}:`, error);
             });
         }
-        
-        // travelDuration already validated above
-        const chainId = SUPPORTED_CHAINS[targetChain as ChainKey]?.chainId || 7001;
-        
-        // 使用事务创建旅行和结伴旅行记录
-        const result = await prisma.$transaction(async (tx) => {
-            // 1. 创建主旅行记录
-            const travel = await tx.travel.create({
-                data: {
-                    frogId: leaderFrog.id,
-                    targetWallet: '0x0000000000000000000000000000000000000000',
-                    chainId,
-                    status: TravelStatus.Active,
-                    startTime: new Date(),
-                    endTime: new Date(Date.now() + travelDuration * 1000),
-                    isRandom: true,
-                }
-            });
-            
-            // 2. 创建结伴旅行记录
-            const groupTravel = await tx.groupTravel.create({
-                data: {
-                    leaderId: leaderFrog.id,
-                    companionId: companionFrog.id,
-                    travelId: travel.id,
-                    status: 'ACTIVE'
-                }
-            });
-            
-            // 3. 更新两只青蛙状态为旅行中
-            await tx.frog.updateMany({
-                where: { id: { in: [leaderFrog.id, companionFrog.id] } },
-                data: { status: 'Traveling' }
-            });
-            
-            // 4. 创建好友互动记录
-            await tx.friendInteraction.create({
-                data: {
-                    friendshipId: friendship.id,
-                    actorId: leaderFrog.id,
-                    type: 'Travel',
-                    message: `${leaderFrog.name} 和 ${companionFrog.name} 一起踏上了冒险之旅！`,
-                    metadata: { 
-                        groupTravelId: groupTravel.id,
-                        travelId: travel.id,
-                        chainId 
-                    }
-                }
-            });
-            
-            return { travel, groupTravel };
-        });
-        
-        // 启动后台处理
-        travelProcessor.processTravel(result.travel).catch((error: any) => {
-            logger.error(`Failed to process group travel ${result.travel.id}:`, error);
-        });
         
         res.json({
             success: true,
             data: {
-                travelId: result.travel.id,
-                groupTravelId: result.groupTravel.id,
-                leader: { id: leaderFrog.tokenId, name: leaderFrog.name },
-                companion: { id: companionFrog.tokenId, name: companionFrog.name },
+                travelId: result.travelId,
+                groupTravelId: result.groupTravelId,
+                leader: result.leader,
+                companion: result.companion,
             },
-            message: `🐸🐸 ${leaderFrog.name} 和 ${companionFrog.name} 一起出发啦！`,
+            message: `🐸🐸 ${result.leader.name} 和 ${result.companion.name} 一起出发啦！`,
         });
         
     } catch (error: any) {
@@ -1115,22 +803,11 @@ router.post('/group', async (req, res) => {
 router.get('/:travelId/group', async (req, res) => {
     try {
         const travelId = parseInt(req.params.travelId);
-        
-        const groupTravel = await prisma.groupTravel.findUnique({
-            where: { travelId },
-            include: {
-                leader: true,
-                companion: true,
-                travel: true
-            }
-        });
-        
-        if (!groupTravel) {
-            return res.status(404).json({ 
-                success: false, 
-                error: 'Group travel not found' 
-            });
+        if (isNaN(travelId)) {
+            return res.status(400).json({ success: false, error: 'Invalid travel ID' });
         }
+
+        const groupTravel = await travelQueryServiceV1.getGroupTravelByTravelId(travelId);
         
         res.json({
             success: true,
@@ -1148,7 +825,6 @@ router.get('/:travelId/group', async (req, res) => {
 
 // ============ 🆕 V2.0 投喂系统 API ============
 
-import { travelFeedService } from '../../services/travel/travel-feed.service';
 
 /**
  * POST /api/travels/:travelId/feed
@@ -1169,7 +845,11 @@ router.post('/:travelId/feed', async (req, res) => {
 
         logger.info(`[TravelAPI] Feed request: travelId=${travelId}, feederId=${feederId}, type=${feedType}`);
 
-        const result = await travelFeedService.feedTravel(travelId, feederId, feedType);
+        const result = await travelCommandServiceV1.feedTravel({
+            travelId,
+            feederId,
+            feedType,
+        });
 
         if (!result.success) {
             return res.status(400).json({
@@ -1207,7 +887,7 @@ router.get('/:travelId/feeds', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid travel ID' });
         }
 
-        const feeds = await travelFeedService.getFeedHistory(travelId);
+        const feeds = await travelQueryServiceV1.getTravelFeeds(travelId);
 
         res.json({
             success: true,
@@ -1350,7 +1030,6 @@ router.get('/leaderboard/gold-label', async (req, res) => {
 
 // ============ 🆕 V2.0 P2 救援系统 API ============
 
-import { rescueService } from '../../services/travel/rescue.service';
 
 /**
  * GET /api/travels/rescue/public
@@ -1359,7 +1038,7 @@ import { rescueService } from '../../services/travel/rescue.service';
 router.get('/rescue/public', async (req, res) => {
     try {
         const limit = parseInt(req.query.limit as string) || 20;
-        const requests = await rescueService.getPublicRequests(limit);
+        const requests = await travelQueryServiceV1.getPublicRescueRequests(limit);
 
         res.json({
             success: true,
@@ -1386,7 +1065,7 @@ router.get('/rescue/friends/:frogId', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid frog ID' });
         }
 
-        const requests = await rescueService.getFriendRequests(frogId);
+        const requests = await travelQueryServiceV1.getFriendRescueRequests(frogId);
 
         res.json({
             success: true,
@@ -1420,7 +1099,10 @@ router.post('/rescue/:requestId', async (req, res) => {
 
         logger.info(`[TravelAPI] Rescue request: requestId=${requestId}, rescuerId=${rescuerId}`);
 
-        const result = await rescueService.performRescue(requestId, rescuerId);
+        const result = await travelCommandServiceV1.performRescue({
+            requestId,
+            rescuerId,
+        });
 
         if (!result.success) {
             return res.status(400).json({
