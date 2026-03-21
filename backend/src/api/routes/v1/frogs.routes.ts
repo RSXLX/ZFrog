@@ -7,6 +7,7 @@ import { soulImprintService } from '../../../modules/soul/soul-imprint.service';
 import { hatchService } from '../../../modules/life/hatch.service';
 import { eggQueryService } from '../../../modules/life/egg.query';
 import { normalizeWalletAddress } from '../../../modules/identity/nonce.service';
+import { frogWalletQueryService } from '../../../modules/web3/frog-wallet.query';
 
 const router = Router();
 
@@ -14,7 +15,7 @@ router.get('/status', (req, res) =>
   respondSuccess(req, res, {
     module: 'frogs',
     status: 'ready',
-    nextIssue: 'V1-I05',
+    nextIssue: 'V1-I08',
   })
 );
 
@@ -103,6 +104,53 @@ router.post(
     });
 
     return respondSuccess(req, res, result);
+  })
+);
+
+router.get(
+  '/:frogId/wallet',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    const frogId = Number(req.params.frogId);
+    if (Number.isNaN(frogId) || frogId <= 0) {
+      return respondError(req, res, 400, 'INVALID_INPUT', 'frogId must be a positive integer');
+    }
+
+    const authWallet = req.user?.walletAddress || req.user?.address;
+    if (!authWallet) {
+      throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
+    }
+
+    const wallet = await frogWalletQueryService.getWalletByFrogId(frogId, authWallet);
+    return respondSuccess(req, res, wallet);
+  })
+);
+
+router.get(
+  '/:frogId/milestones',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    const frogId = Number(req.params.frogId);
+    if (Number.isNaN(frogId) || frogId <= 0) {
+      return respondError(req, res, 400, 'INVALID_INPUT', 'frogId must be a positive integer');
+    }
+
+    const rawLimit = req.query.limit === undefined ? 100 : Number(req.query.limit);
+    if (!Number.isInteger(rawLimit) || rawLimit <= 0 || rawLimit > 200) {
+      return respondError(req, res, 400, 'INVALID_INPUT', 'limit must be an integer between 1 and 200');
+    }
+
+    const authWallet = req.user?.walletAddress || req.user?.address;
+    if (!authWallet) {
+      throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
+    }
+
+    const milestones = await frogWalletQueryService.getMilestonesByFrogId(
+      frogId,
+      authWallet,
+      rawLimit
+    );
+    return respondSuccess(req, res, milestones);
   })
 );
 
