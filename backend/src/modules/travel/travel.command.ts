@@ -14,6 +14,7 @@ import { travelEventService } from './travel-events';
 import { travelFeedService } from '../../services/travel/travel-feed.service';
 import { rescueService } from '../../services/travel/rescue.service';
 import { groupTravelService } from '../../services/group-travel.service';
+import { omniTravelService } from '../../services/omni-travel.service';
 
 type Tx = Prisma.TransactionClient;
 
@@ -95,6 +96,25 @@ interface ConfirmGroupTravelInput {
 interface CompleteGroupTravelInput {
   crossChainMessageId: string;
   xpReward?: number;
+}
+
+interface MarkCrossChainStartedInput {
+  travelId: number;
+  messageId: string;
+  txHash: string;
+}
+
+interface MarkCrossChainArrivedInput {
+  tokenId: number;
+  messageId: string;
+  arrivalTime?: Date;
+}
+
+interface MarkCrossChainCompletedInput {
+  tokenId: number;
+  returnMessageId: string;
+  xpEarned?: number;
+  txHash: string;
 }
 
 const normalizeTravelType = (raw?: string): NormalizedTravelType => {
@@ -212,6 +232,123 @@ const getOwnedFrog = async (tx: Tx, frogId: number, walletAddress: string) => {
 };
 
 export class TravelCommandServiceV1 {
+  async markCrossChainStarted(input: MarkCrossChainStartedInput): Promise<void> {
+    await omniTravelService.onCrossChainTravelStarted(input.travelId, input.messageId, input.txHash);
+
+    const travel = await prisma.travel.findUnique({
+      where: { id: input.travelId },
+      select: {
+        frogId: true,
+        status: true,
+        currentStage: true,
+        progress: true,
+      },
+    });
+
+    if (!travel) {
+      return;
+    }
+
+    await travelEventService.appendStandalone({
+      frogId: travel.frogId,
+      travelId: input.travelId,
+      eventType: 'TravelProgressed',
+      payload: {
+        status: travel.status,
+        currentStage: travel.currentStage,
+        progress: travel.progress,
+        crossChainMessageId: input.messageId,
+        lockTxHash: input.txHash,
+      },
+      source: 'cross_chain_started',
+    });
+  }
+
+  async markCrossChainArrived(input: MarkCrossChainArrivedInput): Promise<void> {
+    const arrival = input.arrivalTime || new Date();
+    await omniTravelService.onFrogArrivedAtTarget(input.tokenId, input.messageId, arrival);
+
+    const travel = await prisma.travel.findFirst({
+      where: {
+        frog: { tokenId: input.tokenId },
+        isCrossChain: true,
+        crossChainMessageId: input.messageId,
+      },
+      select: {
+        id: true,
+        frogId: true,
+        status: true,
+        currentStage: true,
+        progress: true,
+      },
+    });
+
+    if (!travel) {
+      return;
+    }
+
+    await travelEventService.appendStandalone({
+      frogId: travel.frogId,
+      travelId: travel.id,
+      eventType: 'TravelProgressed',
+      payload: {
+        status: travel.status,
+        currentStage: travel.currentStage,
+        progress: travel.progress,
+        arrivedAt: arrival.toISOString(),
+      },
+      source: 'cross_chain_arrived',
+    });
+  }
+
+  async markCrossChainCompleted(input: MarkCrossChainCompletedInput): Promise<void> {
+    await omniTravelService.onCrossChainTravelCompleted(
+      input.tokenId,
+      input.returnMessageId,
+      input.xpEarned || 0,
+      input.txHash
+    );
+
+    const travel = await prisma.travel.findFirst({
+      where: {
+        frog: { tokenId: input.tokenId },
+        isCrossChain: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        frogId: true,
+        status: true,
+        currentStage: true,
+        progress: true,
+        completedAt: true,
+        crossChainXpEarned: true,
+      },
+    });
+
+    if (!travel) {
+      return;
+    }
+
+    await travelEventService.appendStandalone({
+      frogId: travel.frogId,
+      travelId: travel.id,
+      eventType: 'TravelCompleted',
+      payload: {
+        status: travel.status,
+        currentStage: travel.currentStage,
+        progress: travel.progress,
+        completedAt: travel.completedAt?.toISOString() || null,
+        xpEarned: travel.crossChainXpEarned ?? input.xpEarned ?? 0,
+      },
+      source: 'cross_chain_completed',
+    });
+  }
+
+  async syncCrossChainState(tokenId: number): Promise<void> {
+    await omniTravelService.syncCrossChainTravelState(tokenId);
+  }
+
   async startGroupTravel(input: StartGroupTravelInput): Promise<{
     travelId: number;
     groupTravelId: number;

@@ -5,10 +5,9 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { omniTravelService } from '../../services/omni-travel.service';
 import { logger } from '../../utils/logger';
-import { prisma } from '../../database';
 import { travelCommandServiceV1 } from '../../modules/travel/travel.command';
+import { travelQueryServiceV1 } from '../../modules/travel/travel.query';
 
 const router = Router();
 
@@ -18,7 +17,7 @@ const router = Router();
  */
 router.get('/supported-chains', async (req: Request, res: Response) => {
   try {
-    const chains = omniTravelService.getSupportedChains();
+    const chains = travelQueryServiceV1.getSupportedCrossChains();
     res.json({
       success: true,
       data: chains,
@@ -41,7 +40,7 @@ router.get('/can-travel/:tokenId', async (req: Request, res: Response) => {
     const tokenId = parseInt(req.params.tokenId);
     const targetChainId = parseInt(req.query.targetChainId as string) || 97; // Default BSC Testnet
 
-    const result = await omniTravelService.canStartCrossChainTravel(tokenId, targetChainId);
+    const result = await travelQueryServiceV1.canStartCrossChainTravel(tokenId, targetChainId);
     res.json({
       success: true,
       data: result,
@@ -70,8 +69,11 @@ router.post('/travel', async (req: Request, res: Response) => {
       });
     }
 
-    // Verify eligibility against existing on-chain gate.
-    const eligibility = await omniTravelService.canStartCrossChainTravel(tokenId, targetChainId);
+    // Verify eligibility against existing on-chain gate via unified travel.query.
+    const eligibility = await travelQueryServiceV1.canStartCrossChainTravel(Number(tokenId), Number(targetChainId)) as {
+      canStart: boolean;
+      reason?: string;
+    };
     if (!eligibility.canStart) {
       // FIX: If travel just started on-chain (but not in DB), allow creation
       if (eligibility.reason === 'Travel_Just_Started') {
@@ -130,7 +132,11 @@ router.post('/travel/:travelId/started', async (req: Request, res: Response) => 
       });
     }
 
-    await omniTravelService.onCrossChainTravelStarted(travelId, messageId, txHash);
+    await travelCommandServiceV1.markCrossChainStarted({
+      travelId,
+      messageId,
+      txHash,
+    });
 
     res.json({
       success: true,
@@ -154,11 +160,11 @@ router.post('/travel/:tokenId/arrived', async (req: Request, res: Response) => {
     const tokenId = parseInt(req.params.tokenId);
     const { messageId, arrivalTime } = req.body;
 
-    await omniTravelService.onFrogArrivedAtTarget(
+    await travelCommandServiceV1.markCrossChainArrived({
       tokenId,
       messageId,
-      arrivalTime ? new Date(arrivalTime) : new Date()
-    );
+      arrivalTime: arrivalTime ? new Date(arrivalTime) : new Date(),
+    });
 
     res.json({
       success: true,
@@ -182,12 +188,12 @@ router.post('/travel/:tokenId/completed', async (req: Request, res: Response) =>
     const tokenId = parseInt(req.params.tokenId);
     const { returnMessageId, xpEarned, txHash } = req.body;
 
-    await omniTravelService.onCrossChainTravelCompleted(
+    await travelCommandServiceV1.markCrossChainCompleted({
       tokenId,
       returnMessageId,
-      xpEarned || 0,
-      txHash
-    );
+      xpEarned: xpEarned || 0,
+      txHash,
+    });
 
     res.json({
       success: true,
@@ -210,29 +216,11 @@ router.get('/travel/:tokenId/status', async (req: Request, res: Response) => {
   try {
     const tokenId = parseInt(req.params.tokenId);
 
-    const onChainStatus = await omniTravelService.getCrossChainTravelStatus(tokenId);
-    
-    // Also get database record
-    const dbTravel = await prisma.travel.findFirst({
-      where: {
-        frog: { tokenId },
-        isCrossChain: true,
-        status: { in: ['Active', 'Processing'] },
-      },
-    });
+    const data = await travelQueryServiceV1.getCrossChainStatus(tokenId);
 
     res.json({
       success: true,
-      data: {
-        onChain: onChainStatus,
-        database: dbTravel ? {
-          id: dbTravel.id,
-          status: dbTravel.status,
-          crossChainStatus: dbTravel.crossChainStatus,
-          progress: dbTravel.progress,
-          targetChain: dbTravel.targetChain,
-        } : null,
-      },
+      data,
     });
   } catch (error) {
     logger.error('Error getting travel status:', error);
@@ -252,7 +240,7 @@ router.get('/travel/:tokenId/visiting', async (req: Request, res: Response) => {
     const tokenId = parseInt(req.params.tokenId);
     const targetChainId = parseInt(req.query.targetChainId as string) || 97;
 
-    const result = await omniTravelService.checkVisitingFrogOnChain(tokenId, targetChainId);
+    const result = await travelQueryServiceV1.getCrossChainVisitingStatus(tokenId, targetChainId);
 
     res.json({
       success: true,
@@ -273,20 +261,11 @@ router.get('/travel/:tokenId/visiting', async (req: Request, res: Response) => {
  */
 router.get('/active', async (req: Request, res: Response) => {
   try {
-    const travels = await omniTravelService.getActiveCrossChainTravels();
+    const travels = await travelQueryServiceV1.getActiveCrossChainTravels();
 
     res.json({
       success: true,
-      data: travels.map(t => ({
-        id: t.id,
-        frogTokenId: t.frog.tokenId,
-        frogName: t.frog.name,
-        targetChain: t.targetChain,
-        crossChainStatus: t.crossChainStatus,
-        progress: t.progress,
-        startTime: t.startTime,
-        endTime: t.endTime,
-      })),
+      data: travels,
     });
   } catch (error) {
     logger.error('Error getting active travels:', error);
@@ -305,7 +284,7 @@ router.post('/sync/:tokenId', async (req: Request, res: Response) => {
   try {
     const tokenId = parseInt(req.params.tokenId);
 
-    await omniTravelService.syncCrossChainTravelState(tokenId);
+    await travelCommandServiceV1.syncCrossChainState(tokenId);
 
     res.json({
       success: true,
@@ -327,85 +306,11 @@ router.post('/sync/:tokenId', async (req: Request, res: Response) => {
 router.get('/travel/:travelId/discoveries', async (req: Request, res: Response) => {
   try {
     const travelId = parseInt(req.params.travelId);
-
-    // Get travel record with discoveries
-    const travel = await prisma.travel.findUnique({
-      where: { id: travelId },
-      include: {
-        discoveries: {
-          orderBy: { createdAt: 'desc' },
-        },
-        frog: true,
-      },
-    });
-
-    if (!travel) {
-      return res.status(404).json({
-        success: false,
-        error: 'Travel not found',
-      });
-    }
-
-    // Format discoveries
-    const discoveries = travel.discoveries.map(d => ({
-      id: d.id,
-      type: d.type,
-      title: d.title,
-      description: d.description,
-      rarity: d.rarity,
-      blockNumber: d.blockNumber,
-      createdAt: d.createdAt,
-    }));
-
-    // Get on-chain stats - try to get real data from CrossChainMessage or transaction
-    let gasUsed: string | null = null;
-    let exploredBlock = travel.exploredBlock ? Number(travel.exploredBlock) : null;
-    
-    // Try to get gasUsed from CrossChainMessage table
-    if (travel.crossChainMessageId) {
-      const crossChainMessage = await prisma.crossChainMessage.findUnique({
-        where: { messageId: travel.crossChainMessageId },
-      });
-      if (crossChainMessage?.gasUsed) {
-        gasUsed = crossChainMessage.gasUsed;
-      }
-    }
-    
-    // Try to get block number from TravelInteraction if not available
-    if (!exploredBlock) {
-      const latestInteraction = await prisma.travelInteraction.findFirst({
-        where: { travelId: travel.id },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (latestInteraction?.blockNumber) {
-        exploredBlock = Number(latestInteraction.blockNumber);
-      }
-    }
-
-    const onChainStats = {
-      exploredBlock,
-      gasUsed: gasUsed || null, // Return null if no real data, frontend will handle
-      targetChain: travel.targetChain,
-      exploredAddress: (travel.exploredSnapshot as any)?.address || travel.targetWallet,
-    };
+    const data = await travelQueryServiceV1.getCrossChainDiscoveries(travelId);
 
     res.json({
       success: true,
-      data: {
-        discoveries,
-        onChainStats,
-        summary: {
-          total: discoveries.length,
-          byType: discoveries.reduce((acc, d) => {
-            acc[d.type] = (acc[d.type] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>),
-          byRarity: discoveries.reduce((acc, d) => {
-            acc[d.rarity] = (acc[d.rarity] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>),
-        },
-      },
+      data,
     });
   } catch (error) {
     logger.error('Error getting discoveries:', error);

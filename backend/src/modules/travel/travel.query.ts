@@ -6,6 +6,7 @@ import { toTravelMachineState } from './travel-state-machine';
 import { travelQueryService } from '../../services/travel/travel-query.service';
 import { rescueService } from '../../services/travel/rescue.service';
 import { travelFeedService } from '../../services/travel/travel-feed.service';
+import { omniTravelService } from '../../services/omni-travel.service';
 
 type TravelWithRelations = Prisma.TravelGetPayload<{
   include: {
@@ -148,6 +149,29 @@ export interface TravelStatsReadModel {
   recentTravel: unknown | null;
 }
 
+export interface CrossChainDiscoveriesReadModel {
+  discoveries: Array<{
+    id: number;
+    type: string;
+    title: string;
+    description: string;
+    rarity: number;
+    blockNumber: string | null;
+    createdAt: string;
+  }>;
+  onChainStats: {
+    exploredBlock: number | null;
+    gasUsed: string | null;
+    targetChain: string;
+    exploredAddress: string;
+  };
+  summary: {
+    total: number;
+    byType: Record<string, number>;
+    byRarity: Record<string, number>;
+  };
+}
+
 const parseJournal = (raw: string | null): ParsedJournal | null => {
   if (!raw) {
     return null;
@@ -252,6 +276,152 @@ const toReadModel = (travel: TravelWithRelations): TravelReadModel => {
 };
 
 export class TravelQueryServiceV1 {
+  getSupportedCrossChains(): { chainId: number; name: string; chainType: string }[] {
+    return omniTravelService.getSupportedChains();
+  }
+
+  async canStartCrossChainTravel(tokenId: number, targetChainId: number): Promise<unknown> {
+    return omniTravelService.canStartCrossChainTravel(tokenId, targetChainId);
+  }
+
+  async getCrossChainStatus(tokenId: number): Promise<{
+    onChain: unknown;
+    database: {
+      id: number;
+      status: string;
+      crossChainStatus: string | null;
+      progress: number;
+      targetChain: string;
+    } | null;
+  }> {
+    const onChain = await omniTravelService.getCrossChainTravelStatus(tokenId);
+    const database = await prisma.travel.findFirst({
+      where: {
+        frog: { tokenId },
+        isCrossChain: true,
+        status: { in: ['Active', 'Processing'] },
+      },
+      select: {
+        id: true,
+        status: true,
+        crossChainStatus: true,
+        progress: true,
+        targetChain: true,
+      },
+    });
+
+    return {
+      onChain,
+      database: database
+        ? {
+            id: database.id,
+            status: database.status,
+            crossChainStatus: database.crossChainStatus,
+            progress: database.progress,
+            targetChain: database.targetChain,
+          }
+        : null,
+    };
+  }
+
+  async getCrossChainVisitingStatus(tokenId: number, targetChainId: number): Promise<unknown> {
+    return omniTravelService.checkVisitingFrogOnChain(tokenId, targetChainId);
+  }
+
+  async getActiveCrossChainTravels(): Promise<
+    Array<{
+      id: number;
+      frogTokenId: number;
+      frogName: string;
+      targetChain: string;
+      crossChainStatus: string | null;
+      progress: number;
+      startTime: Date;
+      endTime: Date;
+    }>
+  > {
+    const travels = await omniTravelService.getActiveCrossChainTravels();
+    return travels.map((t) => ({
+      id: t.id,
+      frogTokenId: t.frog.tokenId,
+      frogName: t.frog.name,
+      targetChain: t.targetChain,
+      crossChainStatus: t.crossChainStatus,
+      progress: t.progress,
+      startTime: t.startTime,
+      endTime: t.endTime,
+    }));
+  }
+
+  async getCrossChainDiscoveries(travelId: number): Promise<CrossChainDiscoveriesReadModel> {
+    const travel = await prisma.travel.findUnique({
+      where: { id: travelId },
+      include: {
+        discoveries: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!travel) {
+      throw new AppError(404, 'Travel not found', 'NOT_FOUND');
+    }
+
+    let gasUsed: string | null = null;
+    let exploredBlock = travel.exploredBlock ? Number(travel.exploredBlock) : null;
+
+    if (travel.crossChainMessageId) {
+      const crossChainMessage = await prisma.crossChainMessage.findUnique({
+        where: { messageId: travel.crossChainMessageId },
+      });
+      if (crossChainMessage?.gasUsed) {
+        gasUsed = crossChainMessage.gasUsed;
+      }
+    }
+
+    if (!exploredBlock) {
+      const latestInteraction = await prisma.travelInteraction.findFirst({
+        where: { travelId: travel.id },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (latestInteraction?.blockNumber) {
+        exploredBlock = Number(latestInteraction.blockNumber);
+      }
+    }
+
+    const discoveries = travel.discoveries.map((d) => ({
+      id: d.id,
+      type: d.type,
+      title: d.title,
+      description: d.description,
+      rarity: d.rarity,
+      blockNumber: d.blockNumber?.toString() || null,
+      createdAt: d.createdAt.toISOString(),
+    }));
+
+    return {
+      discoveries,
+      onChainStats: {
+        exploredBlock,
+        gasUsed: gasUsed || null,
+        targetChain: travel.targetChain,
+        exploredAddress: ((travel.exploredSnapshot as any)?.address as string) || travel.targetWallet,
+      },
+      summary: {
+        total: discoveries.length,
+        byType: discoveries.reduce((acc, d) => {
+          acc[d.type] = (acc[d.type] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+        byRarity: discoveries.reduce((acc, d) => {
+          const key = String(d.rarity);
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+      },
+    };
+  }
+
   async getLegacyHistory(params: {
     walletAddress: string;
     frogTokenId?: number;
