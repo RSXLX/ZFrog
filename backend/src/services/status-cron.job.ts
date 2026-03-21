@@ -9,8 +9,11 @@
 
 import cron from 'node-cron';
 import { prisma } from '../database';
-import { calculateFrogLevel, EVOLUTION_CONFIG } from './evolution.service';
+import { calculateFrogLevel } from './evolution.service';
 import * as notificationService from './notification.service';
+import { lifeCommandService } from '../modules/life/life.command';
+import { lifeQueryService } from '../modules/life/life.query';
+import { dormancyService } from '../modules/life/dormancy.service';
 
 // 配置
 const CONFIG = {
@@ -33,30 +36,31 @@ async function checkSickness() {
   const twoHoursAgo = new Date(Date.now() - CONFIG.sickDurationHours * 60 * 60 * 1000);
   
   try {
-    // 找到健康度低且未生病的青蛙
+    // 找到可能需要标记生病的青蛙
     const atRiskFrogs = await prisma.frog.findMany({
       where: {
-        health: { lt: CONFIG.sickThreshold },
         isSick: false,
         lastStatusUpdate: { lt: twoHoursAgo },
       },
       select: {
         id: true,
         name: true,
-        health: true,
-        lastStatusUpdate: true,
       },
     });
 
     for (const frog of atRiskFrogs) {
+      const life = await lifeQueryService.getLifeByFrogId(frog.id);
+      if (life.health >= CONFIG.sickThreshold) {
+        continue;
+      }
+
       console.log(`🤒 青蛙 ${frog.name} (ID: ${frog.id}) 健康度过低，标记为生病`);
-      
-      await prisma.frog.update({
-        where: { id: frog.id },
-        data: {
-          isSick: true,
-          sickSince: new Date(),
-        },
+
+      await lifeCommandService.applyDelta({
+        frogId: frog.id,
+        setIsSick: true,
+        sickSince: new Date(),
+        source: 'status-cron.sickness',
       });
     }
 
@@ -96,13 +100,12 @@ async function triggerPoopEvents() {
       
       if (Math.random() < poopChance) {
         console.log(`💩 青蛙 ${frog.name} (ID: ${frog.id}) 触发排泄事件`);
-        
-        await prisma.frog.update({
-          where: { id: frog.id },
-          data: {
-            needsClean: true,
-            cleanliness: { decrement: 30 },
-          },
+
+        await lifeCommandService.applyDelta({
+          frogId: frog.id,
+          cleanlinessDelta: -30,
+          setNeedsClean: true,
+          source: 'status-cron.poop',
         });
       }
     }
@@ -127,17 +130,12 @@ async function updateEvolutionEligibility() {
         id: true,
         name: true,
         totalTravels: true,
-        happiness: true,
-        health: true,
       },
     });
 
     for (const frog of unevolveFrogs) {
-      const level = calculateFrogLevel(
-        frog.totalTravels,
-        frog.happiness ?? 50,
-        frog.health ?? 100
-      );
+      const life = await lifeQueryService.getLifeByFrogId(frog.id);
+      const level = calculateFrogLevel(frog.totalTravels, life.happiness, life.health);
 
       if (level >= CONFIG.evolutionLevel) {
         console.log(`✨ 青蛙 ${frog.name} (ID: ${frog.id}) 达到进化条件，等级: ${level}`);
@@ -203,21 +201,23 @@ async function nightlyEnergyRecovery() {
       select: {
         id: true,
         name: true,
-        energy: true,
       },
     });
 
     for (const frog of frogsToRecover) {
-      const newEnergy = Math.min(100, frog.energy + 30);
-      
-      console.log(`😴 青蛙 ${frog.name} (ID: ${frog.id}) 夜间休息，能量 ${frog.energy} → ${newEnergy}`);
-      
-      await prisma.frog.update({
-        where: { id: frog.id },
-        data: {
-          energy: newEnergy,
-          lastStatusUpdate: now,
-        },
+      const life = await lifeQueryService.getLifeByFrogId(frog.id);
+      const gain = Math.min(30, Math.max(0, 100 - life.energy));
+      if (gain <= 0) {
+        continue;
+      }
+
+      const newEnergy = life.energy + gain;
+      console.log(`😴 青蛙 ${frog.name} (ID: ${frog.id}) 夜间休息，能量 ${life.energy} → ${newEnergy}`);
+
+      await lifeCommandService.applyDelta({
+        frogId: frog.id,
+        energyDelta: gain,
+        source: 'status-cron.nightly_energy',
       });
     }
 
@@ -280,8 +280,6 @@ async function checkStatusWarnings() {
   }
 }
 
-import { hibernationService } from './hibernation.service';
-
 /**
  * 主定时任务 - 每 5 分钟执行一次
  */
@@ -295,7 +293,7 @@ async function runStatusCron() {
     resetDailyLimits(),
     nightlyEnergyRecovery(),
     checkStatusWarnings(), // P4: 状态警告检测
-    hibernationService.batchCheckHibernation(), // V4.0: 冬眠状态检测
+    dormancyService.batchCheckDormancy(), // V4.0: 冬眠状态检测
   ]);
   
   console.log(`[StatusCron] 定时任务执行完成`);

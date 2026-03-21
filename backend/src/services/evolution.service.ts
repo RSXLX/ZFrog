@@ -5,6 +5,8 @@
  */
 
 import { prisma } from '../database';
+import { lifeCommandService } from '../modules/life/life.command';
+import { lifeQueryService } from '../modules/life/life.query';
 
 // 进化类型定义
 export type EvolutionType = 'explorer' | 'scholar' | 'social';
@@ -72,11 +74,8 @@ export async function checkEvolutionEligibility(frogId: number): Promise<{
     };
   }
 
-  const currentLevel = calculateFrogLevel(
-    frog.totalTravels,
-    frog.happiness ?? 50,
-    frog.health ?? 100
-  );
+  const life = await lifeQueryService.getLifeByFrogId(frogId);
+  const currentLevel = calculateFrogLevel(frog.totalTravels, life.happiness, life.health);
 
   // 已经进化过
   if (frog.evolutionType) {
@@ -146,9 +145,13 @@ export async function evolve(frogId: number, evolutionType: EvolutionType): Prom
       where: { id: frogId },
       data: {
         evolutionType: evolutionType,
-        // 进化后幸福度+20
-        happiness: { increment: 20 },
       },
+    });
+    await lifeCommandService.applyDelta({
+      frogId,
+      happinessDelta: 20,
+      touchCare: true,
+      source: 'evolution.service.evolve',
     });
 
     const bonus = EVOLUTION_CONFIG.bonuses[evolutionType];

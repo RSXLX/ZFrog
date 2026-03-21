@@ -7,6 +7,7 @@ import {
   applyLifeDecay,
   calculateRestRecovery,
   clampLifeStat,
+  deriveMood,
   LifeComputedState,
   LifeSnapshot,
   resolveHibernationStatus,
@@ -44,6 +45,21 @@ interface PlayInput extends FrogLookup {
 interface LifeActionInput extends FrogLookup {
   source?: string;
   requestId?: string;
+}
+
+interface LifeDeltaInput extends LifeActionInput {
+  hungerDelta?: number;
+  happinessDelta?: number;
+  cleanlinessDelta?: number;
+  healthDelta?: number;
+  energyDelta?: number;
+  setIsSick?: boolean;
+  setNeedsClean?: boolean;
+  setIsDormant?: boolean;
+  setHibernationStatus?: HibernationStatus;
+  sickSince?: Date | null;
+  touchInteraction?: boolean;
+  touchCare?: boolean;
 }
 
 interface BlessDormancyInput {
@@ -169,6 +185,21 @@ export class LifeCommandService {
     return base + bonus;
   }
 
+  private recomputeMood(state: LifeComputedState): LifeComputedState {
+    return {
+      ...state,
+      mood: deriveMood({
+        hunger: state.hunger,
+        happiness: state.happiness,
+        cleanliness: state.cleanliness,
+        health: state.health,
+        energy: state.energy,
+        isSick: state.isSick,
+        hibernationStatus: state.hibernationStatus,
+      }),
+    };
+  }
+
   private async writeDomainEvent(
     tx: Tx,
     frogId: number,
@@ -276,11 +307,86 @@ export class LifeCommandService {
   async syncLifeState(input: FrogLookup): Promise<LifeStateResult> {
     return prisma.$transaction(async (tx) => {
       const frog = await this.getFrogForWrite(tx, input);
-      const computed = applyLifeDecay(toLifeSnapshot(frog));
+      const computed = this.recomputeMood(applyLifeDecay(toLifeSnapshot(frog)));
       await this.persistState(tx, frog, computed, {
         now: new Date(),
       });
       return toLifeStateResult(computed);
+    });
+  }
+
+  async applyDelta(input: LifeDeltaInput): Promise<LifeStateResult> {
+    return prisma.$transaction(async (tx) => {
+      const frog = await this.getFrogForWrite(tx, input);
+      const now = new Date();
+      const computed = applyLifeDecay(toLifeSnapshot(frog), now);
+
+      let nextState: LifeComputedState = {
+        ...computed,
+        hunger: clampLifeStat(computed.hunger + (input.hungerDelta || 0)),
+        happiness: clampLifeStat(computed.happiness + (input.happinessDelta || 0)),
+        cleanliness: clampLifeStat(computed.cleanliness + (input.cleanlinessDelta || 0)),
+        health: clampLifeStat(computed.health + (input.healthDelta || 0)),
+        energy: clampLifeStat(computed.energy + (input.energyDelta || 0)),
+      };
+
+      if (input.setIsSick !== undefined) {
+        nextState.isSick = input.setIsSick;
+      }
+      if (input.setNeedsClean !== undefined) {
+        nextState.needsClean = input.setNeedsClean;
+      }
+      if (input.setHibernationStatus) {
+        nextState.hibernationStatus = input.setHibernationStatus;
+      }
+      if (input.setIsDormant !== undefined) {
+        nextState.isDormant = input.setIsDormant;
+      }
+
+      nextState = this.recomputeMood(nextState);
+
+      await this.persistState(tx, frog, nextState, {
+        now,
+        hibernationStatus: input.setHibernationStatus,
+        lastInteractedAt: input.touchInteraction ? now : undefined,
+        lastCareAt: input.touchCare ? now : undefined,
+        sickSince: input.sickSince,
+      });
+
+      await this.writeDomainEvent(
+        tx,
+        frog.id,
+        'PetStateUpdated',
+        {
+          action: 'delta',
+          source: input.source || 'unknown',
+          delta: {
+            hunger: input.hungerDelta || 0,
+            happiness: input.happinessDelta || 0,
+            cleanliness: input.cleanlinessDelta || 0,
+            health: input.healthDelta || 0,
+            energy: input.energyDelta || 0,
+          },
+        },
+        input.requestId,
+        'life.command.delta'
+      );
+
+      if (nextState.needsClean) {
+        await this.writeDomainEvent(
+          tx,
+          frog.id,
+          'PetNeedsCare',
+          {
+            reason: 'needs_clean',
+            cleanliness: nextState.cleanliness,
+          },
+          input.requestId,
+          'life.command.delta'
+        );
+      }
+
+      return toLifeStateResult(nextState);
     });
   }
 
@@ -311,7 +417,7 @@ export class LifeCommandService {
       const now = new Date();
       const computed = applyLifeDecay(toLifeSnapshot(frog), now);
 
-      const nextState: LifeComputedState = {
+      let nextState: LifeComputedState = {
         ...computed,
         hunger: clampLifeStat(computed.hunger + foodEffects.hunger * quantity),
         energy: clampLifeStat(computed.energy + foodEffects.energy * quantity),
@@ -319,6 +425,7 @@ export class LifeCommandService {
         isDormant: false,
         hibernationStatus: 'ACTIVE',
       };
+      nextState = this.recomputeMood(nextState);
 
       await this.persistState(tx, frog, nextState, {
         now,
@@ -371,13 +478,14 @@ export class LifeCommandService {
       const now = new Date();
       const computed = applyLifeDecay(toLifeSnapshot(frog), now);
 
-      const nextState: LifeComputedState = {
+      let nextState: LifeComputedState = {
         ...computed,
         cleanliness: 100,
         needsClean: false,
         isDormant: false,
         hibernationStatus: 'ACTIVE',
       };
+      nextState = this.recomputeMood(nextState);
 
       await this.persistState(tx, frog, nextState, {
         now,
@@ -420,13 +528,14 @@ export class LifeCommandService {
           ? Math.max(0, Math.floor(input.happinessGainOverride))
           : this.resolvePlayGain(gameType, input.score);
 
-      const nextState: LifeComputedState = {
+      let nextState: LifeComputedState = {
         ...computed,
         happiness: clampLifeStat(computed.happiness + happinessGain),
         energy: clampLifeStat(computed.energy - 3),
         isDormant: false,
         hibernationStatus: 'ACTIVE',
       };
+      nextState = this.recomputeMood(nextState);
 
       await this.persistState(tx, frog, nextState, {
         now,
@@ -464,11 +573,12 @@ export class LifeCommandService {
       const now = new Date();
       const computed = applyLifeDecay(toLifeSnapshot(frog), now);
 
-      const nextState: LifeComputedState = {
+      let nextState: LifeComputedState = {
         ...computed,
         health: clampLifeStat(computed.health + 50),
         isSick: false,
       };
+      nextState = this.recomputeMood(nextState);
 
       await this.persistState(tx, frog, nextState, {
         now,
@@ -545,10 +655,11 @@ export class LifeCommandService {
       const computed = applyLifeDecay(toLifeSnapshot(frog), now);
       const energyGain = calculateRestRecovery(frog.restingSince, now);
 
-      const nextState: LifeComputedState = {
+      let nextState: LifeComputedState = {
         ...computed,
         energy: clampLifeStat(computed.energy + energyGain),
       };
+      nextState = this.recomputeMood(nextState);
 
       await this.persistState(tx, frog, nextState, {
         now,
@@ -594,11 +705,12 @@ export class LifeCommandService {
       }
 
       const computed = applyLifeDecay(toLifeSnapshot(frog), now);
-      const nextState: LifeComputedState = {
+      let nextState: LifeComputedState = {
         ...computed,
         isDormant: targetStatus === 'SLEEPING',
         hibernationStatus: targetStatus,
       };
+      nextState = this.recomputeMood(nextState);
 
       await this.persistState(tx, frog, nextState, {
         now,
@@ -642,7 +754,7 @@ export class LifeCommandService {
       }
 
       const computed = applyLifeDecay(toLifeSnapshot(frog), now);
-      const nextState: LifeComputedState = {
+      let nextState: LifeComputedState = {
         ...computed,
         hunger: clampLifeStat(Math.max(computed.hunger, 50)),
         happiness: clampLifeStat(Math.max(computed.happiness, 50)),
@@ -652,6 +764,7 @@ export class LifeCommandService {
         isDormant: false,
         hibernationStatus: 'ACTIVE',
       };
+      nextState = this.recomputeMood(nextState);
 
       await this.persistState(tx, frog, nextState, {
         now,
