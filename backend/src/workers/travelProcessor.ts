@@ -22,6 +22,7 @@ import { affinityService } from '../services/friend/affinity.service';
 import { chainMaterialService } from '../services/travel/chain-material.service';
 import { rescueService } from '../services/travel/rescue.service';
 import type { Server } from 'socket.io';
+import { travelEventService } from '../modules/travel/travel-events';
 
 // 定义 ZetaChain Athens Testnet
 const zetachainAthens = {
@@ -836,6 +837,21 @@ class TravelProcessor {
                 });
             }
 
+            await travelEventService.appendStandalone({
+                frogId: frog.id,
+                travelId,
+                eventType: 'TravelCompleted',
+                payload: {
+                    status: TravelStatus.Completed,
+                    currentStage: TravelStage.RETURNING,
+                    progress: 100,
+                    journalHash,
+                    souvenirId: dbSouvenirId || null,
+                    chainId,
+                },
+                source: 'travel_processor',
+            });
+
             logger.info(`Travel ${travelId} completed successfully`);
 
         } catch (error) {
@@ -849,6 +865,17 @@ class TravelProcessor {
             await prisma.frog.update({
                 where: { id: travel.frog.id },
                 data: { status: FrogStatus.Idle },
+            });
+
+            await travelEventService.appendStandalone({
+                frogId: travel.frog.id,
+                travelId,
+                eventType: 'TravelFailed',
+                payload: {
+                    status: TravelStatus.Failed,
+                    reason: error instanceof Error ? error.message : 'unknown',
+                },
+                source: 'travel_processor',
             });
         }
     }
@@ -929,9 +956,27 @@ class TravelProcessor {
     }
 
     private async updateTravelStage(travelId: number, stage: TravelStage, progress: number) {
-        await prisma.travel.update({
+        const updated = await prisma.travel.update({
             where: { id: travelId },
             data: { currentStage: stage, progress },
+            select: {
+                frogId: true,
+                status: true,
+                currentStage: true,
+                progress: true,
+            },
+        });
+
+        await travelEventService.appendStandalone({
+            frogId: updated.frogId,
+            travelId,
+            eventType: 'TravelProgressed',
+            payload: {
+                status: updated.status,
+                currentStage: updated.currentStage,
+                progress: updated.progress,
+            },
+            source: 'travel_processor',
         });
     }
 

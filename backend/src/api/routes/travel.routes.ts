@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { prisma } from '../../database';
 import { TravelStatus } from '@prisma/client';
-import { travelP0Service } from '../../services/travel/travel-p0.service';
 import { explorationService } from '../../services/travel/exploration.service';
 import { ChainKey, SUPPORTED_CHAINS, getRandomTargetChain, getChainKey } from '../../config/chains';
 import { travelProcessor } from '../../workers/travelProcessor';
 import { logger } from '../../utils/logger';
 import { parsePositiveInt, parseNonNegativeInt, isValidDuration } from '../../utils/validation';
+import { travelCommandServiceV1 } from '../../modules/travel/travel.command';
+import { travelQueryServiceV1 } from '../../modules/travel/travel.query';
 
 // 递归处理 BigInt 序列化问题
 // ... (原有代码)
@@ -650,67 +651,35 @@ router.get('/:travelId/trajectory', async (req, res) => {
 router.get('/journal/:travelId', async (req, res) => {
     try {
         const travelId = parseInt(req.params.travelId);
-        
-        const travel = await prisma.travel.findUnique({
-            where: { id: travelId },
-            include: {
-                frog: true,
-                souvenir: true,
-            },
-        });
-        
-        if (!travel || !travel.journalContent) {
+        if (isNaN(travelId)) {
+            return res.status(400).json({ error: 'Invalid travel ID' });
+        }
+
+        const detail = await travelQueryServiceV1.getTravel({ travelId });
+        if (!detail.journal) {
             return res.status(404).json({ error: 'Journal not found' });
         }
-        
-        let journal = null;
-        try {
-            if (travel.journalContent) {
-                journal = JSON.parse(travel.journalContent);
-            }
-        } catch (e) {
-            journal = { 
-                title: '旅行回顾',
-                content: travel.journalContent,
-                mood: 'happy',
-                highlights: []
-            };
-        }
 
-        // Fetch discoveries from DB
-        let discoveries = await prisma.travelDiscovery.findMany({
-            where: { travelId },
-            orderBy: { createdAt: 'desc' }
-        });
-
-        // Fallback: If DB is empty, try to use the JSON snapshot (Legacy or Cross-Chain fallback)
-        if (discoveries.length === 0 && travel.exploredSnapshot) {
-            const snapshot = travel.exploredSnapshot as any;
-            if (snapshot && Array.isArray(snapshot.discoveries) && snapshot.discoveries.length > 0) {
-                discoveries = snapshot.discoveries;
-                // Ensure dates are stringified if needed, but usually JSON is parsed as objects
-            }
-        }
-
-        res.json({
-            success: true,
-            data: stringifyBigInt({
-                id: travel.id,
-                frogName: travel.frog.name,
-                journalHash: travel.journalHash,
-                journal,
-                souvenir: travel.souvenir,
-                completedAt: travel.completedAt,
-                exploredBlock: travel.exploredBlock?.toString(),
-                exploredSnapshot: {
-                    discoveries: discoveries
+        res.json(
+            stringifyBigInt({
+                success: true,
+                data: {
+                    id: detail.travelId,
+                    frogName: detail.frogName,
+                    journalHash: null,
+                    journal: detail.journal,
+                    souvenir: detail.souvenir,
+                    completedAt: detail.completedAt,
+                    exploredBlock: null,
+                    exploredSnapshot: {
+                        discoveries: detail.discoveries,
+                    },
+                    status: detail.status,
+                    chainId: detail.chainId,
+                    targetWallet: detail.targetWallet,
                 },
-                // Include other travel fields
-                status: travel.status,
-                chainId: travel.chainId,
-                targetWallet: travel.targetWallet
             })
-        });
+        );
         
     } catch (error) {
         console.error('Error fetching journal:', error);
@@ -725,68 +694,81 @@ router.get('/journal/:travelId', async (req, res) => {
 router.post('/start', async (req, res) => {
     try {
         const { frogId, travelType = 'RANDOM', targetChain: inputChain, targetAddress, duration } = req.body;
-        
-        // 如果未传入目标链，随机选择一个
         const targetChain = inputChain || getRandomTargetChain();
-        
-        logger.info(`[TravelAPI] POST /start: frogId=${frogId}, type=${travelType}, chain=${targetChain}${!inputChain ? ' (random)' : ''}, duration=${duration}`);
-        
+
+        logger.info(
+            `[TravelAPI] POST /start: frogId=${frogId}, type=${travelType}, chain=${targetChain}${!inputChain ? ' (random)' : ''}, duration=${duration}`
+        );
+
         if (!frogId) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'frogId is required' 
+            return res.status(400).json({
+                success: false,
+                error: 'frogId is required',
             });
         }
-        
-        // 根据tokenId查找青蛙的数据库id
+
+        const tokenId = parseInt(String(frogId), 10);
+        if (Number.isNaN(tokenId) || tokenId < 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'frogId must be a valid tokenId',
+            });
+        }
+
         const frog = await prisma.frog.findUnique({
-            where: { tokenId: parseInt(frogId) },
+            where: { tokenId },
+            select: {
+                id: true,
+                tokenId: true,
+                ownerAddress: true,
+            },
         });
-        
+
         if (!frog) {
-            return res.status(404).json({ 
-                success: false, 
-                error: 'Frog not found' 
+            return res.status(404).json({
+                success: false,
+                error: 'Frog not found',
             });
         }
-        
-        // 如果是随机探索且没有提供目标地址，使用零地址
-        const finalTargetAddress = travelType === 'RANDOM' && !targetAddress 
-            ? '0x0000000000000000000000000000000000000000' 
-            : targetAddress;
-        
-        const chainConfig = SUPPORTED_CHAINS[targetChain as ChainKey];
-        
-        // 创建旅行记录
-        const travel = await prisma.travel.create({
-            data: {
-                frogId: frog.id,
-                targetWallet: finalTargetAddress,
-                chainId: chainConfig?.chainId || 7001,
-                status: TravelStatus.Active,
-                startTime: new Date(),
-                endTime: new Date(Date.now() + (duration || 60) * 1000), // 默认60秒
-                isRandom: travelType === 'RANDOM',
-            },
-            include: {
-                frog: true,
-            },
+
+        const parsedDuration = duration ? parseInt(String(duration), 10) : undefined;
+        const normalizedType = String(travelType).toLowerCase() === 'specific' ? 'specific' : 'random';
+
+        const startResult = await travelCommandServiceV1.startTravel({
+            frogId: frog.id,
+            walletAddress: frog.ownerAddress,
+            travelType: normalizedType,
+            targetChain,
+            targetAddress,
+            duration: Number.isNaN(parsedDuration as number) ? undefined : parsedDuration,
+            source: 'legacy_travel_start',
         });
-        
-        // 启动后台处理
-        travelProcessor.processTravel(travel).catch((error: any) => {
-            logger.error(`Failed to process travel ${travel.id}:`, error);
+
+        const chainConfig =
+            SUPPORTED_CHAINS[(startResult.targetChain as ChainKey) || getChainKey(startResult.chainId)] || null;
+        const chainName = chainConfig?.displayName || String(startResult.targetChain);
+
+        const createdTravel = await prisma.travel.findUnique({
+            where: { id: startResult.travelId },
+            include: { frog: true },
         });
-        
+
+        if (createdTravel) {
+            travelProcessor.processTravel(createdTravel).catch((error: any) => {
+                logger.error(`Failed to process travel ${createdTravel.id}:`, error);
+            });
+        }
+
         res.json({
             success: true,
             data: {
-                travelId: travel.id,
-                txHash: '0x' + Math.random().toString(16).slice(2, 66), // 临时模拟hash
-                targetChain: targetChain,
-                chainName: chainConfig?.displayName || targetChain,
+                travelId: startResult.travelId,
+                targetChain: startResult.targetChain,
+                chainName,
+                status: startResult.status,
+                currentStage: startResult.currentStage,
             },
-            message: `🐸 青蛙背上小书包出发去${chainConfig?.displayName || targetChain}啦！`,
+            message: `🐸 青蛙背上小书包出发去${chainName}啦！`,
         });
         
     } catch (error: any) {
@@ -805,49 +787,88 @@ router.post('/start', async (req, res) => {
 router.post('/start-p0', async (req, res) => {
     try {
         const { frogId, travelType = 'RANDOM', targetChain: inputChain, targetAddress, duration } = req.body;
-        
-        // 如果未传入目标链，随机选择一个
         const targetChain = inputChain || getRandomTargetChain();
-        
-        logger.info(`[TravelAPI] POST /start-p0: frogId=${frogId}, type=${travelType}, chain=${targetChain}${!inputChain ? ' (random)' : ''}, duration=${duration}`);
-        
+
+        logger.info(
+            `[TravelAPI] POST /start-p0: frogId=${frogId}, type=${travelType}, chain=${targetChain}${!inputChain ? ' (random)' : ''}, duration=${duration}`
+        );
+
         if (!frogId) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'frogId is required' 
+            return res.status(400).json({
+                success: false,
+                error: 'frogId is required',
             });
         }
-        
-        // 根据tokenId查找青蛙的数据库id
+
+        const tokenId = parseInt(String(frogId), 10);
+        if (Number.isNaN(tokenId) || tokenId < 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'frogId must be a valid tokenId',
+            });
+        }
+
         const frog = await prisma.frog.findUnique({
-            where: { tokenId: parseInt(frogId) },
+            where: { tokenId },
+            select: {
+                id: true,
+                ownerAddress: true,
+            },
         });
-        
+
         if (!frog) {
-            return res.status(404).json({ 
-                success: false, 
-                error: 'Frog not found' 
+            return res.status(404).json({
+                success: false,
+                error: 'Frog not found',
             });
         }
-        
-        const result = await travelP0Service.startTravel({
-            frogId: frog.id, // 使用数据库id
-            travelType: travelType as 'RANDOM' | 'SPECIFIC',
-            targetChain: targetChain as ChainKey,
+
+        const parsedDuration = duration ? parseInt(String(duration), 10) : 120;
+        const normalizedType = String(travelType).toLowerCase() === 'specific' ? 'specific' : 'random';
+
+        const result = await travelCommandServiceV1.startTravel({
+            frogId: frog.id,
+            walletAddress: frog.ownerAddress,
+            travelType: normalizedType,
+            targetChain,
             targetAddress,
-            duration: duration ? parseInt(duration) : undefined,
+            duration: Number.isNaN(parsedDuration) ? 120 : parsedDuration,
+            source: 'legacy_travel_start_p0',
         });
-        
-        const chainConfig = SUPPORTED_CHAINS[targetChain as ChainKey];
-        
+
+        const chainConfig =
+            SUPPORTED_CHAINS[(result.targetChain as ChainKey) || getChainKey(result.chainId)] || null;
+        const chainName = chainConfig?.displayName || String(result.targetChain);
+
+        const delay = Number.isNaN(parsedDuration) ? 120 : parsedDuration;
+        setTimeout(() => {
+            prisma.travel
+                .findUnique({
+                    where: { id: result.travelId },
+                    include: { frog: true },
+                })
+                .then((travel) => {
+                    if (!travel) {
+                        return;
+                    }
+                    return travelProcessor.processTravel(travel);
+                })
+                .catch((error) => {
+                    logger.error(`Failed to process delayed P0 travel ${result.travelId}:`, error);
+                });
+        }, delay * 1000);
+
         res.json({
             success: true,
             data: {
-                ...result,
-                targetChain: targetChain,
-                chainName: chainConfig?.displayName || targetChain,
+                travelId: result.travelId,
+                estimatedDuration: delay,
+                targetChain: result.targetChain,
+                chainName,
+                status: result.status,
+                currentStage: result.currentStage,
             },
-            message: `🐸 青蛙背上小书包出发去${chainConfig?.displayName || targetChain}啦！`,
+            message: `🐸 青蛙背上小书包出发去${chainName}啦！`,
         });
         
     } catch (error: any) {
@@ -866,82 +887,39 @@ router.post('/start-p0', async (req, res) => {
 router.get('/p0/:travelId', async (req, res) => {
     try {
         const travelId = parseInt(req.params.travelId);
-        
-        const travel = await prisma.travel.findUnique({
-            where: { id: travelId },
-        });
-        
-        if (!travel) {
-            return res.status(404).json({
+        if (isNaN(travelId)) {
+            return res.status(400).json({
                 success: false,
-                error: '找不到这次旅行',
+                error: 'Invalid travel ID',
             });
         }
-        
-        // 解析 P0 数据 (Improved Logic)
-        // Fetch discoveries from DB
-        let discoveries = await prisma.travelDiscovery.findMany({
-            where: { travelId },
-            orderBy: { createdAt: 'desc' }
-        });
 
-        // Fallback: If DB is empty, try to use the JSON snapshot (Legacy or Cross-Chain fallback)
-        if (discoveries.length === 0 && travel.exploredSnapshot) {
-            const snapshot = travel.exploredSnapshot as any;
-            if (snapshot && Array.isArray(snapshot.discoveries) && snapshot.discoveries.length > 0) {
-                discoveries = snapshot.discoveries;
-            }
-        }
-        
-        const souvenir = travel.souvenirData as any;
-        
-        // 解析日记内容
-        let journal = null;
-        const rawContent = travel.journalContent || '';
-        
-        // Try to parse if it looks like JSON
-        if (rawContent.trim().startsWith('{')) {
-            try {
-                journal = JSON.parse(rawContent);
-            } catch (e) {
-                // If parsing fails despite looking like JSON, treat as text
-                journal = { 
-                    title: '旅行回顾',
-                    content: rawContent,
-                    mood: 'happy',
-                    highlights: []
-                };
-            }
-        } else {
-            // It's a plain string (legacy or cross-chain AI text)
-            journal = { 
-                title: '旅行回顾',
-                content: rawContent,
-                mood: 'happy',
-                highlights: []
-            };
-        }
-        
-        // 获取纪念品详细信息
-        let souvenirDetail = null;
-        if (travel.souvenirId) {
-            souvenirDetail = await prisma.souvenir.findUnique({
-                where: { id: travel.souvenirId }
-            });
-        }
-        
-        res.json(stringifyBigInt({
-            success: true,
-            data: {
-                ...travel,
-                journal,
-                exploredSnapshot: {
-                   discoveries
+        const detail = await travelQueryServiceV1.getTravel({ travelId });
+        res.json(
+            stringifyBigInt({
+                success: true,
+                data: {
+                    id: detail.travelId,
+                    travelId: detail.travelId,
+                    frogId: detail.frogId,
+                    tokenId: detail.tokenId,
+                    status: detail.status,
+                    currentStage: detail.currentStage,
+                    progress: detail.progress,
+                    chainId: detail.chainId,
+                    targetWallet: detail.targetWallet,
+                    startTime: detail.startTime,
+                    endTime: detail.endTime,
+                    completedAt: detail.completedAt,
+                    journal: detail.journal,
+                    exploredSnapshot: {
+                        discoveries: detail.discoveries,
+                    },
+                    souvenir: detail.souvenir,
+                    exploredBlock: null,
                 },
-                souvenir: souvenirDetail,
-                exploredBlock: travel.exploredBlock?.toString(),
-            },
-        }));
+            })
+        );
         
     } catch (error) {
         console.error('Error fetching P0 travel:', error);

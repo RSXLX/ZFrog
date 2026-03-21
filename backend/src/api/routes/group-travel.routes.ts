@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { groupTravelService } from '../../services/group-travel.service';
 import { parseNonNegativeInt, parsePositiveInt } from '../../utils/validation';
 import { logger } from '../../utils/logger';
+import { prisma } from '../../database';
+import { travelCommandServiceV1 } from '../../modules/travel/travel.command';
 
 const router = Router();
 
@@ -154,7 +156,33 @@ router.post('/complete', async (req, res) => {
 
     const result = await groupTravelService.completeGroupTravel(crossChainMessageId, xp);
 
-    res.json(result);
+    const groupTravel = await prisma.groupTravel.findUnique({
+      where: { crossChainMessageId },
+      include: {
+        leader: {
+          select: {
+            ownerAddress: true,
+          },
+        },
+      },
+    });
+
+    let unifiedTravel = null;
+    if (groupTravel?.travelId && groupTravel.leader?.ownerAddress) {
+      unifiedTravel = await travelCommandServiceV1.completeTravel({
+        travelId: groupTravel.travelId,
+        walletAddress: groupTravel.leader.ownerAddress,
+        source: 'legacy_group_travel_complete',
+      });
+    }
+
+    res.json({
+      ...result,
+      data: {
+        ...(result as any).data,
+        unifiedTravel,
+      },
+    });
 
   } catch (error: any) {
     logger.error('[GroupTravel] complete error:', error);

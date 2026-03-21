@@ -5,12 +5,12 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { omniTravelService } from '../../services/omni-travel.service';
 import { logger } from '../../utils/logger';
+import { prisma } from '../../database';
+import { travelCommandServiceV1 } from '../../modules/travel/travel.command';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 /**
  * GET /api/v1/cross-chain/supported-chains
@@ -70,7 +70,7 @@ router.post('/travel', async (req: Request, res: Response) => {
       });
     }
 
-    // Verify eligibility
+    // Verify eligibility against existing on-chain gate.
     const eligibility = await omniTravelService.canStartCrossChainTravel(tokenId, targetChainId);
     if (!eligibility.canStart) {
       // FIX: If travel just started on-chain (but not in DB), allow creation
@@ -85,18 +85,25 @@ router.post('/travel', async (req: Request, res: Response) => {
       }
     }
 
-    // Create travel record
-    const result = await omniTravelService.createCrossChainTravelRecord(
-      frogId,
-      tokenId,
-      targetChainId,
-      duration,
-      ownerAddress
-    );
+    const result = await travelCommandServiceV1.startTravel({
+      frogId: Number(frogId),
+      walletAddress: String(ownerAddress),
+      travelType: 'cross_chain',
+      targetChain: Number(targetChainId),
+      duration: Number(duration),
+      source: 'legacy_cross_chain_travel',
+    });
 
     res.json({
       success: true,
-      data: result,
+      data: {
+        travelId: result.travelId,
+        status: result.status,
+        currentStage: result.currentStage,
+        targetChain: result.targetChain,
+        chainId: result.chainId,
+        endTime: result.endTime,
+      },
     });
   } catch (error) {
     logger.error('Error creating cross-chain travel:', error);
