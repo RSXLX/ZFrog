@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Frog, FriendInteraction, InteractionType } from '../../types';
-import { apiService } from '../../services/api';
+import { socialFeatureApi } from '../../features/social/api';
 import { BreedPanel } from '../breed';
 import { LevelUpCelebration } from '../common/MicroInteractions';
 
@@ -49,8 +49,8 @@ const FriendInteractionModal: React.FC<FriendInteractionProps> = ({
   const fetchInteractionHistory = async () => {
     try {
       setLoadingHistory(true);
-      const response = await apiService.get(`/friends/${friendshipId}/interactions?limit=10`);
-      setInteractions(response.success ? response.data : []);
+      const history = await socialFeatureApi.getFriendInteractions(friendshipId, 10);
+      setInteractions(history as FriendInteraction[]);
     } catch (err) {
       console.error('Error fetching interaction history:', err);
     } finally {
@@ -60,10 +60,8 @@ const FriendInteractionModal: React.FC<FriendInteractionProps> = ({
 
   const fetchIntimacyInfo = async () => {
     try {
-      const response = await apiService.get(`/friends/${friendshipId}/intimacy`);
-      if (response.success) {
-        setIntimacyInfo(response.data);
-      }
+      const data = await socialFeatureApi.getFriendIntimacy(friendshipId);
+      if (data) setIntimacyInfo(data);
     } catch (err) {
       console.error('Error fetching intimacy info:', err);
     }
@@ -79,7 +77,7 @@ const FriendInteractionModal: React.FC<FriendInteractionProps> = ({
     try {
       const metadata = {};
       
-      const result = await apiService.post(`/friends/${friendshipId}/interact`, {
+      const result = await socialFeatureApi.interactWithFriend(friendshipId, {
         actorId: currentFrogId,
         type: selectedType,
         message: message.trim() || undefined,

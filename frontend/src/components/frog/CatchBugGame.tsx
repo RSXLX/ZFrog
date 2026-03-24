@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiService } from '../../services/api';
+import { lifeFeatureApi } from '../../features/life/api';
 
 interface CatchBugGameProps {
   frogId: number;
@@ -64,7 +64,7 @@ export function CatchBugGame({ frogId, ownerAddress, onComplete }: CatchBugGameP
   // 检查剩余游戏次数
   const checkRemaining = async () => {
     try {
-      const response: any = await apiService.get(`/nurture/${frogId}/game-remaining?game=catch_bug`);
+      const response: any = await lifeFeatureApi.getLegacyGameRemaining(frogId, 'catch_bug');
       if (response.success) {
         setRemaining(response.remaining);
       }
@@ -254,7 +254,7 @@ export function CatchBugGame({ frogId, ownerAddress, onComplete }: CatchBugGameP
   const submitScore = async (score: number) => {
     try {
       setLoading(true);
-      const response: any = await apiService.post(`/nurture/${frogId}/play/catch-bug`, {
+      const response: any = await lifeFeatureApi.playCatchBugLegacy(frogId, {
         score,
       });
       

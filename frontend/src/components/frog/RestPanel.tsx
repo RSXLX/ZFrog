@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiService } from '../../services/api';
+import { lifeFeatureApi } from '../../features/life/api';
 
 interface RestPanelProps {
   frogId: number;
@@ -44,7 +44,7 @@ export function RestPanel({
   // 获取休息状态
   const fetchRestStatus = async () => {
     try {
-      const response: any = await apiService.get(`/nurture/${frogId}/rest-status`);
+      const response: any = await lifeFeatureApi.getLegacyRestStatus(frogId);
       if (response.success) {
         setRestInfo(response.data);
         setResting(response.data.isResting);
@@ -69,7 +69,7 @@ export function RestPanel({
     setError(null);
     
     try {
-      const response: any = await apiService.post(`/nurture/${frogId}/rest/start`);
+      const response: any = await lifeFeatureApi.startLegacyRest(frogId);
       if (response.success) {
         setResting(true);
         onRestChange?.();
@@ -92,7 +92,7 @@ export function RestPanel({
     setError(null);
     
     try {
-      const response: any = await apiService.post(`/nurture/${frogId}/rest/end`);
+      const response: any = await lifeFeatureApi.endLegacyRest(frogId);
       if (response.success) {
         setResting(false);
         onRestChange?.();

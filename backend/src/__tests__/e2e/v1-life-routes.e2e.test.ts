@@ -32,7 +32,6 @@ jest.mock('../../modules/life/life.command', () => ({
     startRest: jest.fn(),
     endRest: jest.fn(),
     syncDormancyStatus: jest.fn(),
-    blessDormant: jest.fn(),
   },
 }));
 
@@ -40,6 +39,7 @@ jest.mock('../../modules/life/dormancy.service', () => ({
   dormancyService: {
     getRevivalCostWithDiscount: jest.fn(),
     reviveDormant: jest.fn(),
+    blessDormant: jest.fn(),
   },
 }));
 
@@ -165,13 +165,6 @@ describe('V1 Life Routes E2E', () => {
       hibernationStatus: 'ACTIVE',
       changed: false,
     });
-    mockLifeCommand.blessDormant.mockResolvedValue({
-      success: true,
-      message: '成功祈福',
-      blessingsReceived: 2,
-      blesserEnergy: 70,
-    });
-
     mockDormancy.getRevivalCostWithDiscount.mockResolvedValue({
       baseCost: 100,
       discount: 15,
@@ -182,6 +175,12 @@ describe('V1 Life Routes E2E', () => {
       success: true,
       message: '青蛙已成功唤醒',
       cost: 85,
+    });
+    mockDormancy.blessDormant.mockResolvedValue({
+      success: true,
+      message: '成功祈福',
+      blessingsReceived: 2,
+      blesserEnergy: 70,
     });
   });
 
@@ -291,7 +290,7 @@ describe('V1 Life Routes E2E', () => {
 
     expect(okResp.status).toBe(200);
     expect(okResp.body.success).toBe(true);
-    expect(mockLifeCommand.blessDormant).toHaveBeenCalledWith({
+    expect(mockDormancy.blessDormant).toHaveBeenCalledWith({
       blesserFrogId: 9,
       targetFrogId: 1,
       walletAddress: '0xabc0000000000000000000000000000000000001',

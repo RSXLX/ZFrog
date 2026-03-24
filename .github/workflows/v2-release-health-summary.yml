@@ -1,0 +1,50 @@
+name: v2-release-health-summary
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '40 20 * * 1'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  summary:
+    name: V2 Release Health Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Generate weekly release health summary
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          node ./scripts/ci/v2-release-health-summary.mjs
+          --summary-config ./.github/release-gates/v2-release-health-summary.json
+          --rc-config ./.github/release-gates/v2-rc-gate.json
+          --fallback-config ./.github/release-gates/v2-cutover-fallback-gate.json
+          --fallback-log ./reports/cutover/dev-entry.log
+          --report ./reports/v2-release-health-summary.md
+          --summary-json ./reports/v2-release-health-summary.json
+
+      - name: Publish summary report
+        if: always()
+        run: cat reports/v2-release-health-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release health summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-release-health-summary-report
+          path: |
+            reports/v2-release-health-summary.md
+            reports/v2-release-health-summary.json

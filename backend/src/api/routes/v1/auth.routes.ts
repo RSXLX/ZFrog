@@ -5,7 +5,7 @@ import { authRequired } from '../../../middlewares/auth.middleware';
 import { authService, worldVerifyService } from '../../../modules/identity';
 import { prisma } from '../../../database';
 
-const router = Router();
+const router: Router = Router();
 
 router.get('/status', (req, res) =>
   respondSuccess(req, res, {

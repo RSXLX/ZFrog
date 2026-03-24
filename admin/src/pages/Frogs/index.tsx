@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Card, Table, Tag, Input, Button, Space, Modal, Select, message, Descriptions, Popconfirm } from 'antd';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Card, Table, Tag, Input, Button, Space, Modal, Select, message, Descriptions, Popconfirm } from 'antd';
 import { SearchOutlined, ReloadOutlined, RollbackOutlined } from '@ant-design/icons';
 import api from '../../services/api';
 import { getApiErrorMessage } from '../../utils/error';
@@ -16,6 +16,29 @@ interface FrogRecord {
   createdAt: string;
 }
 
+interface LifeRecalculationReceipt {
+  frog: {
+    id: number;
+    tokenId: number;
+    name: string;
+    status: string;
+    hibernationStatus: string;
+  };
+  life: {
+    hunger: number;
+    happiness: number;
+    cleanliness: number;
+    health: number;
+    energy: number;
+    mood: string;
+    isSick: boolean;
+    needsClean: boolean;
+    isDormant: boolean;
+    hibernationStatus: string;
+  };
+  recalculatedAt: string;
+}
+
 const statusColors: Record<string, string> = {
   Idle: 'success',
   Traveling: 'processing',
@@ -26,6 +49,7 @@ const statusColors: Record<string, string> = {
 const Frogs: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [recalling, setRecalling] = useState<number | null>(null);
+  const [recalculating, setRecalculating] = useState<number | null>(null);
   const [frogs, setFrogs] = useState<FrogRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -34,12 +58,9 @@ const Frogs: React.FC = () => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedFrog, setSelectedFrog] = useState<FrogRecord | null>(null);
   const [newStatus, setNewStatus] = useState('');
+  const [lifeReceipt, setLifeReceipt] = useState<LifeRecalculationReceipt | null>(null);
 
-  useEffect(() => {
-    fetchFrogs();
-  }, [page, pageSize]);
-
-  const fetchFrogs = async () => {
+  const fetchFrogs = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get('/api/admin/frogs', {
@@ -55,10 +76,17 @@ const Frogs: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, search]);
+
+  useEffect(() => {
+    fetchFrogs();
+  }, [fetchFrogs]);
 
   const handleSearch = () => {
-    setPage(1);
+    if (page !== 1) {
+      setPage(1);
+      return;
+    }
     fetchFrogs();
   };
 
@@ -89,11 +117,25 @@ const Frogs: React.FC = () => {
       const result = response as unknown as { success: boolean; txHash: string; message: string };
       message.success(`召回成功！交易哈希: ${result.txHash?.slice(0, 10)}...`);
       fetchFrogs();
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.error || '链上召回失败';
-      message.error(errorMsg);
+    } catch (err) {
+      message.error(getApiErrorMessage(err, '链上召回失败'));
     } finally {
       setRecalling(null);
+    }
+  };
+
+  const handleRecalculateLife = async (record: FrogRecord) => {
+    try {
+      setRecalculating(record.tokenId);
+      const response = await api.post(`/api/admin/frogs/${record.tokenId}/recalculate-life`);
+      const result = response as unknown as LifeRecalculationReceipt;
+      setLifeReceipt(result);
+      message.success(`Life 重算完成：${result.frog.name}（${result.life.mood}）`);
+      fetchFrogs();
+    } catch (err) {
+      message.error(getApiErrorMessage(err, 'Life 重算失败'));
+    } finally {
+      setRecalculating(null);
     }
   };
 
@@ -124,9 +166,16 @@ const Frogs: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 200,
+      width: 280,
       render: (_: unknown, record: FrogRecord) => (
         <Space>
+          <Button
+            size="small"
+            loading={recalculating === record.tokenId}
+            onClick={() => handleRecalculateLife(record)}
+          >
+            重算 Life
+          </Button>
           <Button size="small" onClick={() => handleStatusEdit(record)}>
             修改状态
           </Button>
@@ -175,6 +224,17 @@ const Frogs: React.FC = () => {
           </Space>
         }
       >
+        {lifeReceipt && (
+          <Alert
+            type="success"
+            showIcon
+            closable
+            onClose={() => setLifeReceipt(null)}
+            style={{ marginBottom: 16 }}
+            message={`Life 重算回执：#${lifeReceipt.frog.tokenId} ${lifeReceipt.frog.name}`}
+            description={`mood=${lifeReceipt.life.mood} | hunger=${lifeReceipt.life.hunger} | happiness=${lifeReceipt.life.happiness} | cleanliness=${lifeReceipt.life.cleanliness} | energy=${lifeReceipt.life.energy} | at=${new Date(lifeReceipt.recalculatedAt).toLocaleString()}`}
+          />
+        )}
         <Table
           dataSource={frogs}
           columns={columns}

@@ -4,6 +4,7 @@ import { MessageCircle, Gift, MapPin, Clock, ChevronRight } from 'lucide-react';
 import { Button } from '../common/Button';
 import { ScaleOnHover } from '../common/animations/FadeIn';
 import type { Friend } from '../../types';
+import { buildMemoryPalacePath } from '../../features/memory-palace/routes';
 
 interface FriendCardProps {
   friend: Friend;
@@ -115,7 +116,7 @@ export function FriendCard({
                   onVisit(friend);
                   return;
                 }
-                navigate(friend.ownerAddress ? `/visit/${friend.ownerAddress}` : '/garden');
+                navigate(buildMemoryPalacePath(friend.id));
               }}
             >
               拜访

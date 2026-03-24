@@ -1,8 +1,6 @@
 
-import { PrismaClient } from '@prisma/client';
 import { omniTravelService } from '../services/omni-travel.service';
-
-const prisma = new PrismaClient();
+import { prisma } from '../database';
 
 async function main() {
   console.log('=== Checking Active Cross-Chain Travels ===\n');

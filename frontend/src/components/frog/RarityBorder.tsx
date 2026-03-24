@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { RarityTier } from '../../services/appearance.api';
+import { RarityTier } from '../../features/appearance/api';
 import './RarityBorder.css';
 
 interface RarityBorderProps {

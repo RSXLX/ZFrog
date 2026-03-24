@@ -23,7 +23,7 @@ function stringifyBigInt(obj: any): any {
     return obj;
 }
 
-const router = Router();
+const router: Router = Router();
 
 // 定义 ZetaChain
 const zetachainAthens = {
@@ -227,7 +227,7 @@ router.get('/search', async (req, res) => {
             });
         }
 
-        res.json(frogs);
+        res.json({ success: true, data: stringifyBigInt(frogs) });
     } catch (error) {
         console.error('Error searching frogs:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -498,31 +498,6 @@ router.get('/:tokenId', async (req, res) => {
             }
         }
 
-        if (!frog) {
-            return res.status(404).json({ error: 'Frog not found' });
-        }
-        
-        // [Sync-on-Read] 同步链上状态到数据库，确保状态最新
-        try {
-            await omniTravelService.syncFrogStatusFromChain(tokenId);
-            // 重新获取更新后的 frog 数据
-            frog = await prisma.frog.findUnique({
-                where: { tokenId },
-                include: {
-                    travels: {
-                        where: { status: 'Completed' },
-                        orderBy: { createdAt: 'desc' },
-                        take: 50,
-                    },
-                    souvenirs: true,
-                },
-            });
-        } catch (syncErr) {
-            logger.warn(`[FrogAPI] Failed to sync frog ${tokenId} status:`, syncErr);
-            // 继续使用数据库中的数据
-        }
-        
-        // 再次检查 frog 是否存在 (sync 后重新获取可能返回 null)
         if (!frog) {
             return res.status(404).json({ error: 'Frog not found' });
         }

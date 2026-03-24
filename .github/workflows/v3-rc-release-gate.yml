@@ -1,0 +1,86 @@
+name: v3-rc-release-gate
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - v3-beta-regression-matrix
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  gate:
+    name: V3 RC Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Evaluate V3 RC gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node ./scripts/ci/v3-rc-gate-check.mjs \
+            --config ./.github/release-gates/v3-rc-gate.json \
+            --report ./reports/v3/v3-rc-gate-report.md \
+            --out-json ./reports/v3/v3-rc-gate.json
+
+      - name: Generate V3 release health summary
+        if: always()
+        run: |
+          node ./scripts/ci/v3-release-health-summary.mjs \
+            --rc-result ./reports/v3/v3-rc-gate.json \
+            --report ./reports/v3/v3-release-health-summary.md \
+            --out-json ./reports/v3/v3-release-health-summary.json
+
+      - name: Publish report summary
+        if: always()
+        run: |
+          echo "## V3 RC Gate" >> "$GITHUB_STEP_SUMMARY"
+          cat ./reports/v3/v3-rc-gate-report.md >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## V3 Release Health Summary" >> "$GITHUB_STEP_SUMMARY"
+          cat ./reports/v3/v3-release-health-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Archive V3 RC gate evidence
+        if: always()
+        run: |
+          node ./scripts/ci/v3-rc-gate-archive.mjs \
+            --report ./reports/v3/v3-rc-gate-report.md \
+            --out-dir ./reports/history/v3-rc-gate
+
+      - name: Upload V3 RC gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-rc-gate-report
+          path: |
+            reports/v3/v3-rc-gate-report.md
+            reports/v3/v3-rc-gate.json
+
+      - name: Upload V3 release health summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-release-health-summary
+          path: |
+            reports/v3/v3-release-health-summary.md
+            reports/v3/v3-release-health-summary.json
+
+      - name: Upload V3 RC gate evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-rc-gate-evidence
+          path: reports/history/v3-rc-gate

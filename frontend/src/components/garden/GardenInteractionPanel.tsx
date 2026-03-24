@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { GardenFrogState, getFriendshipLevel } from '../../types/garden';
-import { apiService } from '../../services/api';
+import { gardenFeatureApi } from '../../features/garden/api';
+import { socialFeatureApi } from '../../features/social/api';
 import { useToast } from '../common/ToastProvider';
 
 interface GardenInteractionPanelProps {
@@ -35,8 +36,7 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
     const loadFriendship = async () => {
       setFriendshipLoading(true);
       try {
-        const response = await apiService.get<{ success: boolean; data: any[] }>(`/friends/list/${hostFrogId}`);
-        const list = response?.data || [];
+        const list = await socialFeatureApi.listFriends(hostFrogId);
         const matched = list.find((item) => item.tokenId === frogState.frog.tokenId);
         if (!cancelled) {
           setFriendshipXp(Math.max(0, Number(matched?.intimacy || 0)));
@@ -72,7 +72,7 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
     setShowHeartAnimation(true);
     
     try {
-      await apiService.post(`/garden/${hostFrogId}/interact`, {
+      await gardenFeatureApi.interact(hostFrogId, {
         targetFrogId: frogState.frog.tokenId,
         type: 'like'
       });
@@ -91,7 +91,7 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
   const handleFeed = async () => {
     setIsLoading(true);
     try {
-      await apiService.post(`/garden/${hostFrogId}/interact`, {
+      await gardenFeatureApi.interact(hostFrogId, {
         targetFrogId: frogState.frog.tokenId,
         type: 'feed',
         data: { foodType: 'apple' }
@@ -109,7 +109,7 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
   const handleGift = async () => {
     setIsLoading(true);
     try {
-      await apiService.post(`/garden/${hostFrogId}/interact`, {
+      await gardenFeatureApi.interact(hostFrogId, {
         targetFrogId: frogState.frog.tokenId,
         type: 'gift',
         data: { giftType: 'flower' }
@@ -127,7 +127,7 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
   const handlePhoto = async () => {
     setIsLoading(true);
     try {
-      await apiService.post(`/garden/${hostFrogId}/interact`, {
+      await gardenFeatureApi.interact(hostFrogId, {
         targetFrogId: frogState.frog.tokenId,
         type: 'photo'
       });
@@ -147,7 +147,7 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
     
     setIsLoading(true);
     try {
-      await apiService.post(`/garden/${hostFrogId}/messages`, {
+      await gardenFeatureApi.postMessage(hostFrogId, {
         authorFrogId: hostFrogId,
         content: message
       });
@@ -165,9 +165,7 @@ export const GardenInteractionPanel: React.FC<GardenInteractionPanelProps> = ({
     if (window.confirm(`确定让 ${frogState.frog.name} 现在离开吗？`)) {
       setIsLoading(true);
       try {
-        await apiService.post(`/garden/${hostFrogId}/leave`, {
-          guestFrogId: frogState.frog.tokenId
-        });
+        await gardenFeatureApi.leave(hostFrogId, frogState.frog.tokenId);
         toast.success('访客已离开');
         onInteractionComplete();
       } catch (error) {

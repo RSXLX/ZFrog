@@ -10,7 +10,7 @@
 import { useState, useCallback,  useEffect } from 'react';
 import { useAccount, useWalletClient, usePublicClient } from 'wagmi';
 import { parseEther, type Address, encodeFunctionData } from 'viem';
-import { apiService } from '../services/api';
+import { crossChainTransferFeatureApi } from '../features/crosschain-transfer/api';
 import { BSC_CONNECTOR_ADDRESS, SEPOLIA_CONNECTOR_ADDRESS } from '../config/contracts';
 
 // ============ 配置 ============
@@ -140,10 +140,8 @@ export function useCrossChain(frogId: number) {
   // 加载转账历史
   const loadTransfers = useCallback(async () => {
     try {
-      const response = await apiService.get(`/crosschain-transfer/${frogId}/history`);
-      if (response.success) {
-        setTransfers(response.data.transfers || []);
-      }
+      const response = await crossChainTransferFeatureApi.getHistory(frogId);
+      setTransfers(response.transfers || []);
     } catch (error) {
       console.error('Failed to load transfers:', error);
     }
@@ -152,10 +150,8 @@ export function useCrossChain(frogId: number) {
   // 加载好友列表
   const loadFriends = useCallback(async () => {
     try {
-      const response = await apiService.get(`/crosschain-transfer/${frogId}/friends`);
-      if (response.success) {
-        setFriends(response.data || []);
-      }
+      const response = await crossChainTransferFeatureApi.getFriends(frogId);
+      setFriends(response || []);
     } catch (error) {
       console.error('Failed to load friends:', error);
     }
@@ -164,10 +160,8 @@ export function useCrossChain(frogId: number) {
   // 加载统计
   const loadStats = useCallback(async () => {
     try {
-      const response = await apiService.get(`/crosschain-transfer/${frogId}/stats`);
-      if (response.success) {
-        setStats(response.data);
-      }
+      const response = await crossChainTransferFeatureApi.getStats(frogId);
+      setStats(response);
     } catch (error) {
       console.error('Failed to load stats:', error);
     }
@@ -193,7 +187,7 @@ export function useCrossChain(frogId: number) {
 
       try {
         // 1. 创建转账记录
-        const createResponse = await apiService.post('/crosschain-transfer/create', {
+        const createResponse = await crossChainTransferFeatureApi.create({
           fromFrogId: frogId,
           fromAddress: address,
           toAddress: params.toAddress,
@@ -205,11 +199,11 @@ export function useCrossChain(frogId: number) {
           message: params.message,
         });
 
-        if (!createResponse.success) {
+        if (!createResponse) {
           throw new Error('Failed to create transfer record');
         }
 
-        const transferId = createResponse.data.id;
+        const transferId = createResponse.id;
 
         // 2. 发送链上交易
         // 判断是同链还是跨链
@@ -224,7 +218,7 @@ export function useCrossChain(frogId: number) {
           });
 
           // 更新状态
-          await apiService.post('/crosschain-transfer/confirm', {
+          await crossChainTransferFeatureApi.confirm({
             transferId,
             cctxHash: hash,
             status: 'COMPLETED',
@@ -272,7 +266,7 @@ export function useCrossChain(frogId: number) {
           });
 
           // 更新状态为确认中
-          await apiService.post('/crosschain-transfer/confirm', {
+          await crossChainTransferFeatureApi.confirm({
             transferId,
             cctxHash: hash,
             status: 'CONFIRMING',

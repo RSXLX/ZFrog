@@ -3,8 +3,9 @@ import { prisma } from '../../database';
 import { logger } from '../../utils/logger';
 import { lifeCommandService } from '../../modules/life/life.command';
 import { lifeQueryService } from '../../modules/life/life.query';
+import { markLegacyDeprecated } from './legacy-deprecation';
 
-const router = Router();
+const router: Router = Router();
 
 // 食物配置 (与前端保持一致)
 const FOOD_CONFIG: Record<string, { name: string; energy: number; happiness: number; rarity: string }> = {
@@ -29,6 +30,7 @@ const INTERACTION_CONFIG: Record<string, { happinessBonus: number }> = {
  */
 router.get('/:tokenId/status', async (req, res) => {
   try {
+    markLegacyDeprecated(res, '/api/v1/frogs/:frogId/life');
     const tokenId = parseInt(req.params.tokenId);
 
     if (isNaN(tokenId)) {

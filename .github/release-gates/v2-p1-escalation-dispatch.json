@@ -1,0 +1,136 @@
+{
+  "gateId": "v2-p1-escalation-dispatch",
+  "issue": {
+    "titlePrefix": "[V2-W15-17][P1 Escalation]",
+    "labels": ["p1", "v2", "release-health", "need-triage"],
+    "ownerRouteLabelPrefix": "owner-route",
+    "defaultOwnerRoute": "v2-release-ops",
+    "reasonOwnerRoutes": {
+      "workspace-startup-failed": "workspace-platform"
+    },
+    "ownerRoutePatterns": [
+      {
+        "pattern": "^p1-timeout-",
+        "ownerRoute": "release-automation"
+      },
+      {
+        "pattern": "^dispatch-quality-",
+        "ownerRoute": "release-automation"
+      },
+      {
+        "pattern": "^workspace-",
+        "ownerRoute": "workspace-platform"
+      },
+      {
+        "pattern": "^manual-|^ad-hoc-",
+        "ownerRoute": "release-triage"
+      }
+    ],
+    "failOnMissingOwnerRoute": true,
+    "defaultAssignees": [],
+    "reasonAssignees": {
+      "workspace-startup-failed": []
+    },
+    "reasonLabels": {
+      "workspace-startup-failed": ["cutover"]
+    },
+    "maxCreatePerRun": 3,
+    "template": {
+      "defaultPath": ".github/ISSUE_TEMPLATE/v2-p1-escalation.md"
+    },
+    "issueForm": {
+      "requiredFieldIds": [
+        "reason",
+        "owner_route",
+        "owner_route_source",
+        "current",
+        "previous",
+        "delta_signed",
+        "history",
+        "signals",
+        "summary_verdict",
+        "summary_generated_at",
+        "window_days",
+        "dispatch_quality_passed",
+        "dispatch_quality_latest_run_failed",
+        "dispatch_quality_consecutive_failure_detected",
+        "dispatch_quality_consecutive_failed_weeks",
+        "dispatch_quality_consecutive_failure_threshold",
+        "dispatch_quality_latest_run",
+        "dispatch_quality_latest_run_url",
+        "timeout_passed",
+        "timeout_latest_run_failed",
+        "timeout_consecutive_failure_detected",
+        "timeout_consecutive_failed_weeks",
+        "timeout_consecutive_failure_threshold",
+        "timeout_latest_run",
+        "timeout_latest_run_url",
+        "timeout_stability_passed",
+        "timeout_stability_latest_run_failed",
+        "timeout_stability_consecutive_failure_detected",
+        "timeout_stability_consecutive_failed_weeks",
+        "timeout_stability_consecutive_failure_threshold",
+        "timeout_stability_latest_run",
+        "timeout_stability_latest_run_url",
+        "dispatch_workflow_run_url",
+        "dispatch_workflow_artifacts_url",
+        "dispatch_workflow_run_id",
+        "dispatch_workflow_run_attempt"
+      ],
+      "fieldMap": {
+        "reason": "reason",
+        "owner_route": "ownerRoute",
+        "owner_route_source": "ownerRouteSource",
+        "current": "current",
+        "previous": "previous",
+        "delta_signed": "deltaSigned",
+        "history": "history",
+        "signals": "signals",
+        "summary_verdict": "summaryVerdict",
+        "summary_generated_at": "summaryGeneratedAt",
+        "window_days": "windowDays",
+        "dispatch_quality_passed": "dispatchQualityPassed",
+        "dispatch_quality_latest_run_failed": "dispatchQualityLatestRunFailed",
+        "dispatch_quality_consecutive_failure_detected": "dispatchQualityConsecutiveFailureDetected",
+        "dispatch_quality_consecutive_failed_weeks": "dispatchQualityConsecutiveFailedWeeks",
+        "dispatch_quality_consecutive_failure_threshold": "dispatchQualityConsecutiveFailureThreshold",
+        "dispatch_quality_latest_run": "dispatchQualityLatestRun",
+        "dispatch_quality_latest_run_url": "dispatchQualityLatestRunUrl",
+        "timeout_passed": "timeoutPassed",
+        "timeout_latest_run_failed": "timeoutLatestRunFailed",
+        "timeout_consecutive_failure_detected": "timeoutConsecutiveFailureDetected",
+        "timeout_consecutive_failed_weeks": "timeoutConsecutiveFailedWeeks",
+        "timeout_consecutive_failure_threshold": "timeoutConsecutiveFailureThreshold",
+        "timeout_latest_run": "timeoutLatestRun",
+        "timeout_latest_run_url": "timeoutLatestRunUrl",
+        "timeout_stability_passed": "timeoutStabilityPassed",
+        "timeout_stability_latest_run_failed": "timeoutStabilityLatestRunFailed",
+        "timeout_stability_consecutive_failure_detected": "timeoutStabilityConsecutiveFailureDetected",
+        "timeout_stability_consecutive_failed_weeks": "timeoutStabilityConsecutiveFailedWeeks",
+        "timeout_stability_consecutive_failure_threshold": "timeoutStabilityConsecutiveFailureThreshold",
+        "timeout_stability_latest_run": "timeoutStabilityLatestRun",
+        "timeout_stability_latest_run_url": "timeoutStabilityLatestRunUrl",
+        "dispatch_workflow_run_url": "dispatchWorkflowRunUrl",
+        "dispatch_workflow_artifacts_url": "dispatchWorkflowArtifactsUrl",
+        "dispatch_workflow_run_id": "dispatchWorkflowRunId",
+        "dispatch_workflow_run_attempt": "dispatchWorkflowRunAttempt"
+      },
+      "enforceTemplateCoverage": true
+    }
+  },
+  "applyRetry": {
+    "maxAttempts": 3,
+    "baseDelayMs": 800,
+    "maxDelayMs": 5000,
+    "retryOnStatuses": [429, 500, 502, 503, 504]
+  },
+  "idempotency": {
+    "logPath": "reports/v2-p1-escalation-dispatch-idempotency.jsonl"
+  },
+  "summary": {
+    "requireGeneratedAt": true,
+    "maxAgeHours": 36,
+    "maxFutureSkewMinutes": 5
+  },
+  "notes": "Create one standardized P1 issue per candidate reason (including timeout/dispatch trend signals), block dispatch when release summary freshness checks fail (including future-skew guard), write workflow run/artifact deep links into issue body and trace comments, and keep owner-route + retry/idempotency safeguards."
+}

@@ -1,0 +1,17 @@
+{
+  "gateId": "v2-p1-timeout-stability-observation-gate",
+  "observation": {
+    "requiredConsecutivePassedWeeks": 2,
+    "failOnInsufficientConsecutivePassedWeeks": true,
+    "requireLatestTimeoutRunPass": true,
+    "requireNoTimeoutConsecutiveFailure": true,
+    "requireTimeoutGatePass": true,
+    "maxLabelDriftIssues": 0,
+    "failOnLabelDrift": true,
+    "requireRatchetingCheck": true,
+    "ratchetingCheckId": "timeout-candidate-recovery-threshold-ratchet",
+    "failOnMissingRatchetingCheck": true,
+    "failOnRatchetingCheckFailure": true
+  },
+  "notes": "Machine-check the two-week timeout stability observation loop: consecutive timeout gate pass trend + no label drift + ratchet check pass."
+}

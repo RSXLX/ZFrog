@@ -6,8 +6,9 @@
 import { Router } from 'express';
 import { prisma } from '../../database';
 import * as notificationService from '../../services/notification.service';
+import { ApiRes } from '../../utils/apiResponse';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * GET /api/notifications/:frogId
@@ -17,6 +18,9 @@ router.get('/:frogId', async (req, res) => {
   try {
     const frogId = parseInt(req.params.frogId);
     const { limit = '20', offset = '0', unreadOnly = 'false', type } = req.query;
+    if (isNaN(frogId)) {
+      return ApiRes.validationError(res, 'Invalid frogId');
+    }
 
     // 验证青蛙是否存在
     const frog = await prisma.frog.findUnique({
@@ -24,7 +28,7 @@ router.get('/:frogId', async (req, res) => {
     });
 
     if (!frog) {
-      return res.status(404).json({ error: 'Frog not found' });
+      return ApiRes.notFound(res, 'Frog not found');
     }
 
     const result = await notificationService.getNotifications(frog.id, {
@@ -34,10 +38,10 @@ router.get('/:frogId', async (req, res) => {
       type: type as string,
     });
 
-    res.json(result);
+    return ApiRes.success(res, result);
   } catch (error) {
     console.error('Error fetching notifications:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return ApiRes.serverError(res, error as Error);
   }
 });
 
@@ -48,20 +52,23 @@ router.get('/:frogId', async (req, res) => {
 router.get('/:frogId/unread-count', async (req, res) => {
   try {
     const frogId = parseInt(req.params.frogId);
+    if (isNaN(frogId)) {
+      return ApiRes.validationError(res, 'Invalid frogId');
+    }
 
     const frog = await prisma.frog.findUnique({
       where: { tokenId: frogId },
     });
 
     if (!frog) {
-      return res.status(404).json({ error: 'Frog not found' });
+      return ApiRes.notFound(res, 'Frog not found');
     }
 
     const count = await notificationService.getUnreadCount(frog.id);
-    res.json({ count });
+    return ApiRes.success(res, { count });
   } catch (error) {
     console.error('Error fetching unread count:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return ApiRes.serverError(res, error as Error);
   }
 });
 
@@ -72,12 +79,15 @@ router.get('/:frogId/unread-count', async (req, res) => {
 router.put('/:notificationId/read', async (req, res) => {
   try {
     const notificationId = parseInt(req.params.notificationId);
+    if (isNaN(notificationId)) {
+      return ApiRes.validationError(res, 'Invalid notificationId');
+    }
 
     await notificationService.markAsRead(notificationId);
-    res.json({ success: true });
+    return ApiRes.success(res, null, 'Notification marked as read');
   } catch (error) {
     console.error('Error marking notification as read:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return ApiRes.serverError(res, error as Error);
   }
 });
 
@@ -88,20 +98,23 @@ router.put('/:notificationId/read', async (req, res) => {
 router.put('/:frogId/read-all', async (req, res) => {
   try {
     const frogId = parseInt(req.params.frogId);
+    if (isNaN(frogId)) {
+      return ApiRes.validationError(res, 'Invalid frogId');
+    }
 
     const frog = await prisma.frog.findUnique({
       where: { tokenId: frogId },
     });
 
     if (!frog) {
-      return res.status(404).json({ error: 'Frog not found' });
+      return ApiRes.notFound(res, 'Frog not found');
     }
 
     await notificationService.markAllAsRead(frog.id);
-    res.json({ success: true });
+    return ApiRes.success(res, null, 'All notifications marked as read');
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return ApiRes.serverError(res, error as Error);
   }
 });
 
@@ -112,12 +125,15 @@ router.put('/:frogId/read-all', async (req, res) => {
 router.delete('/:notificationId', async (req, res) => {
   try {
     const notificationId = parseInt(req.params.notificationId);
+    if (isNaN(notificationId)) {
+      return ApiRes.validationError(res, 'Invalid notificationId');
+    }
 
     await notificationService.deleteNotification(notificationId);
-    res.json({ success: true });
+    return ApiRes.deleted(res, 'Notification deleted');
   } catch (error) {
     console.error('Error deleting notification:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return ApiRes.serverError(res, error as Error);
   }
 });
 

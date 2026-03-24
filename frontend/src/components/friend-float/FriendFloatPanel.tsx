@@ -17,6 +17,7 @@ import { JoinCommunityModal } from './JoinCommunityModal';
 import FriendRequests from '../frog/FriendRequests';
 import FriendInteractionModal from '../frog/FriendInteraction';
 import { useMyFrog } from '../../hooks/useMyFrog';
+import { buildMemoryPalacePath } from '../../features/memory-palace/routes';
 import '../../styles/friend-float.css';
 
 // 动画配置
@@ -125,7 +126,7 @@ export const FriendFloatPanel: React.FC = () => {
   };
 
   const handleVisitClick = (friend: Frog) => {
-    navigate(`/visit/${friend.ownerAddress}`);
+    navigate(buildMemoryPalacePath(friend.id));
     setExpanded(false);
   };
 

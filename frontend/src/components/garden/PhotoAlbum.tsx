@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiService } from '../../services/api';
+import { gardenFeatureApi } from '../../features/garden/api';
 import { useToast } from '../common/ToastProvider';
 import { useHomesteadWeb3 } from '../../hooks/useHomesteadWeb3';
 
@@ -55,14 +55,10 @@ export const PhotoAlbum: React.FC<PhotoAlbumProps> = ({
 
   const loadPhotos = async () => {
     try {
-      const response = await apiService.get(`/homestead/${frogId}/photos`, {
-        params: {
-          nftOnly: filter === 'nft' ? 'true' : 'false',
-        }
+      const response = await gardenFeatureApi.getPhotos(frogId, {
+        nftOnly: filter === 'nft' ? 'true' : 'false',
       });
-      if (response.success) {
-        setPhotos(response.data?.photos || []);
-      }
+      setPhotos(response?.photos || []);
     } catch (error) {
       console.error('Failed to load photos:', error);
     } finally {
@@ -73,7 +69,7 @@ export const PhotoAlbum: React.FC<PhotoAlbumProps> = ({
   // 点赞
   const handleLike = async (photoId: string) => {
     try {
-      await apiService.post(`/homestead/${frogId}/photos/${photoId}/like`);
+      await gardenFeatureApi.likePhoto(frogId, photoId);
       setPhotos(prevPhotos =>
         prevPhotos.map(p =>
           p.id === photoId ? { ...p, likesCount: p.likesCount + 1 } : p
@@ -141,13 +137,13 @@ export const PhotoAlbum: React.FC<PhotoAlbumProps> = ({
         }
       }
 
-      const response = await apiService.post(`/homestead/${frogId}/photos/${photo.id}/mint`, {
+      const response = await gardenFeatureApi.mintPhoto(frogId, photo.id, {
         nftContract: contract,
         nftTokenId,
         mintTxHash,
       });
 
-      if (!response.success) {
+      if (!response?.success) {
         throw new Error(response.error || '记录 NFT 信息失败');
       }
 

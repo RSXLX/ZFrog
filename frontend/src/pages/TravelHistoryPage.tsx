@@ -7,8 +7,10 @@ import { FeatureGateState } from '../components/common/FeatureGateState';
 import { TravelResult } from '../components/travel/TravelResult';
 import { EmptyTravels } from '../components/common/EmptyState';
 import { AnimatedNumber } from '../components/common/MicroInteractions';
-import { apiService, type Frog as OwnedFrog } from '../services/api';
+import type { Frog as OwnedFrog } from '../types';
 import { useMyFrog } from '../hooks/useMyFrog';
+import { travelFeatureApi } from '../features/travel/api';
+import type { LegacyTravelHistoryItem, LegacyTravelStatsReadModel } from '../lib/api/contracts';
 import { 
     Clock, 
     MapPin, 
@@ -21,46 +23,6 @@ import {
     ChevronRight,
     Map
 } from 'lucide-react';
-
-interface Travel {
-    id: number;
-    frogId: number;
-    targetChain: string;
-    targetWallet: string;
-    chainId: number;
-    status: string;
-    exploredBlock?: string;
-    exploredTimestamp?: string;
-    diary?: string;
-    diaryMood?: string;
-    journalContent?: string | null;
-    journal?: {
-        title: string;
-        content: string;
-        mood: string;
-        highlights: string[];
-    } | null;
-    souvenir?: {
-        name: string;
-        rarity: string;
-        tokenId?: number;
-    } | null;
-    completedAt?: string;
-    frog?: {
-        name: string;
-        tokenId: number;
-    };
-    discoveries?: any[];
-}
-
-interface TravelStats {
-    totalTrips: number;
-    bscTrips: number;
-    ethTrips: number;
-    zetaTrips: number;
-    totalDiscoveries: number;
-    rareFinds: number;
-}
 
 const chainConfig = {
     BSC_TESTNET: { name: 'BSC 测试网', icon: '🟡', color: 'from-yellow-400 to-orange-500' },
@@ -86,10 +48,10 @@ export function TravelHistoryPage() {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const { address, frog, loading: frogLoading, isConnected, hasFrog } = useMyFrog();
-    const [travels, setTravels] = useState<Travel[]>([]);
-    const [stats, setStats] = useState<TravelStats | null>(null);
+    const [travels, setTravels] = useState<LegacyTravelHistoryItem[]>([]);
+    const [stats, setStats] = useState<LegacyTravelStatsReadModel | null>(null);
     const [loading, setLoading] = useState(true);
-    const [selectedTravel, setSelectedTravel] = useState<Travel | null>(null);
+    const [selectedTravel, setSelectedTravel] = useState<LegacyTravelHistoryItem | null>(null);
     const [souvenirImages, setSouvenirImages] = useState<Record<string, string>>({});
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
@@ -136,30 +98,22 @@ export function TravelHistoryPage() {
                 params.frogId = fId;
             }
             
-            const travelsResponse = await apiService.get('/travels/history', {
-                params
-            });
+            const travelsResponse = await travelFeatureApi.getHistory(params);
             
             // 获取统计数据
-            const statsParams: any = { address };
-            if (fId && fId !== 'all') {
-                statsParams.frogId = fId;
-            }
-            const statsResponse = await apiService.get('/travels/stats', {
-                params: statsParams
-            });
+            const statsResponse = await travelFeatureApi.getStats(address, fId || undefined);
             
-            if (travelsResponse.success && travelsResponse.data) {
-                const fetchedTravels = travelsResponse.data.travels || [];
+            if (travelsResponse) {
+                const fetchedTravels = travelsResponse.travels || [];
                 setTravels(fetchedTravels);
-                setTotal(travelsResponse.data.total || 0);
+                setTotal(travelsResponse.total || 0);
 
                 // 异步获取纪念品图片
                 fetchedTravels.forEach(async (t: any) => {
                     const sId = t.souvenir?.tokenId || (t.souvenirData ? `p0-${t.id}` : null);
                     if (sId) {
                         try {
-                            const res = await apiService.getSouvenirImageStatus(sId.toString());
+                            const res = await travelFeatureApi.getSouvenirImageStatus(sId.toString());
                             if (res.success && res.record) {
                                 const url = res.record.gatewayUrl || res.record.imageUrl;
                                 if (url) {
@@ -174,9 +128,7 @@ export function TravelHistoryPage() {
                 setTotal(0);
             }
             
-            if (statsResponse.success && statsResponse.data) {
-                setStats(statsResponse.data);
-            }
+            setStats(statsResponse);
         } catch (error) {
             console.error('Failed to fetch data:', error);
             // 确保在错误情况下也初始化状态
@@ -188,7 +140,7 @@ export function TravelHistoryPage() {
         }
     };
 
-    const handleTravelClick = (travel: Travel) => {
+    const handleTravelClick = (travel: LegacyTravelHistoryItem) => {
         navigate(`/travel-detail/${travel.id}`);
     };
 

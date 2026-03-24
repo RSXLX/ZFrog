@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount, useReadContract, usePublicClient } from 'wagmi';
 import { motion } from 'framer-motion';
 import { OMNI_TRAVEL_ADDRESS, OMNI_TRAVEL_ABI, ZETAFROG_ABI } from '../../config/contracts';
-import { getSupportedChains, canStartCrossChainTravel, createCrossChainTravel, notifyCrossChainTravelStarted, syncCrossChainState } from '../../services/cross-chain.api';
+import { crossChainTransferFeatureApi } from '../../features/crosschain-transfer/api';
 import { Button } from '../common/Button';
 import { useChainId } from 'wagmi';
 import { usePendingTravel } from '../../hooks/usePendingTravel';
@@ -116,7 +116,7 @@ export function CrossChainTravelForm({ frogId, tokenId, frogName, onSuccess }: C
 
   // Load supported chains
   useEffect(() => {
-    getSupportedChains().then(chains => {
+    crossChainTransferFeatureApi.getSupportedChains().then(chains => {
       setSupportedChains(chains);
       if (chains.length > 0 && !targetChainId) {
         // Pick a random chain instead of always the first one
@@ -135,7 +135,7 @@ export function CrossChainTravelForm({ frogId, tokenId, frogName, onSuccess }: C
     if (!tokenId || !targetChainId) return;
 
     setIsCheckingEligibility(true);
-    canStartCrossChainTravel(tokenId, targetChainId)
+    crossChainTransferFeatureApi.canStartTravel(tokenId, targetChainId)
       .then(result => {
         setIsEligible(result.canStart);
         setEligibilityReason(result.reason || '');
@@ -263,10 +263,10 @@ export function CrossChainTravelForm({ frogId, tokenId, frogName, onSuccess }: C
     try {
       setIsSyncing(true);
       setError('');
-      await syncCrossChainState(tokenId);
+      await crossChainTransferFeatureApi.syncState(tokenId);
       
       // Re-check eligibility after sync
-      const result = await canStartCrossChainTravel(tokenId, targetChainId);
+      const result = await crossChainTransferFeatureApi.canStartTravel(tokenId, targetChainId);
       setIsEligible(result.canStart);
       setEligibilityReason(result.reason || '');
     } catch (err: any) {
@@ -283,7 +283,7 @@ export function CrossChainTravelForm({ frogId, tokenId, frogName, onSuccess }: C
       const createAndNotify = async () => {
          try {
              // Create travel record ONLY after successful transaction submission
-             const { travelId: newTravelId } = await createCrossChainTravel({
+             const { travelId: newTravelId } = await crossChainTransferFeatureApi.createTravel({
                 frogId,
                 tokenId,
                 targetChainId,
@@ -294,7 +294,7 @@ export function CrossChainTravelForm({ frogId, tokenId, frogName, onSuccess }: C
              
              // Notify backend
              const messageId = hash; 
-             await notifyCrossChainTravelStarted(newTravelId, messageId, hash);
+             await crossChainTransferFeatureApi.notifyTravelStarted(newTravelId, messageId, hash);
              
              // 【改进】直接跳转到旅行详情页，简化状态管理
              navigate(`/travel/${newTravelId}`);
@@ -306,7 +306,7 @@ export function CrossChainTravelForm({ frogId, tokenId, frogName, onSuccess }: C
       };
       createAndNotify();
     }
-  }, [isSuccess, hash, travelId, createCrossChainTravel, notifyCrossChainTravelStarted, frogId, tokenId, targetChainId, duration, address, clearPendingTravel, navigate]);
+  }, [isSuccess, hash, travelId, frogId, tokenId, targetChainId, duration, address, clearPendingTravel, navigate]);
 
   // Handle failed transaction (Revert)
   useEffect(() => {

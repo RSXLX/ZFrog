@@ -1,11 +1,13 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { buildSessionAuthHeaders } from '../lib/auth/session';
 import { Frog } from '../types';
 export type { Frog };
 
-
-
-
 class ApiService {
+  private getAuthHeaders(): Record<string, string> {
+    return buildSessionAuthHeaders();
+  }
+
   private async request(endpoint: string, options?: RequestInit) {
     let finalEndpoint = endpoint;
     // 如果不是以 http 开头且不是以 /api 开头，自动补全 /api
@@ -14,19 +16,30 @@ class ApiService {
     }
     
     const url = finalEndpoint.startsWith('http') ? finalEndpoint : `${API_BASE_URL}${finalEndpoint}`;
+    const headers = new Headers(options?.headers);
+
+    Object.entries(this.getAuthHeaders()).forEach(([key, value]) => {
+      if (!headers.has(key)) {
+        headers.set(key, value);
+      }
+    });
+
+    if (!(options?.body instanceof FormData) && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+
     const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
       ...options,
+      headers,
     });
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         let errorMessage = `API Error: ${response.status} ${response.statusText}`;
         
-        if (errorData.error) {
+        if (typeof errorData?.message === 'string') {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
           if (typeof errorData.error === 'string') {
             errorMessage = errorData.error;
           } else if (errorData.error.message) {
@@ -72,8 +85,11 @@ class ApiService {
     });
   }
 
-  async delete<T = any>(endpoint: string): Promise<T> {
-    return this.request(endpoint, { method: 'DELETE' });
+  async delete<T = any>(endpoint: string, data?: any): Promise<T> {
+    return this.request(endpoint, {
+      method: 'DELETE',
+      ...(data !== undefined ? { body: JSON.stringify(data) } : {}),
+    });
   }
 
   /**
@@ -82,7 +98,7 @@ class ApiService {
    */
   async getFrogsByOwner(address: string): Promise<Frog[]> {
     console.warn('[API] getFrogsByOwner is deprecated. Use getMyFrog instead (single frog per wallet).');
-    const res = await this.get(`/api/frogs/owner/${address.toLowerCase()}`);
+    const res = await this.get(`/frogs/owner/${address.toLowerCase()}`);
     return res.data;
   }
 
@@ -91,7 +107,7 @@ class ApiService {
    */
   async getMyFrog(address: string): Promise<Frog | null> {
     try {
-      const res = await this.get(`/api/frogs/my/${address.toLowerCase()}`);
+      const res = await this.get(`/frogs/my/${address.toLowerCase()}`);
       return res.data;
     } catch (error) {
       if ((error as any).response?.status === 404) {
@@ -107,8 +123,8 @@ class ApiService {
   async getFrogDetail(tokenId: number, viewerAddress?: string): Promise<Frog | null> {
     try {
       const url = viewerAddress 
-        ? `/api/frogs/${tokenId}?viewerAddress=${viewerAddress.toLowerCase()}`
-        : `/api/frogs/${tokenId}`;
+        ? `/frogs/${tokenId}?viewerAddress=${viewerAddress.toLowerCase()}`
+        : `/frogs/${tokenId}`;
       const res = await this.get(url);
       return res.data;
     } catch (error) {
@@ -124,7 +140,7 @@ class ApiService {
    */
   async syncFrog(tokenId: number): Promise<boolean> {
     try {
-      const response = await this.post('/api/frogs/sync', { tokenId });
+      const response = await this.post('/frogs/sync', { tokenId });
       return response.success;
     } catch (error) {
         console.error('Sync failed:', error);
@@ -136,7 +152,7 @@ class ApiService {
    * 获取青蛙旅行历史
    */
   async getFrogsTravels(frogId: number): Promise<any[]> {
-    const res = await this.get(`/api/travels/${frogId}`);
+    const res = await this.get(`/travels/${frogId}`);
     return res.data;
   }
 
@@ -148,7 +164,7 @@ class ApiService {
     if (frogId) {
       params.append('frogId', frogId.toString());
     }
-    const res = await this.get(`/api/travels/history?${params}`);
+    const res = await this.get(`/travels/history?${params}`);
     return res.data;
   }
 
@@ -156,7 +172,7 @@ class ApiService {
    * 获取纪念品图片生成状态
    */
   async getSouvenirImageStatus(souvenirId: string) {
-    const res = await this.get(`/api/nft-image/status/${souvenirId}`);
+    const res = await this.get(`/nft-image/status/${souvenirId}`);
     return res;
   }
 
@@ -165,10 +181,10 @@ class ApiService {
    */
   async getBadges(frogId?: number, ownerAddress?: string): Promise<any> {
     if (frogId) {
-      const res = await this.get(`/api/badges/${frogId}`);
+      const res = await this.get(`/badges/${frogId}`);
       return res.data;
     } else if (ownerAddress) {
-      const res = await this.get(`/api/badges?ownerAddress=${ownerAddress}`);
+      const res = await this.get(`/badges?ownerAddress=${ownerAddress}`);
       return res.data;
     }
     return [];
@@ -178,7 +194,7 @@ class ApiService {
    * 获取待领取奖励
    */
   async getPendingRewards(ownerAddress: string): Promise<any[]> {
-    const res = await this.get(`/api/badges/rewards?ownerAddress=${ownerAddress}`);
+    const res = await this.get(`/badges/rewards?ownerAddress=${ownerAddress}`);
     return res.data || [];
   }
 
@@ -186,7 +202,7 @@ class ApiService {
    * 领取单个奖励
    */
   async claimReward(rewardId: string): Promise<{ txHash: string }> {
-    const res = await this.post('/api/badges/rewards/claim', { rewardId });
+    const res = await this.post('/badges/rewards/claim', { rewardId });
     if (!res.success) {
       throw new Error(res.error || 'Failed to claim reward');
     }
@@ -197,7 +213,7 @@ class ApiService {
    * 批量领取所有奖励
    */
   async claimAllRewards(ownerAddress: string): Promise<{ successCount: number; txHashes: string[] }> {
-    const res = await this.post('/api/badges/rewards/claim-all', { ownerAddress });
+    const res = await this.post('/badges/rewards/claim-all', { ownerAddress });
     if (!res.success) {
       throw new Error(res.error || 'Failed to claim rewards');
     }
@@ -209,17 +225,17 @@ class ApiService {
    */
   async getSouvenirs(frogId?: number, ownerAddress?: string): Promise<any> {
     if (frogId) {
-      const res = await this.get(`/api/souvenirs/${frogId}`);
+      const res = await this.get(`/souvenirs/${frogId}`);
       return res.data;
     } else if (ownerAddress) {
-      const res = await this.get(`/api/souvenirs?ownerAddress=${ownerAddress}`);
+      const res = await this.get(`/souvenirs?ownerAddress=${ownerAddress}`);
       return res.data;
     }
     return [];
   }
 
   async discoverLuckyAddress(chain: string) {
-    const res = await this.get(`/api/travels/lucky-address?chain=${chain}`);
+    const res = await this.get(`/travels/lucky-address?chain=${chain}`);
     return res.data;
   }
 
@@ -232,7 +248,7 @@ class ApiService {
     duration: number
   ): Promise<{ travelId: number; txHash: string }> {
     try {
-      const response = await this.post('/api/travel/start', {
+      const response = await this.post('/travel/start', {
         frogId,
         travelType: 'RANDOM',
         targetChain,
@@ -271,7 +287,7 @@ class ApiService {
       throw new Error('Invalid target address format');
     }
 
-    const response = await this.post('/api/travel/start', {
+    const response = await this.post('/travel/start', {
       frogId,
       travelType: 'TARGETED',
       targetChain,

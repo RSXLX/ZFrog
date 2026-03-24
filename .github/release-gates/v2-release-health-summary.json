@@ -1,0 +1,39 @@
+{
+  "gateId": "v2-release-health-summary",
+  "windowDays": 7,
+  "attention": {
+    "trackReasonIncrease": true,
+    "failOnReasonIncrease": false,
+    "trackConsecutiveReasonIncrease": true,
+    "consecutiveIncreaseWindows": 2,
+    "failOnConsecutiveReasonIncrease": false
+  },
+  "dispatchQuality": {
+    "workflowFile": "v2-p1-escalation-dispatch.yml",
+    "sampleSize": 12,
+    "events": ["schedule"],
+    "trackConsecutiveFailureWeeks": true,
+    "consecutiveFailureWeeks": 2,
+    "failOnConsecutiveFailureWeeks": true,
+    "failOnLatestFailure": true
+  },
+  "timeoutGate": {
+    "workflowFile": "v2-p1-escalation-dispatch.yml",
+    "sampleSize": 12,
+    "events": ["schedule"],
+    "trackConsecutiveFailureWeeks": true,
+    "consecutiveFailureWeeks": 2,
+    "failOnConsecutiveFailureWeeks": true,
+    "failOnLatestFailure": false
+  },
+  "timeoutStabilityGate": {
+    "workflowFile": "v2-p1-escalation-dispatch.yml",
+    "sampleSize": 12,
+    "events": ["schedule"],
+    "trackConsecutiveFailureWeeks": true,
+    "consecutiveFailureWeeks": 2,
+    "failOnConsecutiveFailureWeeks": true,
+    "failOnLatestFailure": false
+  },
+  "notes": "Weekly synthesis of RC gate, cutover fallback gate, dispatch-quality gate, timeout gate, and timeout-stability gate with trend visibility."
+}

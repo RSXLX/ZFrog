@@ -1,0 +1,31 @@
+[
+  {
+    "number": 201,
+    "state": "open",
+    "title": "[V2-W15-06][P1 Escalation] workspace-startup-failed",
+    "html_url": "https://example.test/zfrog/issues/201",
+    "body": "<!-- v2-p1-reason:workspace-startup-failed -->\nP1 escalation issue",
+    "created_at": "2026-03-18T00:00:00Z",
+    "updated_at": "2026-03-20T00:00:00Z",
+    "labels": [
+      { "name": "p1" },
+      { "name": "v2" },
+      { "name": "release-health" },
+      { "name": "need-triage" }
+    ]
+  },
+  {
+    "number": 202,
+    "state": "open",
+    "title": "[V2-W15-06][P1 Escalation] manual-debug",
+    "html_url": "https://example.test/zfrog/issues/202",
+    "body": "<!-- v2-p1-reason:manual-debug -->\nP1 escalation issue",
+    "created_at": "2026-03-22T06:00:00Z",
+    "updated_at": "2026-03-23T09:30:00Z",
+    "labels": [
+      { "name": "p1" },
+      { "name": "v2" },
+      { "name": "release-health" }
+    ]
+  }
+]

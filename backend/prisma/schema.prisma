@@ -126,6 +126,7 @@ model Frog {
   ritualsAsFrog                    Ritual[]            @relation("RitualFrog")
   ritualsAsTarget                  Ritual[]            @relation("RitualTarget")
   memoryPalace                     MemoryPalace?
+  memorySummaries                  MemorySummary[]
   onchainMilestones                OnchainMilestone[]
   domainEvents                     DomainEvent[]
 
@@ -259,6 +260,120 @@ model HumanVerification {
   @@map("human_verifications")
 }
 
+model IntegrationApp {
+  id          String                  @id @default(cuid())
+  slug        String                  @unique
+  name        String
+  appType     String
+  status      String                  @default("ACTIVE")
+  metadata    Json?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  permissions IntegrationPermission[]
+  keys        IntegrationKey[]
+
+  @@index([appType, status])
+  @@map("integration_apps")
+}
+
+model IntegrationPermission {
+  id         String         @id @default(cuid())
+  appId      String
+  permission String
+  createdAt  DateTime       @default(now())
+  app        IntegrationApp @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@unique([appId, permission])
+  @@index([permission])
+  @@map("integration_permissions")
+}
+
+model IntegrationKey {
+  id         String         @id @default(cuid())
+  appId      String
+  label      String?
+  keyPrefix  String         @unique
+  secretHash String
+  status     String         @default("ACTIVE")
+  issuedBy   String?
+  issuedAt   DateTime       @default(now())
+  revokedAt  DateTime?
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  app        IntegrationApp @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@index([appId, status])
+  @@index([expiresAt])
+  @@map("integration_keys")
+}
+
+model CouncilRun {
+  id               String   @id
+  appId            String
+  keyId            String
+  requestedByActor String
+  requestId        String?
+  focus            String
+  objective        String?
+  rationale        String
+  riskLevel        String
+  dataSources      Json
+  suggestedActions Json
+  traceId          String   @unique
+  promptKitVersion String
+  model            String
+  fingerprint      String
+  createdAt        DateTime @default(now())
+  suggestion       CouncilSuggestion?
+
+  @@index([appId, createdAt])
+  @@map("council_runs")
+}
+
+model CouncilSuggestion {
+  id             String   @id
+  runId          String   @unique
+  title          String
+  focus          String
+  objective      String?
+  rationale      String
+  riskLevel      String
+  riskReason     String
+  dataSources    Json
+  suggestedActions Json
+  status         String   @default("OPEN")
+  createdByAppId String
+  createdByKeyId String
+  createdByActor String
+  requestId      String?
+  updatedByActor String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  run            CouncilRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  response       CouncilResponse?
+
+  @@index([createdByAppId, status, createdAt])
+  @@map("council_suggestions")
+}
+
+model CouncilResponse {
+  id               String            @id @default(cuid())
+  suggestionId     String            @unique
+  decision         String
+  note             String?
+  respondedByAppId String
+  respondedByActor String
+  respondedAt      DateTime          @default(now())
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  suggestion       CouncilSuggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+
+  @@index([respondedByAppId, respondedAt])
+  @@map("council_responses")
+}
+
 model EggProfile {
   id           Int       @id @default(autoincrement())
   frogId       Int       @unique
@@ -335,6 +450,29 @@ model RelationshipEvent {
   @@map("relationship_events")
 }
 
+model RelationshipAttestation {
+  id               String   @id @default(cuid())
+  subjectFrogId    Int
+  objectFrogId     Int
+  attestationType  String
+  source           String
+  evidence         Json?
+  status           String   @default("QUEUED")
+  idempotencyKey   String?  @unique
+  requestId        String?
+  createdByAddress String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  onchainMilestones OnchainMilestone[]
+
+  @@index([subjectFrogId, createdAt])
+  @@index([objectFrogId, createdAt])
+  @@index([attestationType, createdAt])
+  @@index([status, createdAt])
+  @@unique([subjectFrogId, objectFrogId, attestationType, source])
+  @@map("relationship_attestations")
+}
+
 model Ritual {
   id           BigInt    @id @default(autoincrement())
   frogId       Int
@@ -371,10 +509,425 @@ model MemoryPalace {
   @@map("memory_palaces")
 }
 
+model MemoryPalaceWorld {
+  id             String                    @id
+  journeyId      String
+  title          String
+  summary        String?                   @db.Text
+  templateSlug   String?
+  status         String                    @default("ACTIVE")
+  ownerAppId     String
+  ownerKeyId     String
+  createdByActor String
+  requestId      String?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  collaborators  MemoryPalaceCollaborator[]
+  contributions  MemoryPalaceContribution[]
+  visits         MemoryPalaceVisit[]
+  exhibits       MemoryPalaceExhibit[]
+
+  @@index([ownerAppId, createdAt])
+  @@index([journeyId, createdAt])
+  @@index([status, createdAt])
+  @@map("memory_palace_worlds")
+}
+
+model MemoryPalaceCollaborator {
+  id           String           @id @default(cuid())
+  worldId      String
+  appId        String
+  role         String           @default("CONTRIBUTOR")
+  addedByActor String
+  createdAt    DateTime         @default(now())
+  world        MemoryPalaceWorld @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@unique([worldId, appId])
+  @@index([appId, createdAt])
+  @@map("memory_palace_collaborators")
+}
+
+model MemoryPalaceContribution {
+  id        String            @id
+  worldId   String
+  appId     String
+  actor     String
+  type      String
+  content   String            @db.Text
+  metadata  Json?
+  requestId String?
+  createdAt DateTime          @default(now())
+  world     MemoryPalaceWorld @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@index([worldId, createdAt])
+  @@index([appId, createdAt])
+  @@index([type, createdAt])
+  @@map("memory_palace_contributions")
+}
+
+model MemoryPalaceVisit {
+  id             String              @id
+  worldId        String
+  visitorAppId   String
+  visitorKeyId   String
+  visitorActor   String
+  entryType      String              @default("GUESTBOOK")
+  message        String              @db.Text
+  metadata       Json?
+  requestId      String?
+  createdAt      DateTime            @default(now())
+  world          MemoryPalaceWorld   @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  featuredExhibit MemoryPalaceExhibit?
+
+  @@index([worldId, createdAt])
+  @@index([visitorAppId, createdAt])
+  @@index([entryType, createdAt])
+  @@map("memory_palace_visits")
+}
+
+model MemoryPalaceExhibit {
+  id             String            @id
+  worldId        String
+  visitId        String            @unique
+  featuredByActor String
+  featureReason  String?           @db.Text
+  metadata       Json?
+  requestId      String?
+  featuredAt     DateTime          @default(now())
+  world          MemoryPalaceWorld @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  visit          MemoryPalaceVisit @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  @@index([worldId, featuredAt])
+  @@index([featuredByActor, featuredAt])
+  @@map("memory_palace_exhibits")
+}
+
+model MemoryPalaceTemplate {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  name           String
+  status         String   @default("DRAFT")
+  config         Json?
+  createdByAppId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([createdByAppId, createdAt])
+  @@map("memory_palace_templates")
+}
+
+model CreatorProfile {
+  id        String         @id @default(cuid())
+  appId     String         @unique
+  status    String         @default("ACTIVE")
+  metadata  Json?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  assets    CreatorAsset[]
+  packs     CreatorPack[]
+
+  @@index([status, createdAt])
+  @@map("creator_profiles")
+}
+
+model CreatorAsset {
+  id             String             @id
+  creatorAppId   String
+  createdByKeyId String
+  createdByActor String
+  requestId      String?
+  assetType      String
+  mimeType       String
+  sourceUrl      String
+  checksum       String
+  bytes          Int
+  status         String             @default("READY")
+  preview        Json
+  metadata       Json?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  profile        CreatorProfile     @relation(fields: [creatorAppId], references: [appId], onDelete: Cascade)
+  packAssets     CreatorPackAsset[]
+  licenseBindings CreatorAssetBinding[]
+
+  @@index([creatorAppId, createdAt])
+  @@index([assetType, status, createdAt])
+  @@map("creator_assets")
+}
+
+model CreatorPack {
+  id             String             @id
+  creatorAppId   String
+  slug           String
+  title          String
+  summary        String?            @db.Text
+  status         String             @default("DRAFT")
+  previewState   String             @default("READY")
+  createdByKeyId String
+  createdByActor String
+  requestId      String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  profile        CreatorProfile     @relation(fields: [creatorAppId], references: [appId], onDelete: Cascade)
+  assets         CreatorPackAsset[]
+
+  @@unique([creatorAppId, slug])
+  @@index([creatorAppId, status, createdAt])
+  @@map("creator_packs")
+}
+
+model CreatorPackAsset {
+  id        String      @id @default(cuid())
+  packId    String
+  assetId   String
+  sortOrder Int         @default(0)
+  createdAt DateTime    @default(now())
+  pack      CreatorPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+  asset     CreatorAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@unique([packId, assetId])
+  @@index([assetId])
+  @@index([packId, sortOrder])
+  @@map("creator_pack_assets")
+}
+
+model CreatorAssetBinding {
+  id                  String              @id
+  assetId             String
+  creatorAppId        String
+  checksum            String
+  ownerWallet         String
+  issuedAt            DateTime
+  anchorDigest        String
+  status              String              @default("BOUND")
+  replayCount         Int                 @default(0)
+  lastError           String?
+  onchainRequired     Boolean             @default(false)
+  anchoredAt          DateTime?
+  createdByKeyId      String
+  createdByActor      String
+  lastReplayedByActor String?
+  requestId           String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  asset               CreatorAsset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  onchainAnchor       OnchainCreatorAsset?
+
+  @@unique([assetId, checksum, ownerWallet, issuedAt])
+  @@index([creatorAppId, status, createdAt])
+  @@index([assetId, createdAt])
+  @@index([status, updatedAt])
+  @@map("creator_asset_bindings")
+}
+
+model OnchainCreatorAsset {
+  id         String              @id
+  bindingId  String              @unique
+  anchorId   String              @unique
+  mode       String              @default("mock")
+  chainId    Int?
+  txHash     String?
+  blockNumber BigInt?
+  payload    Json?
+  anchoredAt DateTime            @default(now())
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  binding    CreatorAssetBinding @relation(fields: [bindingId], references: [id], onDelete: Cascade)
+
+  @@index([chainId, anchoredAt])
+  @@index([txHash, anchoredAt])
+  @@map("onchain_creator_assets")
+}
+
+model RelationshipEdge {
+  id                 String   @id
+  scopeAppId         String
+  frogId             Int
+  peerFrogId         Int
+  score              Int      @default(0)
+  signalCount        Int      @default(0)
+  journeyCount       Int      @default(0)
+  rescueCount        Int      @default(0)
+  witnessCount       Int      @default(0)
+  contributionCount  Int      @default(0)
+  firstOccurredAt    DateTime
+  lastOccurredAt     DateTime
+  metadata           Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  anchors            RelationshipEdgeAnchor[]
+
+  @@unique([scopeAppId, frogId, peerFrogId])
+  @@index([scopeAppId, frogId, lastOccurredAt])
+  @@index([scopeAppId, peerFrogId, lastOccurredAt])
+  @@index([scopeAppId, score, lastOccurredAt])
+  @@map("relationship_edges")
+}
+
+model RelationshipEdgeAnchor {
+  id                  String                          @id
+  scopeAppId          String
+  edgeId              String
+  frogId              Int
+  peerFrogId          Int
+  anchorDigest        String
+  status              String                          @default("PENDING")
+  replayCount         Int                             @default(0)
+  lastError           String?
+  onchainRequired     Boolean                         @default(false)
+  anchoredAt          DateTime?
+  createdByKeyId      String
+  createdByActor      String
+  lastReplayedByActor String?
+  requestId           String?
+  edgeSnapshot        Json?
+  createdAt           DateTime                        @default(now())
+  updatedAt           DateTime                        @updatedAt
+  edge                RelationshipEdge                @relation(fields: [edgeId], references: [id], onDelete: Cascade)
+  onchainAnchor       OnchainRelationshipEdgeAnchor?
+
+  @@unique([scopeAppId, edgeId, anchorDigest])
+  @@index([scopeAppId, status, updatedAt])
+  @@index([scopeAppId, frogId, updatedAt])
+  @@index([edgeId, createdAt])
+  @@map("relationship_edge_anchors")
+}
+
+model OnchainRelationshipEdgeAnchor {
+  id             String                   @id
+  anchorRecordId String                   @unique
+  anchorId       String                   @unique
+  mode           String                   @default("mock")
+  chainId        Int?
+  txHash         String?
+  blockNumber    BigInt?
+  payload        Json?
+  anchoredAt     DateTime                 @default(now())
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  anchorRecord   RelationshipEdgeAnchor   @relation(fields: [anchorRecordId], references: [id], onDelete: Cascade)
+
+  @@index([chainId, anchoredAt])
+  @@index([txHash, anchoredAt])
+  @@map("onchain_relationship_edge_anchors")
+}
+
+model RelationshipEdgeSnapshot {
+  id                String   @id
+  scopeAppId        String
+  frogId            Int
+  version           Int      @default(1)
+  computedAt        DateTime @default(now())
+  totalEdges        Int
+  totalScore        Int
+  strongestPeerFrogId Int?
+  strongestScore    Int?
+  digest            String
+  metadata          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([scopeAppId, frogId, computedAt])
+  @@index([scopeAppId, computedAt])
+  @@map("relationship_edge_snapshots")
+}
+
+model PartnerCampaign {
+  id               String            @id
+  partnerAppId     String
+  slug             String
+  title            String
+  description      String?           @db.Text
+  status           String            @default("DRAFT")
+  callbackEndpoint String
+  callbackSecret   String
+  callbackSecretHash String
+  rewardPolicy     Json?
+  metadata         Json?
+  createdByKeyId   String
+  createdByActor   String
+  requestId        String?
+  publishedAt      DateTime?
+  pausedAt         DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  callbacks        PartnerCallback[]
+  rewards          PartnerReward[]
+
+  @@unique([partnerAppId, slug])
+  @@index([partnerAppId, status, createdAt])
+  @@index([status, createdAt])
+  @@map("partner_campaigns")
+}
+
+model PartnerCallback {
+  id               String          @id
+  campaignId       String
+  partnerEventId   String
+  eventType        String
+  signatureVersion String          @default("v1-hmac-sha256")
+  signature        String
+  verified         Boolean         @default(false)
+  status           String          @default("REJECTED")
+  reason           String?
+  payload          Json
+  requestId        String?
+  receivedAt       DateTime        @default(now())
+  processedAt      DateTime        @default(now())
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  campaign         PartnerCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  reward           PartnerReward?  @relation("PartnerCallbackReward")
+
+  @@unique([campaignId, partnerEventId])
+  @@index([campaignId, receivedAt])
+  @@index([status, receivedAt])
+  @@map("partner_callbacks")
+}
+
+model PartnerReward {
+  id             String          @id
+  campaignId     String
+  callbackId     String          @unique
+  recipientWallet String
+  rewardType     String
+  amount         String
+  status         String          @default("GRANTED")
+  metadata       Json?
+  grantedAt      DateTime        @default(now())
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  campaign       PartnerCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  callback       PartnerCallback @relation("PartnerCallbackReward", fields: [callbackId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, createdAt])
+  @@index([recipientWallet, createdAt])
+  @@map("partner_rewards")
+}
+
+model MemorySummary {
+  id          Int      @id @default(autoincrement())
+  frogId      Int
+  summaryType String   @default("RELATIONSHIP_V1")
+  summaryText String   @db.Text
+  sourceData  Json?
+  generatedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  frog Frog @relation(fields: [frogId], references: [id])
+
+  @@unique([frogId, summaryType])
+  @@index([summaryType, generatedAt])
+  @@map("memory_summaries")
+}
+
 model OnchainMilestone {
   id            BigInt   @id @default(autoincrement())
   frogId        Int
   travelId      Int?
+  attestationId String?
   milestoneType String
   chainId       Int?
   txHash        String?
@@ -382,11 +935,13 @@ model OnchainMilestone {
   payload       Json?
   createdAt     DateTime @default(now())
 
-  frog   Frog    @relation(fields: [frogId], references: [id])
-  travel Travel? @relation(fields: [travelId], references: [id])
+  frog        Frog                   @relation(fields: [frogId], references: [id])
+  travel      Travel?                @relation(fields: [travelId], references: [id])
+  attestation RelationshipAttestation? @relation(fields: [attestationId], references: [id], onDelete: SetNull)
 
   @@index([frogId, milestoneType, createdAt])
   @@index([travelId])
+  @@index([attestationId, createdAt])
   @@map("onchain_milestones")
 }
 

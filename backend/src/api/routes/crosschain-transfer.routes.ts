@@ -12,7 +12,7 @@
 import { Router, Request, Response } from 'express';
 import { crossChainTransferService } from '../../services/crosschain-transfer.service';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * 创建跨链转账记录

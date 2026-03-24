@@ -1,0 +1,20 @@
+{
+  "generatedAt": "2026-03-24T00:00:00.000Z",
+  "runId": "local",
+  "runUrl": "n/a",
+  "layerReportPath": "/tmp/v3-dashboard-playwright-layer.local.json",
+  "layerStatus": "failure",
+  "drill": {
+    "smokeResult": "fail",
+    "runtimeStatusSnapshot": "unknown（受限环境未进入页面）",
+    "moduleSnapshot": "relationshipGraph=unknown（未进入 toggle 验证）",
+    "freezeWritePathResult": "fail（未执行到写路径拦截验证）",
+    "rollbackReadPathResult": "fail（未执行到读链路恢复验证）",
+    "freezeSeconds": "n/a",
+    "rollbackSeconds": "n/a",
+    "runtimeStatusApiResult": "fail",
+    "moduleReadApiResult": "fail",
+    "anomalies": "Playwright layer status=failure，执行环境端口监听受限（listen EPERM）。",
+    "conclusion": "暂缓发布"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "generatedAt": "2026-03-23T05:41:11.886Z",
+  "mode": "dry-run",
+  "configPath": ".github/release-gates/v2-p1-escalation-dispatch.json",
+  "summaryPath": "./scripts/ci/fixtures/v2-release-health-summary.sample.json",
+  "repository": "",
+  "openIssueSource": "fixture:./scripts/ci/fixtures/v2-open-issues.sample.json",
+  "retryPolicy": {
+    "maxAttempts": 3,
+    "baseDelayMs": 800,
+    "maxDelayMs": 5000,
+    "retryOnStatuses": [
+      429,
+      500,
+      502,
+      503,
+      504
+    ]
+  },
+  "idempotencyLogPath": "/Users/sxlx/.gemini/antigravity/ZFrog/reports/v2-p1-escalation-dispatch-idempotency.jsonl",
+  "idempotencyLogRecords": 0,
+  "summaryVerdict": "PASS",
+  "schemaValidation": {
+    "valid": true,
+    "errors": [],
+    "warnings": []
+  },
+  "actions": [
+    {
+      "reason": "workspace-startup-failed",
+      "current": 3,
+      "previous": 2,
+      "delta": 1,
+      "history": [
+        3,
+        2,
+        1
+      ],
+      "signals": [
+        "budget-exceeded",
+        "week-over-week-up",
+        "consecutive-weekly-up"
+      ],
+      "ownerRoute": "workspace-platform",
+      "ownerRouteSource": "reason-map",
+      "decision": "skip-existing",
+      "issueNumber": 101,
+      "issueUrl": "https://example.test/zfrog/issues/101"
+    }
+  ]
+}

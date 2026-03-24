@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useMyFrog } from '../hooks/useMyFrog';
 import { Button } from '../components/common/Button';
 import { FeatureGateState } from '../components/common/FeatureGateState';
-import { apiService } from '../services/api';
+import { rewardFeatureApi } from '../features/reward/api';
 import { useToast } from '../components/common/ToastProvider';
 
 interface Badge {
@@ -136,8 +136,8 @@ export function BadgesPage() {
       try {
         setLoading(true);
         const [badgesData, rewardsData] = await Promise.all([
-          apiService.getBadges(frog.tokenId),
-          apiService.getPendingRewards(frog.ownerAddress),
+          rewardFeatureApi.getBadges(frog.tokenId),
+          rewardFeatureApi.getPendingRewards(frog.ownerAddress),
         ]);
         setBadges(badgesData || []);
         setRewards(rewardsData || []);
@@ -167,13 +167,13 @@ export function BadgesPage() {
     setClaimResult(null);
     
     try {
-      const result = await apiService.claimAllRewards(frog.ownerAddress);
+      const result = await rewardFeatureApi.claimAllRewards(frog.ownerAddress);
       setClaimResult({
         success: true,
         message: `成功领取 ${result.successCount} 份奖励！`,
       });
       // 刷新奖励列表
-      const newRewards = await apiService.getPendingRewards(frog.ownerAddress);
+      const newRewards = await rewardFeatureApi.getPendingRewards(frog.ownerAddress);
       setRewards(newRewards || []);
     } catch (error: any) {
       setClaimResult({

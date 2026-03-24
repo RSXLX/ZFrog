@@ -21,7 +21,7 @@ import {
 } from '../../types/appearance';
 import { logger } from '../../utils/logger';
 
-const router = Router();
+const router: Router = Router();
 
 // ============ B6: 生成外观参数 ============
 

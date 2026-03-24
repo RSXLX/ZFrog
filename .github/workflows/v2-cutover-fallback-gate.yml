@@ -1,0 +1,43 @@
+name: v2-cutover-fallback-gate
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '20 20 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Cutover Fallback Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Evaluate fallback gate
+        if: always()
+        run: >
+          node ./scripts/cutover/legacy-fallback-gate-check.mjs
+          --config ./.github/release-gates/v2-cutover-fallback-gate.json
+          --log ./reports/cutover/dev-entry.log
+          --report ./reports/cutover/legacy-fallback-gate-report.md
+
+      - name: Publish report summary
+        if: always()
+        run: cat reports/cutover/legacy-fallback-gate-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload fallback gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-cutover-fallback-gate-report
+          path: reports/cutover/legacy-fallback-gate-report.md

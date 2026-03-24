@@ -4,7 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState, memo } from 'react';
-import { apiService } from '../../services/api';
+import { travelFeatureApi } from '../../features/travel/api';
 
 // 支持两种使用方式的 props
 interface Travel {
@@ -141,7 +141,7 @@ export const TravelJournal = memo(function TravelJournal(props: JournalProps) {
                              ((props as any).travel?.souvenirData ? `p0-${(props as any).travel.id}` : null);
             
             if (souvenirId) {
-                apiService.getSouvenirImageStatus(souvenirId.toString())
+                travelFeatureApi.getSouvenirImageStatus(souvenirId.toString())
                     .then(res => {
                         if (res.success && res.record) {
                             const displayUrl = res.record.gatewayUrl || res.record.imageUrl;

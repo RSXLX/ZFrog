@@ -5,7 +5,7 @@ import { badgeService } from '../../services/badge/badge.service';
 import { prisma } from '../../database';
 import { airdropService } from '../../services/airdrop/airdrop.service';
 
-const router = Router();
+const router: Router = Router();
 
 // ========== 静态路由必须在动态路由 /:frogId 之前 ==========
 

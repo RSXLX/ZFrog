@@ -141,9 +141,11 @@ export class ApiResponseHelper {
     customMessage?: string,
     statusCode = 400
   ): Response {
+    const message = customMessage || ErrorMessages[code] || '未知错误';
     const response: ApiResponse = {
       success: false,
-      error: customMessage || ErrorMessages[code] || '未知错误',
+      message,
+      error: message, // 兼容旧前端 error 字段读取
       meta: {
         timestamp: Date.now(),
       },
@@ -172,6 +174,7 @@ export class ApiResponseHelper {
     console.error('Server error:', error);
     const response: ApiResponse = {
       success: false,
+      message: '服务器内部错误',
       error: '服务器内部错误',
       meta: {
         timestamp: Date.now(),

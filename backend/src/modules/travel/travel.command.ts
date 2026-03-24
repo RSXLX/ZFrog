@@ -15,6 +15,7 @@ import { travelEventService } from './travel-events';
 import { travelFeedService } from '../../services/travel/travel-feed.service';
 import { rescueService } from '../../services/travel/rescue.service';
 import { groupTravelService } from '../../services/group-travel.service';
+import { memoryPalaceService } from '../memory-palace/memory-palace.service';
 import {
   omniTravelCommandAdapter,
   omniTravelQueryAdapter,
@@ -808,6 +809,19 @@ export class TravelCommandServiceV1 {
         frog: existing.frog,
       };
     });
+
+    try {
+      await memoryPalaceService.upsertFromTravel({
+        travelId: travel.id,
+        requestId: input.requestId,
+        source: input.source || 'v1_travel_complete',
+      });
+    } catch (error) {
+      logger.error('[TravelCommand] Failed to upsert memory palace after travel completion', {
+        travelId: travel.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     const machine = toTravelMachineState({
       status: travel.status,

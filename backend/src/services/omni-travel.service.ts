@@ -8,7 +8,7 @@
  * - Syncs on-chain state with database
  */
 
-import { PrismaClient, CrossChainStatus, ChainType, TravelStatus, TravelStage, CrossChainMessageStatus, MessageDirection, DiscoveryType } from '@prisma/client';
+import { CrossChainStatus, ChainType, TravelStatus, TravelStage, CrossChainMessageStatus, MessageDirection, DiscoveryType } from '@prisma/client';
 import { createPublicClient, createWalletClient, http, parseAbi, Hex, encodeFunctionData } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { config } from '../config';
@@ -17,8 +17,7 @@ import { explorationService } from './travel/exploration.service';
 import { aiService } from './ai.service';
 import { ChainKey, getChainConfig, getChainKey } from '../config/chains';
 import { observerService } from './observer.service';
-
-const prisma = new PrismaClient();
+import { prisma } from '../database';
 
 // Contract ABIs
 const OMNI_TRAVEL_ABI = parseAbi([
@@ -1050,12 +1049,16 @@ export class OmniTravelService {
       logger.info(`[CrossChain] Updated frog stats for travel ${travel.id} on ${chainKey}`);
       
       // Then check badges
-      const { badgeService } = await import('./badge/badge.service');
-      const unlockedBadges = await badgeService.checkAndUnlock(travel.frogId, {
-        chain: chainKey,
-        travelId: travel.id,
-        discoveries: discoveries,
-      });
+      const { badgeMaintenanceService } = await import('./badge/badge-maintenance.service');
+      const badgeResult = await badgeMaintenanceService.reconcileFrogBadges(
+        { frogId: travel.frogId },
+        {
+          syncDefinitions: false,
+          syncStats: false,
+          unlockedByTravelId: travel.id,
+        }
+      );
+      const unlockedBadges = badgeResult.unlockedBadges;
       if (unlockedBadges.length > 0) {
         logger.info(`[CrossChain] Unlocked badges: ${unlockedBadges.join(', ')}`);
       } else {
@@ -1233,4 +1236,3 @@ export class OmniTravelService {
 }
 
 export const omniTravelService = new OmniTravelService();
-

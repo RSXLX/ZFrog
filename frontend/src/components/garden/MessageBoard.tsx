@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiService } from '../../services/api';
+import { gardenFeatureApi } from '../../features/garden/api';
 
 export interface Message {
   id: number;
@@ -53,10 +53,8 @@ export const MessageBoard: React.FC<MessageBoardProps> = ({
 
   const loadMessages = async () => {
     try {
-      const response = await apiService.get(`/homestead/${frogId}/messages`);
-      if (response.success) {
-        setMessages(response.data || []);
-      }
+      const list = await gardenFeatureApi.getMessages(frogId);
+      setMessages(list || []);
     } catch (error) {
       console.error('Failed to load messages:', error);
     } finally {
@@ -69,7 +67,7 @@ export const MessageBoard: React.FC<MessageBoardProps> = ({
     if (!newMessage.trim()) return;
 
     try {
-      const response = await apiService.post(`/homestead/${frogId}/messages`, {
+      const response = await gardenFeatureApi.postMessage(frogId, {
         fromFrogId: currentFrogId,
         message: newMessage,
         emoji: selectedEmoji,
@@ -87,7 +85,7 @@ export const MessageBoard: React.FC<MessageBoardProps> = ({
   // 点赞
   const handleLike = async (messageId: number) => {
     try {
-      await apiService.post(`/homestead/${frogId}/messages/${messageId}/like`);
+      await gardenFeatureApi.likeMessage(frogId, messageId);
       setMessages(msgs =>
         msgs.map(m =>
           m.id === messageId ? { ...m, likesCount: m.likesCount + 1 } : m

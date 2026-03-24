@@ -60,8 +60,13 @@ interface LegacyErrorResponse {
   details?: string;
 }
 
-const isV1Request = (req: Request): boolean =>
-  req.originalUrl.startsWith('/api/v1') || req.path.startsWith('/api/v1');
+const isStructuredApiRequest = (req: Request): boolean =>
+  req.originalUrl.startsWith('/api/v1') ||
+  req.path.startsWith('/api/v1') ||
+  req.originalUrl.startsWith('/api/v2') ||
+  req.path.startsWith('/api/v2') ||
+  req.originalUrl.startsWith('/api/v3') ||
+  req.path.startsWith('/api/v3');
 
 const stringifyLegacyDetails = (details: unknown): string | undefined => {
   if (typeof details === 'string') {
@@ -85,7 +90,7 @@ const sendErrorResponse = (
   message: string,
   details?: unknown
 ): void => {
-  if (isV1Request(req)) {
+  if (isStructuredApiRequest(req)) {
     res
       .status(statusCode)
       .json(

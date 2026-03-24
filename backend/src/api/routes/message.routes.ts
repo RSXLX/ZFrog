@@ -4,9 +4,10 @@
 
 import { Router } from 'express';
 import { prisma } from '../../database';
+import { badgeMaintenanceService } from '../../services/badge/badge-maintenance.service';
 import { logger } from '../../utils/logger';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * POST /api/messages/leave
@@ -52,6 +53,15 @@ router.post('/leave', async (req, res) => {
     });
     
     logger.info(`[Message] ${frog.name} left a message at ${toAddress}`);
+
+    try {
+      await badgeMaintenanceService.reconcileFrogBadges(
+        { frogId: frog.id },
+        { syncDefinitions: false, syncStats: false }
+      );
+    } catch (badgeError) {
+      logger.warn('[Message] Badge reconciliation failed:', badgeError);
+    }
     
     res.json({
       success: true,

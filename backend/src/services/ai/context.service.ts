@@ -1,7 +1,8 @@
 // backend/src/services/ai/context.service.ts
 
-import { PrismaClient, ChatIntent, ChatMessage } from '@prisma/client';
+import { ChatIntent } from '@prisma/client';
 import { logger } from '../../utils/logger';
+import { prisma } from '../../database';
 
 /**
  * 聊天上下文接口
@@ -26,17 +27,13 @@ export interface ChatContext {
  * 负责维护聊天会话的上下文记忆
  */
 export class ContextService {
-  private prisma: PrismaClient;
+  private prisma = prisma;
   
   /** 最大保留的上下文消息数 */
   private static readonly MAX_CONTEXT_MESSAGES = 10;
   
   /** 触发摘要生成的消息阈值 */
   private static readonly SUMMARY_THRESHOLD = 20;
-
-  constructor() {
-    this.prisma = new PrismaClient();
-  }
 
   /**
    * 获取会话上下文

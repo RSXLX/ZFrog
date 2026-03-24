@@ -1,0 +1,14 @@
+{
+  "gateId": "v2-cutover-fallback",
+  "windowDays": 7,
+  "excludeDryRun": true,
+  "thresholds": {
+    "maxLegacyLaunches": 3,
+    "maxLegacyRate": 0.2,
+    "minTotalLaunchesForRate": 5
+  },
+  "reasonBudgets": {
+    "workspace-startup-failed": 1
+  },
+  "notes": "Track legacy fallback health after workspace-first cutover; ignore dry-run rehearsals."
+}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Frog } from '../../types';
-import { apiService } from '../../services/api';
+import { frogFeatureApi } from '../../features/frog/api';
+import { socialFeatureApi } from '../../features/social/api';
 import { FriendCardSkeleton } from '../common/Skeleton';
 
 interface WorldOnlineListProps {
@@ -26,20 +27,10 @@ const WorldOnlineList: React.FC<WorldOnlineListProps> = ({
   const fetchWorldOnlineFrogs = async () => {
     try {
       setLoading(true);
-      const response = await apiService.get('/frogs/world-online', {
-        params: {
-          limit: 20,
-          offset: 0
-        }
-      });
-      
-      if (response.success) {
-        // 过滤掉自己的青蛙
-        const filteredFrogs = response.data.filter((frog: any) => 
-          frog.tokenId !== currentFrogId
-        );
-        setFrogs(filteredFrogs);
-      }
+      const list = await frogFeatureApi.getWorldOnline(20, 0);
+      // 过滤掉自己的青蛙
+      const filteredFrogs = list.filter((frog: any) => frog.tokenId !== currentFrogId);
+      setFrogs(filteredFrogs);
     } catch (err: any) {
       console.error('Error fetching world online frogs:', err);
       setError(err.response?.data?.error || '获取世界在线列表失败');
@@ -50,11 +41,9 @@ const WorldOnlineList: React.FC<WorldOnlineListProps> = ({
 
   const fetchFriendsList = async () => {
     try {
-      const response = await apiService.get(`/friends/list/${currentFrogId}`);
-      if (response.success) {
-        const ids = response.data.map((friend: any) => friend.tokenId);
-        setFriendIds(ids);
-      }
+      const friends = await socialFeatureApi.listFriends(currentFrogId);
+      const ids = friends.map((friend: any) => friend.tokenId);
+      setFriendIds(ids);
     } catch (err) {
       console.error('Error fetching friends list:', err);
     }
@@ -63,7 +52,7 @@ const WorldOnlineList: React.FC<WorldOnlineListProps> = ({
   const sendFriendRequest = async (targetFrogId: number, walletAddress: string) => {
     setSendingRequest(targetFrogId);
     try {
-      await apiService.post('/friends/request', {
+      await socialFeatureApi.sendFriendRequest({
         requesterId: currentFrogId,
         walletAddress: walletAddress
       });

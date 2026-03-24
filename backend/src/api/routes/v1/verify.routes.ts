@@ -5,7 +5,7 @@ import { authRequired } from '../../../middlewares/auth.middleware';
 import { worldVerifyService } from '../../../modules/identity';
 import { normalizeWalletAddress } from '../../../modules/identity/nonce.service';
 
-const router = Router();
+const router: Router = Router();
 
 router.post(
   '/world',

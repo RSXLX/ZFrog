@@ -1,0 +1,8 @@
+packages:
+  - 'frontend'
+  - 'backend'
+  - 'admin'
+  - 'desktop-pet'
+  - 'contracts'
+  - 'apps/*'
+  - 'packages/*'

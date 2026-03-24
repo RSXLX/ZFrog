@@ -10,6 +10,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { rewardFeatureApi } from '../../features/reward/api';
 
 interface TravelBadge {
   id: number;
@@ -69,20 +70,12 @@ export function TravelBadgeList({ frogId, className = '', showProgress = true }:
       setLoading(true);
       
       // Fetch badges
-      const badgesRes = await fetch(`/api/badges/frog/${frogId}/travel`);
-      const badgesData = await badgesRes.json();
-      
-      if (badgesData.success) {
-        setBadges(badgesData.data || []);
-      }
+      const badgesData = await rewardFeatureApi.getTravelBadges(frogId);
+      setBadges(badgesData || []);
       
       // Fetch stats
-      const statsRes = await fetch(`/api/badges/frog/${frogId}/stats`);
-      const statsData = await statsRes.json();
-      
-      if (statsData.success) {
-        setStats(statsData.data);
-      }
+      const statsData = await rewardFeatureApi.getTravelBadgeStats(frogId);
+      if (statsData) setStats(statsData);
     } catch (error) {
       console.error('Failed to fetch badges:', error);
       setError('加载徽章失败');

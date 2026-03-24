@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { homesteadApi } from '../services/home.api';
+import { gardenFeatureApi } from '../features/garden/api';
 
 // 网格配置
 export const GRID_CONFIG = {
@@ -238,13 +238,14 @@ export function useGridEditor(items: GridItem[]): GridEditorState {
     sceneType: string
   ): Promise<boolean> => {
     try {
-      const result = await homesteadApi.acquireEditLock(
+      const result = await gardenFeatureApi.acquireEditLock(
         frogId,
         sceneType,
         sessionIdRef.current
       );
-      setHasEditLock(result.success);
-      return result.success;
+      const locked = Boolean(result?.locked);
+      setHasEditLock(locked);
+      return locked;
     } catch (error) {
       console.error('Failed to acquire edit lock:', error);
       setHasEditLock(false);
@@ -260,7 +261,7 @@ export function useGridEditor(items: GridItem[]): GridEditorState {
     sceneType: string
   ): Promise<void> => {
     try {
-      await homesteadApi.releaseEditLock(frogId, sceneType, sessionIdRef.current);
+      await gardenFeatureApi.releaseEditLock(frogId, sceneType, sessionIdRef.current);
       setHasEditLock(false);
     } catch (error) {
       console.error('Failed to release edit lock:', error);

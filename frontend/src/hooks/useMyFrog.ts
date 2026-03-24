@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWallet } from './useWallet';
-import { apiService, type Frog } from '../services/api';
+import { frogFeatureApi } from '../features/frog/api';
+import type { Frog } from '../types';
 
 /**
  * 获取当前连接钱包的唯一青蛙
@@ -29,7 +30,7 @@ export function useMyFrog() {
       setHasFrog(false);
       
       // 获取该钱包地址的青蛙（现在每个钱包只有一个）
-      const data = await apiService.getMyFrog(address);
+      const data = await frogFeatureApi.getMyFrog(address);
       
       if (data) {
         setFrog(data);

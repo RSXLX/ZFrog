@@ -1,0 +1,16 @@
+{
+  "gateId": "v3-beta-release-gate",
+  "requiredLayers": [
+    "contract",
+    "integration",
+    "e2e",
+    "playwright"
+  ],
+  "passStatuses": [
+    "success"
+  ],
+  "layerFreshnessHours": 30,
+  "allowMissingLayersInDryRun": true,
+  "allowFailureInDryRun": true,
+  "notes": "Week12 baseline gate for V3 beta regression matrix."
+}

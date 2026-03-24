@@ -1,0 +1,25 @@
+{
+  "workflow_runs": [
+    {
+      "status": "completed",
+      "conclusion": "success",
+      "event": "schedule",
+      "updated_at": "2026-03-23T06:00:00Z",
+      "html_url": "https://example.test/zfrog/actions/runs/503"
+    },
+    {
+      "status": "completed",
+      "conclusion": "failure",
+      "event": "schedule",
+      "updated_at": "2026-03-16T06:00:00Z",
+      "html_url": "https://example.test/zfrog/actions/runs/502"
+    },
+    {
+      "status": "completed",
+      "conclusion": "success",
+      "event": "schedule",
+      "updated_at": "2026-03-09T06:00:00Z",
+      "html_url": "https://example.test/zfrog/actions/runs/501"
+    }
+  ]
+}

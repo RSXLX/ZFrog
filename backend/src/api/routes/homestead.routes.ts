@@ -10,12 +10,13 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { badgeMaintenanceService } from '../../services/badge/badge-maintenance.service';
 import { decorationService } from '../../services/decoration.service';
 import { giftService } from '../../services/gift.service';
 import { photoService } from '../../services/photo.service';
 import { achievementService } from '../../services/achievement.service';
 
-const router = Router();
+const router: Router = Router();
 
 // ============ 装饰布局 API ============
 
@@ -52,6 +53,15 @@ router.post('/:frogId/layout/:sceneType', async (req: Request, res: Response) =>
     if (layout) {
       activeBuffs = await decorationService.getActiveBuffs(layout.id);
     }
+
+    try {
+      await badgeMaintenanceService.reconcileFrogBadges(
+        { frogId: parseInt(frogId) },
+        { syncDefinitions: false, syncStats: false }
+      );
+    } catch (badgeError) {
+      console.warn('[Homestead] Failed to reconcile decoration badges:', badgeError);
+    }
     
     res.json({ 
       success: true, 
@@ -85,6 +95,15 @@ router.patch('/:frogId/layout/:sceneType', async (req: Request, res: Response) =
       patches,
       expectedVersion
     );
+
+    try {
+      await badgeMaintenanceService.reconcileFrogBadges(
+        { frogId: parseInt(frogId) },
+        { syncDefinitions: false, syncStats: false }
+      );
+    } catch (badgeError) {
+      console.warn('[Homestead] Failed to reconcile decoration badges:', badgeError);
+    }
     
     res.json({ success: true, data: layout });
   } catch (error: any) {
@@ -341,6 +360,16 @@ router.post('/:frogId/gifts', async (req: Request, res: Response) => {
     const giftData = { ...req.body, toFrogId: parseInt(frogId) };
     
     const gift = await giftService.sendGift(giftData);
+
+    try {
+      await badgeMaintenanceService.reconcileOwnerBadges(fromAddress, {
+        syncDefinitions: false,
+        syncStats: false,
+      });
+    } catch (badgeError) {
+      console.warn('[Homestead] Failed to reconcile gift badges:', badgeError);
+    }
+
     res.status(201).json({ success: true, data: gift });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -396,6 +425,16 @@ router.post('/:frogId/photos', async (req: Request, res: Response) => {
     const photoData = { ...req.body, frogId: parseInt(frogId) };
     
     const photo = await photoService.createPhoto(photoData);
+
+    try {
+      await badgeMaintenanceService.reconcileFrogBadges(
+        { frogId: parseInt(frogId) },
+        { syncDefinitions: false, syncStats: false }
+      );
+    } catch (badgeError) {
+      console.warn('[Homestead] Failed to reconcile photo badges:', badgeError);
+    }
+
     res.status(201).json({ success: true, data: photo });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -596,6 +635,15 @@ router.post('/messages/:messageId/tip', async (req: Request, res: Response) => {
           },
         });
 
+        try {
+          await badgeMaintenanceService.reconcileFrogBadges(
+            { frogId: fromFrogId },
+            { syncDefinitions: false, syncStats: false }
+          );
+        } catch (badgeError) {
+          console.warn('[Homestead] Failed to reconcile message badges:', badgeError);
+        }
+
         res.status(201).json({ success: true, data: newMessage });
       } catch (error: any) {
         console.error('Create message error:', error);
@@ -669,4 +717,3 @@ router.post('/:frogId/messages/:messageId/like', async (req: Request, res: Respo
 });
 
 export default router;
-

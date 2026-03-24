@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiService } from '../../services/api';
+import { notificationFeatureApi } from '../../features/notification/api';
 import { useMyFrog } from '../../hooks/useMyFrog';
 
 interface Notification {
@@ -65,11 +65,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     
     try {
       setLoading(true);
-      const response = await apiService.get(`/notifications/${frog.tokenId}`);
-      if (response.success) {
-        setNotifications(response.data.notifications || []);
-        setUnreadCount(response.data.unreadCount || 0);
-      }
+      const data = await notificationFeatureApi.list(frog.tokenId);
+      setNotifications(data.notifications || []);
+      setUnreadCount(data.unreadCount || 0);
     } catch (err) {
       console.error('Error fetching notifications:', err);
     } finally {
@@ -79,7 +77,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   const markAsRead = async (notificationId: number) => {
     try {
-      await apiService.put(`/notifications/${notificationId}/read`);
+      await notificationFeatureApi.markAsRead(notificationId);
       setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
       );
@@ -93,7 +91,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     if (!frog?.tokenId) return;
     
     try {
-      await apiService.put(`/notifications/${frog.tokenId}/read-all`);
+      await notificationFeatureApi.markAllAsRead(frog.tokenId);
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
     } catch (err) {
@@ -103,7 +101,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   const deleteNotification = async (notificationId: number) => {
     try {
-      await apiService.delete(`/notifications/${notificationId}`);
+      await notificationFeatureApi.remove(notificationId);
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
     } catch (err) {
       console.error('Error deleting notification:', err);

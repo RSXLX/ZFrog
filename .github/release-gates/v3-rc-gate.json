@@ -1,0 +1,24 @@
+{
+  "gateId": "v3-rc-gate",
+  "nightly": {
+    "workflowFile": "v3-beta-regression-matrix.yml",
+    "requiredConsecutiveSuccesses": 3,
+    "maxHoursSinceLatestSuccess": 30,
+    "sampleSize": 20,
+    "allowedEvents": [
+      "schedule"
+    ]
+  },
+  "defectBudget": {
+    "p0Open": 0,
+    "p1Open": 0
+  },
+  "defectSnapshot": {
+    "p0Open": 0,
+    "p1Open": 0,
+    "updatedAt": "2026-03-24T05:40:00Z",
+    "maxHoursSinceUpdated": 168,
+    "source": "manual-triage",
+    "notes": "V3 RC gate baseline for Week 12 closeout."
+  }
+}

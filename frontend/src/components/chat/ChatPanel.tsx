@@ -6,7 +6,7 @@ import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { QuickReplies } from './QuickReplies';
-import { chatApi } from '../../services/chat.api';
+import { chatFeatureApi } from '../../features/chat/api';
 import { ZETAFROG_ADDRESS, ZETAFROG_ABI } from '../../config/contracts';
 
 import { Personality } from '../../types';
@@ -108,7 +108,7 @@ export function ChatPanel({ frogId, frogName, personality }: ChatPanelProps) {
 
     try {
       // 使用流式API
-      chatApi.sendMessageStream(
+      chatFeatureApi.sendMessageStream(
         frogId,
         text,
         undefined, // sessionId
@@ -155,7 +155,7 @@ export function ChatPanel({ frogId, frogName, personality }: ChatPanelProps) {
     } catch (error) {
       // 降级到非流式API
       try {
-        const response = await chatApi.sendMessage(frogId, text);
+        const response = await chatFeatureApi.sendMessage(frogId, text);
         
         setMessages(prev => {
           const newMessages = [...prev];

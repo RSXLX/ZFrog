@@ -11,7 +11,7 @@ import { useFrogData } from '../hooks/useFrogData';
 import { FoodItem } from '../types/frogAnimation';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../components/common/ToastProvider';
-import { apiService } from '../services/api';
+import { travelFeatureApi } from '../features/travel/api';
 // TRAVEL_DESTINATIONS 将在组件内部定义
 
 // 旅行目的地配置
@@ -67,7 +67,7 @@ export function Desktop() {
     if (!activeFrog) return;
 
     try {
-      const response = await apiService.post('/travels/group', {
+      const response = await travelFeatureApi.startGroupTravel({
         leaderId: activeFrog.tokenId,
         companionId: companion.tokenId,
         duration: 3600,

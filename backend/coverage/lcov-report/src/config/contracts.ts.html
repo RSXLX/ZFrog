@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>0/3</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>0/3</span>
             </div>
         
             
@@ -394,7 +394,18 @@
 <a name='L329'></a><a href='#L329'>329</a>
 <a name='L330'></a><a href='#L330'>330</a>
 <a name='L331'></a><a href='#L331'>331</a>
-<a name='L332'></a><a href='#L332'>332</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L332'></a><a href='#L332'>332</a>
+<a name='L333'></a><a href='#L333'>333</a>
+<a name='L334'></a><a href='#L334'>334</a>
+<a name='L335'></a><a href='#L335'>335</a>
+<a name='L336'></a><a href='#L336'>336</a>
+<a name='L337'></a><a href='#L337'>337</a>
+<a name='L338'></a><a href='#L338'>338</a>
+<a name='L339'></a><a href='#L339'>339</a>
+<a name='L340'></a><a href='#L340'>340</a>
+<a name='L341'></a><a href='#L341'>341</a>
+<a name='L342'></a><a href='#L342'>342</a>
+<a name='L343'></a><a href='#L343'>343</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -520,6 +531,16 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -629,6 +650,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -727,9 +749,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// backend/src/config/contracts.ts
 &nbsp;
-// ZetaFrogNFT ABI (完整版 - 与合约完全匹配)
+// ZetaFrog NFT 代理合约 ABI
 export const <span class="cstat-no" title="statement not covered" >ZETAFROG_ABI = [</span>
-    // === 写入函数 ===
     {
         "inputs": [{"internalType": "string", "name": "name", "type": "string"}],
         "name": "mintFrog",
@@ -737,6 +758,122 @@ export const <span class="cstat-no" title="statement not covered" >ZETAFROG_ABI 
         "stateMutability": "nonpayable",
         "type": "function"
     },
+    {
+        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+        "name": "getFrog",
+        "outputs": [
+            {"internalType": "string", "name": "name", "type": "string"},
+            {"internalType": "uint64", "name": "birthday", "type": "uint64"},
+            {"internalType": "uint32", "name": "totalTravels", "type": "uint32"},
+            {"internalType": "uint8", "name": "status", "type": "uint8"},
+            {"internalType": "uint256", "name": "xp", "type": "uint256"},
+            {"internalType": "uint256", "name": "level", "type": "uint256"}
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+        "name": "getFrogStatus",
+        "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+        "name": "ownerOf",
+        "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "address", "name": "owner", "type": "address"}],
+        "name": "balanceOf",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "address", "name": "owner", "type": "address"}],
+        "name": "getTokenIdByOwner",
+        "outputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "address", "name": "owner", "type": "address"}],
+        "name": "hasFrog",
+        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "totalSupply",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "travelContract",
+        "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "omniTravelContract",
+        "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "owner",
+        "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "MAX_SUPPLY",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+        "name": "emergencyResetFrogStatus",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
+            {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
+            {"indexed": false, "internalType": "string", "name": "name", "type": "string"},
+            {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
+        ],
+        "name": "FrogMinted",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
+            {"indexed": false, "internalType": "uint256", "name": "newLevel", "type": "uint256"},
+            {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
+        ],
+        "name": "LevelUp",
+        "type": "event"
+    }
+] as const;
+&nbsp;
+// Travel 合约 ABI
+export const <span class="cstat-no" title="statement not covered" >TRAVEL_ABI = [</span>
     {
         "inputs": [
             {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
@@ -769,46 +906,6 @@ export const <span class="cstat-no" title="statement not covered" >ZETAFROG_ABI 
         "type": "function"
     },
     {
-        "inputs": [
-            {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
-            {"internalType": "uint256", "name": "xpAmount", "type": "uint256"}
-        ],
-        "name": "addExperience",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [{"internalType": "address", "name": "_manager", "type": "address"}],
-        "name": "setTravelManager",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [{"internalType": "address", "name": "_souvenir", "type": "address"}],
-        "name": "setSouvenirNFT",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-&nbsp;
-    // === 读取函数 ===
-    {
-        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-        "name": "getFrog",
-        "outputs": [
-            {"internalType": "string", "name": "name", "type": "string"},
-            {"internalType": "uint64", "name": "birthday", "type": "uint64"},
-            {"internalType": "uint32", "name": "totalTravels", "type": "uint32"},
-            {"internalType": "uint8", "name": "status", "type": "uint8"},
-            {"internalType": "uint256", "name": "xp", "type": "uint256"},
-            {"internalType": "uint256", "name": "level", "type": "uint256"}
-        ],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
         "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
         "name": "getActiveTravel",
         "outputs": [
@@ -824,13 +921,6 @@ export const <span class="cstat-no" title="statement not covered" >ZETAFROG_ABI 
     },
     {
         "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-        "name": "canTravel",
-        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
         "name": "getTravelJournals",
         "outputs": [{"internalType": "string[]", "name": "", "type": "string[]"}],
         "stateMutability": "view",
@@ -838,45 +928,8 @@ export const <span class="cstat-no" title="statement not covered" >ZETAFROG_ABI 
     },
     {
         "inputs": [],
-        "name": "totalSupply",
-        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-        "name": "ownerOf",
-        "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [{"internalType": "address", "name": "owner", "type": "address"}],
-        "name": "balanceOf",
-        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [],
         "name": "travelManager",
         "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "souvenirNFT",
-        "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-&nbsp;
-    // === 常量 ===
-    {
-        "inputs": [],
-        "name": "MAX_SUPPLY",
-        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
         "stateMutability": "view",
         "type": "function"
     },
@@ -901,19 +954,6 @@ export const <span class="cstat-no" title="statement not covered" >ZETAFROG_ABI 
         "stateMutability": "view",
         "type": "function"
     },
-&nbsp;
-    // === 事件 ===
-    {
-        "anonymous": false,
-        "inputs": [
-            {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
-            {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
-            {"indexed": false, "internalType": "string", "name": "name", "type": "string"},
-            {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
-        ],
-        "name": "FrogMinted",
-        "type": "event"
-    },
     {
         "anonymous": false,
         "inputs": [
@@ -921,7 +961,8 @@ export const <span class="cstat-no" title="statement not covered" >ZETAFROG_ABI 
             {"indexed": true, "internalType": "address", "name": "targetWallet", "type": "address"},
             {"indexed": false, "internalType": "uint256", "name": "targetChainId", "type": "uint256"},
             {"indexed": false, "internalType": "uint64", "name": "startTime", "type": "uint64"},
-            {"indexed": false, "internalType": "uint64", "name": "endTime", "type": "uint64"}
+            {"indexed": false, "internalType": "uint64", "name": "endTime", "type": "uint64"},
+            {"indexed": false, "internalType": "bool", "name": "isRandom", "type": "bool"}
         ],
         "name": "TravelStarted",
         "type": "event"
@@ -932,7 +973,8 @@ export const <span class="cstat-no" title="statement not covered" >ZETAFROG_ABI 
             {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
             {"indexed": false, "internalType": "string", "name": "journalHash", "type": "string"},
             {"indexed": false, "internalType": "uint256", "name": "souvenirId", "type": "uint256"},
-            {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
+            {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"},
+            {"indexed": false, "internalType": "uint256", "name": "xpReward", "type": "uint256"}
         ],
         "name": "TravelCompleted",
         "type": "event"
@@ -944,16 +986,6 @@ export const <span class="cstat-no" title="statement not covered" >ZETAFROG_ABI 
             {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
         ],
         "name": "TravelCancelled",
-        "type": "event"
-    },
-    {
-        "anonymous": false,
-        "inputs": [
-            {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
-            {"indexed": false, "internalType": "uint256", "name": "newLevel", "type": "uint256"},
-            {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
-        ],
-        "name": "LevelUp",
         "type": "event"
     }
 ] as const;
@@ -1056,14 +1088,15 @@ export const <span class="cstat-no" title="statement not covered" >SOUVENIR_ABI 
         "name": "SouvenirMinted",
         "type": "event"
     }
-] as const;</pre></td></tr></table></pre>
+] as const;
+&nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-14T06:51:22.496Z
+                at 2026-03-20T04:47:07.829Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

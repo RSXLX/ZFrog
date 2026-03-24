@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { apiService } from '../services/api';
+import { lifeFeatureApi } from '../features/life/api';
 
 // 状态配置
 export const NURTURE_STATUS_CONFIG = {
@@ -50,7 +50,7 @@ export function useFrogNurture(frogId: number | undefined) {
     setError(null);
     
     try {
-      const response = await apiService.get(`/nurture/${frogId}/status`);
+      const response = await lifeFeatureApi.getLegacyNurtureStatus(frogId);
       if (response.success) {
         setStatus(response.data);
         setRealTimeStatus(response.data);
@@ -131,7 +131,7 @@ export function useLilyBalance(ownerAddress: string | undefined, refreshTrigger 
     
     setLoading(true);
     try {
-      const response = await apiService.get(`/nurture/balance/${ownerAddress}`);
+      const response = await lifeFeatureApi.getLegacyLilyBalance(ownerAddress);
       if (response.success) {
         setBalance(response.data);
       }
@@ -161,7 +161,7 @@ export function useFrogNurtureActions(frogId: number | undefined) {
     
     setActionLoading('feed');
     try {
-      const response = await apiService.post(`/nurture/${frogId}/feed`, { foodType });
+      const response = await lifeFeatureApi.feedLegacyNurture(frogId, { foodType });
       return response;
     } catch (err: any) {
       throw new Error(err.response?.data?.error || '喂食失败');
@@ -175,7 +175,7 @@ export function useFrogNurtureActions(frogId: number | undefined) {
     
     setActionLoading('clean');
     try {
-      const response = await apiService.post(`/nurture/${frogId}/clean`);
+      const response = await lifeFeatureApi.cleanLegacyNurture(frogId);
       return response;
     } catch (err: any) {
       throw new Error(err.response?.data?.error || '清洁失败');
@@ -189,7 +189,7 @@ export function useFrogNurtureActions(frogId: number | undefined) {
     
     setActionLoading('play');
     try {
-      const response = await apiService.post(`/nurture/${frogId}/play/guess`, { guess });
+      const response = await lifeFeatureApi.playGuessLegacy(frogId, { guess });
       return response;
     } catch (err: any) {
       throw new Error(err.response?.data?.error || '游戏失败');
@@ -203,7 +203,7 @@ export function useFrogNurtureActions(frogId: number | undefined) {
     
     setActionLoading('heal');
     try {
-      const response = await apiService.post(`/nurture/${frogId}/heal`);
+      const response = await lifeFeatureApi.healLegacyNurture(frogId);
       return response;
     } catch (err: any) {
       throw new Error(err.response?.data?.error || '治疗失败');
@@ -216,7 +216,7 @@ export function useFrogNurtureActions(frogId: number | undefined) {
     if (!frogId) return null;
     
     try {
-      const response = await apiService.get(`/nurture/${frogId}/travel-check`);
+      const response = await lifeFeatureApi.checkTravelRequirementsLegacy(frogId);
       return response.data;
     } catch (err: any) {
       throw new Error(err.response?.data?.error || '检查失败');
@@ -228,7 +228,7 @@ export function useFrogNurtureActions(frogId: number | undefined) {
     
     setActionLoading('evolve');
     try {
-      const response = await apiService.post(`/nurture/${frogId}/evolve`, { evolutionType });
+      const response = await lifeFeatureApi.evolveLegacyNurture(frogId, { evolutionType });
       return response;
     } catch (err: any) {
       throw new Error(err.response?.data?.error || '进化失败');

@@ -1,0 +1,28 @@
+name: v2-social-e2e-adhoc
+
+on:
+  workflow_dispatch:
+
+jobs:
+  social-main-flow:
+    name: Social Main Flow E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Install Playwright Chromium
+        run: npm --prefix frontend exec playwright install --with-deps chromium
+
+      - name: Run social flow e2e
+        run: npm --prefix frontend run test:e2e -- --grep @social-main

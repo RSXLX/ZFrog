@@ -8,6 +8,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DiscoveryCard, DiscoveryData } from './DiscoveryCard';
+import { travelFeatureApi } from '../../features/travel/api';
 
 interface DiscoveryListProps {
   travelId: number;
@@ -49,11 +50,10 @@ export function DiscoveryList({
     async function fetchDiscoveries() {
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/cross-chain/travel/${travelId}/discoveries`);
-        const data = await response.json();
-        
-        if (data.success && data.data?.discoveries) {
-          setDiscoveries(data.data.discoveries);
+        const data = await travelFeatureApi.getCrossChainDiscoveries(travelId);
+
+        if (Array.isArray(data.discoveries)) {
+          setDiscoveries(data.discoveries as DiscoveryData[]);
         } else {
           setError('无法加载发现数据');
         }

@@ -1,0 +1,31 @@
+{
+  "name": "@zfrog/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ZFrog shared contracts, DTOs, and schemas",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "test:contract": "tsx --test src/__tests__/contract.shared.test.ts"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.20",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.3"
+  }
+}

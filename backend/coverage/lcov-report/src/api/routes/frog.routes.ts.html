@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/191</span>
+                <span class='fraction'>0/185</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/58</span>
+                <span class='fraction'>0/57</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/183</span>
+                <span class='fraction'>0/177</span>
             </div>
         
             
@@ -665,32 +665,7 @@
 <a name='L600'></a><a href='#L600'>600</a>
 <a name='L601'></a><a href='#L601'>601</a>
 <a name='L602'></a><a href='#L602'>602</a>
-<a name='L603'></a><a href='#L603'>603</a>
-<a name='L604'></a><a href='#L604'>604</a>
-<a name='L605'></a><a href='#L605'>605</a>
-<a name='L606'></a><a href='#L606'>606</a>
-<a name='L607'></a><a href='#L607'>607</a>
-<a name='L608'></a><a href='#L608'>608</a>
-<a name='L609'></a><a href='#L609'>609</a>
-<a name='L610'></a><a href='#L610'>610</a>
-<a name='L611'></a><a href='#L611'>611</a>
-<a name='L612'></a><a href='#L612'>612</a>
-<a name='L613'></a><a href='#L613'>613</a>
-<a name='L614'></a><a href='#L614'>614</a>
-<a name='L615'></a><a href='#L615'>615</a>
-<a name='L616'></a><a href='#L616'>616</a>
-<a name='L617'></a><a href='#L617'>617</a>
-<a name='L618'></a><a href='#L618'>618</a>
-<a name='L619'></a><a href='#L619'>619</a>
-<a name='L620'></a><a href='#L620'>620</a>
-<a name='L621'></a><a href='#L621'>621</a>
-<a name='L622'></a><a href='#L622'>622</a>
-<a name='L623'></a><a href='#L623'>623</a>
-<a name='L624'></a><a href='#L624'>624</a>
-<a name='L625'></a><a href='#L625'>625</a>
-<a name='L626'></a><a href='#L626'>626</a>
-<a name='L627'></a><a href='#L627'>627</a>
-<a name='L628'></a><a href='#L628'>628</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L603'></a><a href='#L603'>603</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -1187,31 +1162,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1546,7 +1496,7 @@ type FrogData = readonly [
             });
         }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >        res.json(frogs);</span>
+<span class="cstat-no" title="statement not covered" >        res.json({ success: true, data: stringifyBigInt(frogs) });</span>
     } catch (error) {
 <span class="cstat-no" title="statement not covered" >        console.error('Error searching frogs:', error);</span>
 <span class="cstat-no" title="statement not covered" >        res.status(500).json({ error: 'Internal server error' });</span>
@@ -1820,31 +1770,6 @@ type FrogData = readonly [
 <span class="cstat-no" title="statement not covered" >        <span class="missing-if-branch" title="if path not taken" >I</span>if (!frog) {</span>
 <span class="cstat-no" title="statement not covered" >            return res.status(404).json({ error: 'Frog not found' });</span>
         }
-        
-        // [Sync-on-Read] 同步链上状态到数据库，确保状态最新
-<span class="cstat-no" title="statement not covered" >        try {</span>
-<span class="cstat-no" title="statement not covered" >            await omniTravelService.syncFrogStatusFromChain(tokenId);</span>
-            // 重新获取更新后的 frog 数据
-<span class="cstat-no" title="statement not covered" >            frog = await prisma.frog.findUnique({</span>
-                where: { tokenId },
-                include: {
-                    travels: {
-                        where: { status: 'Completed' },
-                        orderBy: { createdAt: 'desc' },
-                        take: 50,
-                    },
-                    souvenirs: true,
-                },
-            });
-        } catch (syncErr) {
-<span class="cstat-no" title="statement not covered" >            logger.warn(`[FrogAPI] Failed to sync frog ${tokenId} status:`, syncErr);</span>
-            // 继续使用数据库中的数据
-        }
-        
-        // 再次检查 frog 是否存在 (sync 后重新获取可能返回 null)
-<span class="cstat-no" title="statement not covered" >        <span class="missing-if-branch" title="if path not taken" >I</span>if (!frog) {</span>
-<span class="cstat-no" title="statement not covered" >            return res.status(404).json({ error: 'Frog not found' });</span>
-        }
 &nbsp;
         // 解析嵌套的旅行日记内容
         const travelsWithJournal = <span class="cstat-no" title="statement not covered" >frog.travels.map(<span class="fstat-no" title="function not covered" >travel </span>=&gt; {</span>
@@ -1951,7 +1876,7 @@ type FrogData = readonly [
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-14T06:51:22.496Z
+                at 2026-03-20T04:47:07.829Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

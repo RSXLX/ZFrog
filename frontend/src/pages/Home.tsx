@@ -9,10 +9,12 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useFrogStore } from '../stores/frogStore';
 import CrossChainTransfer from '../components/crosschain/CrossChainTransfer';
-import { apiService } from '../services/api';
+import { frogFeatureApi } from '../features/frog/api';
 import { Palette, ScanSearch, BookOpen, Warehouse, Gift, Medal, Skull, Zap, Search } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 export function Home() {
+  const { tr } = useI18n();
   const { isConnected, address } = useAccount();
   const navigate = useNavigate();
   const [hasFrogs, setHasFrogs] = useState(false);
@@ -31,7 +33,7 @@ export function Home() {
   useEffect(() => {
     if (isConnected && address) {
       setCheckLoading(true);
-      apiService.getMyFrog(address)
+      frogFeatureApi.getMyFrog(address)
         .then(frog => {
           setHasFrogs(!!frog);
           if (frog && !currentFrog) {
@@ -61,10 +63,13 @@ export function Home() {
               ZetaFrog
             </h1>
             <p className="text-2xl md:text-3xl font-exo text-slate-700 mb-3 font-medium">
-              Your Cross-Chain Desktop Companion
+              {tr('你的跨链桌面伙伴', 'Your Cross-Chain Desktop Companion')}
             </p>
             <p className="text-slate-500 max-w-2xl mx-auto text-lg leading-relaxed">
-              Mint a frog, send it to explore blockchain wallets, and collect AI-generated travel stories from across the omnichain universe.
+              {tr(
+                '铸造一只青蛙，让它探索链上钱包，并收集 AI 生成的跨链旅行故事。',
+                'Mint a frog, send it to explore blockchain wallets, and collect AI-generated travel stories from across the omnichain universe.'
+              )}
             </p>
           </motion.div>
       
@@ -79,7 +84,7 @@ export function Home() {
               <div className="absolute inset-0 bg-green-400/10 rounded-full blur-2xl transform scale-110" />
               <FrogPet
                 frogId={0}
-                name="Demo Frog"
+                name={tr('演示青蛙', 'Demo Frog')}
                 initialState={FrogState.IDLE}
               />
             </div>
@@ -94,7 +99,7 @@ export function Home() {
               className="flex flex-col items-center gap-6"
             >
               <p className="text-slate-600 text-lg font-medium">
-                Connect your wallet to begin the adventure
+                {tr('连接钱包，开始冒险', 'Connect your wallet to begin the adventure')}
               </p>
               <div className="transform hover:scale-105 transition-transform duration-200">
                 <ConnectButton />
@@ -103,7 +108,9 @@ export function Home() {
           ) : checkLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <div className="w-12 h-12 border-4 border-green-200 border-t-green-500 rounded-full animate-spin" />
-              <p className="text-slate-500 font-medium animate-pulse">Checking account status...</p>
+              <p className="text-slate-500 font-medium animate-pulse">
+                {tr('正在检查账户状态...', 'Checking account status...')}
+              </p>
             </div>
           ) : hasFrogs && !showMint ? (
             <motion.div
@@ -115,22 +122,22 @@ export function Home() {
               <div className="grid md:grid-cols-3 gap-6 mt-8">
                 <FeatureCard
                   icon={Palette}
-                  title="Unique NFT"
-                  description="Every travel generates a unique, evolving NFT souvenir."
+                  title={tr('独特 NFT', 'Unique NFT')}
+                  description={tr('每次旅行都会生成独一无二、可进化的 NFT 纪念品。', 'Every travel generates a unique, evolving NFT souvenir.')}
                   color="text-purple-500"
                   bg="bg-purple-50"
                 />
                 <FeatureCard
                   icon={ScanSearch}
-                  title="Wallet Scout"
-                  description="Send your frog to inspect any wallet address on-chain."
+                  title={tr('钱包侦察', 'Wallet Scout')}
+                  description={tr('让你的青蛙去探索任意链上钱包地址。', 'Send your frog to inspect any wallet address on-chain.')}
                   color="text-blue-500"
                   bg="bg-blue-50"
                 />
                 <FeatureCard
                   icon={BookOpen}
-                  title="AI Chronicles"
-                  description="Receive immersive, AI-generated stories from every trip."
+                  title={tr('AI 纪行', 'AI Chronicles')}
+                  description={tr('每次旅途都会生成沉浸式 AI 故事。', 'Receive immersive, AI-generated stories from every trip.')}
                   color="text-amber-500"
                   bg="bg-amber-50"
                 />
@@ -139,13 +146,13 @@ export function Home() {
               {/* How it Works */}
               <div className="mt-20">
                 <h2 className="text-3xl font-bold font-orbitron text-center text-slate-800 mb-12">
-                  How to Play
+                  {tr('玩法指南', 'How to Play')}
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  <StepCard step="01" title="Connect" icon={Zap} />
-                  <StepCard step="02" title="Mint Frog" icon={Skull} />
-                  <StepCard step="03" title="Travel" icon={Search} />
-                  <StepCard step="04" title="Collect" icon={Gift} />
+                  <StepCard step="01" title={tr('连接', 'Connect')} icon={Zap} />
+                  <StepCard step="02" title={tr('铸造青蛙', 'Mint Frog')} icon={Skull} />
+                  <StepCard step="03" title={tr('旅行探索', 'Travel')} icon={Search} />
+                  <StepCard step="04" title={tr('收集奖励', 'Collect')} icon={Gift} />
                 </div>
               </div>
             </motion.div>
@@ -185,7 +192,7 @@ export function Home() {
                 >
                   <h3 className="font-bold font-orbitron text-slate-800 mb-6 flex items-center gap-2 text-lg border-b border-slate-100 pb-4">
                     <Warehouse className="text-green-600" size={24} />
-                    Command Center
+                    {tr('指挥中心', 'Command Center')}
                   </h3>
                   
                   <div className="space-y-3">
@@ -196,7 +203,7 @@ export function Home() {
                       <div className="bg-white/20 p-2 rounded-lg group-hover:bg-white/30 transition-colors">
                         <Skull size={20} />
                       </div>
-                      <span>My Frog</span>
+                      <span>{tr('我的青蛙', 'My Frog')}</span>
                     </Link>
                     
                     <div className="grid grid-cols-2 gap-3">
@@ -205,7 +212,7 @@ export function Home() {
                         className="flex flex-col items-center justify-center p-4 bg-slate-50 hover:bg-white border border-slate-200 hover:border-blue-200 text-slate-600 hover:text-blue-600 rounded-xl transition-all hover:shadow-md group"
                       >
                         <BookOpen size={24} className="mb-2 group-hover:scale-110 transition-transform" />
-                        <span className="text-xs font-medium">Journal</span>
+                        <span className="text-xs font-medium">{tr('日记', 'Journal')}</span>
                       </Link>
                       
                       <Link
@@ -213,7 +220,7 @@ export function Home() {
                         className="flex flex-col items-center justify-center p-4 bg-slate-50 hover:bg-white border border-slate-200 hover:border-purple-200 text-slate-600 hover:text-purple-600 rounded-xl transition-all hover:shadow-md group"
                       >
                         <Medal size={24} className="mb-2 group-hover:scale-110 transition-transform" />
-                        <span className="text-xs font-medium">Badges</span>
+                        <span className="text-xs font-medium">{tr('徽章', 'Badges')}</span>
                       </Link>
                     </div>
 
@@ -222,7 +229,7 @@ export function Home() {
                       className="flex items-center gap-3 w-full p-4 bg-white border border-slate-200 hover:border-pink-200 hover:bg-pink-50 text-slate-700 hover:text-pink-600 rounded-xl font-medium transition-all hover:shadow-sm"
                     >
                       <Gift size={20} />
-                      <span>Souvenirs</span>
+                      <span>{tr('纪念品', 'Souvenirs')}</span>
                     </Link>
 
                     <Link
@@ -232,7 +239,7 @@ export function Home() {
                       <div className="bg-white p-1.5 rounded-full shadow-sm">
                         <span className="text-lg">🆘</span>
                       </div>
-                      <span>Friend Rescue</span>
+                      <span>{tr('好友救援', 'Friend Rescue')}</span>
                     </Link>
                     
                     <button
@@ -240,7 +247,7 @@ export function Home() {
                       className="flex items-center gap-3 w-full p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-100 hover:border-amber-200 text-amber-700 rounded-xl font-medium transition-all hover:shadow-sm"
                     >
                       <Zap size={20} />
-                      <span>Cross-Chain</span>
+                      <span>{tr('跨链转移', 'Cross-Chain')}</span>
                     </button>
                     
                     <div className="pt-4 mt-2 border-t border-slate-100">
@@ -249,7 +256,7 @@ export function Home() {
                         className="flex items-center justify-center gap-2 w-full py-2.5 px-4 text-xs font-medium text-slate-500 hover:text-green-600 bg-slate-50 hover:bg-white border border-transparent hover:border-green-200 rounded-lg transition-all"
                       >
                         <ScanSearch size={14} />
-                        View on Explorer
+                        {tr('在区块浏览器查看', 'View on Explorer')}
                       </button>
                     </div>
                   </div>

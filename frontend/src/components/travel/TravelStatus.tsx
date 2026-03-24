@@ -10,7 +10,7 @@ import { FeedButton } from './FeedButton';
 import { AddressTag, AddressType } from './AddressTag';
 import type { DiscoveryData } from './DiscoveryCard';
 import type { Travel } from '../../types';
-import { travelApi } from '../../services/travel.api';
+import { travelFeatureApi } from '../../features/travel/api';
 
 export interface TravelStatusProps {
     travel: Travel;
@@ -49,21 +49,20 @@ export const TravelStatus = memo(function TravelStatus({ travel, frogName }: Tra
     // Fetch visualization data
     const fetchVisualizationData = useCallback(async () => {
         try {
-            const response = await fetch(`/api/cross-chain/travel/${travel.id}/discoveries`);
-            const data = await response.json();
-            
-            if (data.success && data.data) {
-                if (data.data.discoveries) {
-                    setDiscoveries(data.data.discoveries);
+            const data = await travelFeatureApi.getCrossChainDiscoveries(travel.id);
+
+            if (data) {
+                if (data.discoveries) {
+                    setDiscoveries(data.discoveries as DiscoveryData[]);
                 }
-                if (data.data.onChainStats) {
+                if (data.onChainStats) {
                     setOnChainData({
-                        blockHeight: data.data.onChainStats.exploredBlock,
-                        gasUsed: data.data.onChainStats.gasUsed,
-                        exploredAddress: data.data.onChainStats.exploredAddress,
+                        blockHeight: data.onChainStats.exploredBlock,
+                        gasUsed: data.onChainStats.gasUsed,
+                        exploredAddress: data.onChainStats.exploredAddress,
                     });
-                    if (data.data.onChainStats.exploredAddress) {
-                        setTargetAddress(data.data.onChainStats.exploredAddress);
+                    if (data.onChainStats.exploredAddress) {
+                        setTargetAddress(data.onChainStats.exploredAddress);
                     }
                 }
             }
@@ -75,7 +74,7 @@ export const TravelStatus = memo(function TravelStatus({ travel, frogName }: Tra
     // V2.0: 获取地址类型信息
     const fetchAddressType = useCallback(async (address: string, chainId: number) => {
         try {
-            const result = await travelApi.analyzeAddress(address, chainId);
+            const result = await travelFeatureApi.analyzeAddress(address, chainId);
             setAddressType(result.type);
             setAddressBonus(result.bonus);
         } catch (error) {
@@ -86,7 +85,7 @@ export const TravelStatus = memo(function TravelStatus({ travel, frogName }: Tra
     // V2.0: 获取投喂历史
     const fetchFeedHistory = useCallback(async () => {
         try {
-            const feeds = await travelApi.getFeedHistory(travel.id);
+            const feeds = await travelFeatureApi.getFeedHistory(travel.id);
             setFeedCount(feeds.length);
         } catch (error) {
             console.error('Failed to fetch feed history:', error);

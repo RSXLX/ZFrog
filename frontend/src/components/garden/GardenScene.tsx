@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { GardenState, GardenFrogState } from '../../types/garden';
 import { GardenFrog } from './GardenFrog';
 import { SceneObject } from './SceneObject';
-import { homeApi, GridPlacedItemInput } from '../../services/home.api';
+import { gardenFeatureApi, GridPlacedItemInput } from '../../features/garden/api';
 import useGridEditor, { GridItem, GRID_CONFIG } from '../../hooks/useGridEditor';
 import GridOverlay from './GridOverlay';
 import DraggableItem, { PlacedItemData } from './DraggableItem';
@@ -117,10 +117,10 @@ export const GardenScene: React.FC<GardenSceneProps> = ({
   const loadLayout = useCallback(async () => {
     if (!gardenState.ownerFrog) return;
     try {
-      const res = await homeApi.getLayout(gardenState.ownerFrog.id, sceneType);
-      if (res.data) {
+      const layout = await gardenFeatureApi.getLayout(gardenState.ownerFrog.id, sceneType);
+      if (layout) {
         // 转换 API 数据到 GridItem
-        const items: GridItem[] = res.data.items.map((item: any) => ({
+        const items: GridItem[] = (layout.items || []).map((item: any) => ({
           id: item.id,
           userDecorationId: item.userDecorationId,
           gridX: item.gridX ?? Math.round((item.x || 0) * 0.11), // 兼容转换
@@ -138,7 +138,7 @@ export const GardenScene: React.FC<GardenSceneProps> = ({
         }));
         setPlacedItems(items);
         setComfortData(prev => ({
-          score: res.data.comfortScore || 0,
+          score: layout.comfortScore || 0,
           level: prev?.level || '普通',
           buffs: prev?.buffs || []
         }));
@@ -152,12 +152,12 @@ export const GardenScene: React.FC<GardenSceneProps> = ({
     loadLayout();
     // 同时加载舒适度
     if (gardenState.ownerFrog) {
-        homeApi.getComfort(gardenState.ownerFrog.id, sceneType).then(res => {
-            if (res.data) {
+        gardenFeatureApi.getComfort(gardenState.ownerFrog.id, sceneType).then(comfort => {
+            if (comfort) {
                 setComfortData({
-                    score: res.data.comfortScore,
-                    level: res.data.level,
-                    buffs: res.data.activeBuffs
+                    score: comfort.comfortScore,
+                    level: comfort.level,
+                    buffs: comfort.activeBuffs
                 });
             }
         });
@@ -168,10 +168,8 @@ export const GardenScene: React.FC<GardenSceneProps> = ({
   const loadInventory = useCallback(async () => {
     if (!currentUserFrogId) return;
     try {
-      const res = await homeApi.getUnplacedDecorations(currentUserFrogId, sceneType);
-      if (res.data) {
-        setInventoryItems(res.data);
-      }
+      const decorations = await gardenFeatureApi.getUnplacedDecorations(currentUserFrogId, sceneType);
+      setInventoryItems(decorations);
     } catch (err) {
       console.error('Failed to load inventory:', err);
     }
@@ -230,10 +228,13 @@ export const GardenScene: React.FC<GardenSceneProps> = ({
         zIndex: item.zIndex
       }));
 
-      await homeApi.saveLayoutV2(gardenState.ownerFrog.id, sceneType, itemsToSave, {
+      const saved = await gardenFeatureApi.saveLayoutV2(gardenState.ownerFrog.id, sceneType, itemsToSave, {
         sessionId,
         createSnapshot: true
       });
+      if (!saved) {
+        throw new Error('Failed to save layout');
+      }
       console.log('Layout saved successfully');
       alert('保存成功！舒适度已更新。');
       loadLayout(); // 刷新数据（包括舒适度）

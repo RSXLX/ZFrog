@@ -37,7 +37,7 @@ function createWindow() {
   }
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL('http://localhost:5175');
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }

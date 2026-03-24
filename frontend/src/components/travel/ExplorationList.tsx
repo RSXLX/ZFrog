@@ -7,39 +7,22 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  travelFeatureApi,
+  type TravelExplorationCategory,
+  type TravelExplorationReadModel,
+  type TravelExplorationSummaryReadModel,
+} from '../../features/travel/api';
 
-interface Exploration {
-  id: number;
-  chainId: number;
-  chainName?: string;
-  chainSymbol?: string;
-  blockNumber: string;
-  blockUrl?: string | null;
-  message: string;
-  aiAnalysis?: string;
-  exploredAddress: string | null;
-  exploredUrl?: string | null;
-  isContract: boolean;
-  txHash: string | null;
-  txUrl?: string | null;
-  timestamp: string;
-  source?: 'discovery' | 'interaction';
-}
-
-interface ExplorationSummary {
-  totalAll: number;
-  totalContracts: number;
-  totalWallets: number;
-  filtered: number;
-  uniqueAddresses: number;
-}
+type Exploration = TravelExplorationReadModel;
+type ExplorationSummary = TravelExplorationSummaryReadModel;
 
 interface ExplorationListProps {
   travelId: number;
   className?: string;
 }
 
-type CategoryFilter = 'all' | 'contract' | 'wallet';
+type CategoryFilter = TravelExplorationCategory;
 
 const chainNames: Record<number, string> = {
   97: 'BSC 测试网',
@@ -61,27 +44,26 @@ export function ExplorationList({ travelId, className = '' }: ExplorationListPro
   const fetchExplorations = useCallback(async (reset = false) => {
     try {
       const currentOffset = reset ? 0 : offset;
-      const response = await fetch(
-        `/api/travels/${travelId}/explorations?category=${category}&offset=${currentOffset}&limit=20`
-      );
-      const data = await response.json();
+      const data = await travelFeatureApi.getExplorations(travelId, {
+        category,
+        offset: currentOffset,
+        limit: 20,
+      });
 
-      if (data.success && data.data) {
-        if (reset) {
-          setExplorations(data.data.explorations);
-        } else {
-          setExplorations(prev => [...prev, ...data.data.explorations]);
-        }
-        setSummary(data.data.summary);
-        // 使用新的 pagination 对象
-        if (data.data.pagination) {
-          setOffset(data.data.pagination.offset + data.data.explorations.length);
-          setHasMore(data.data.pagination.hasMore);
-        } else {
-          // 兼容旧格式
-          setOffset(currentOffset + data.data.explorations.length);
-          setHasMore(data.data.hasMore ?? false);
-        }
+      if (reset) {
+        setExplorations(data.explorations);
+      } else {
+        setExplorations(prev => [...prev, ...data.explorations]);
+      }
+      setSummary(data.summary);
+      // 使用新的 pagination 对象
+      if (data.pagination) {
+        setOffset(data.pagination.offset + data.explorations.length);
+        setHasMore(data.pagination.hasMore);
+      } else {
+        // 兼容旧格式
+        setOffset(currentOffset + data.explorations.length);
+        setHasMore(data.hasMore ?? false);
       }
     } catch (error) {
       console.error('Failed to fetch explorations:', error);

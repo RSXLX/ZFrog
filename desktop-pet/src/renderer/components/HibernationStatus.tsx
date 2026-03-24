@@ -24,6 +24,11 @@ const containerStyle: React.CSSProperties = {
 export const HibernationStatus: React.FC<HibernationStatusProps> = ({ state, onWake }) => {
   if (state.status === 'ACTIVE') return null;
 
+  const blessingText =
+    state.blessingsReceived > 0
+      ? `好友祈福 ${state.blessingsReceived} 次`
+      : '可在 Friends 页邀请好友祈福';
+
   return (
     <div style={containerStyle}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>
@@ -35,10 +40,18 @@ export const HibernationStatus: React.FC<HibernationStatusProps> = ({ state, onW
           <>
             已沉睡约 <b>{state.dormantHours}</b> 小时。<br />
             点击唤醒后会逐步恢复精神与心情。
+            <br />
+            <span style={{ color: '#86efac' }}>{blessingText}</span>
           </>
         ) : (
           <>
             唤醒进度：<b>{state.wakeProgress}%</b>
+            {state.blessingsReceived > 0 && (
+              <>
+                <br />
+                <span style={{ color: '#86efac' }}>{blessingText}</span>
+              </>
+            )}
           </>
         )}
       </div>

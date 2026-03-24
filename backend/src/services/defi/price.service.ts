@@ -1,8 +1,8 @@
 // backend/src/services/defi/price.service.ts
 
-import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
 import { logger } from '../../utils/logger';
+import { prisma } from '../../database';
 
 // CoinGecko ID 映射
 const COINGECKO_IDS: Record<string, string> = {
@@ -28,11 +28,10 @@ export interface PriceData {
 }
 
 export class PriceService {
-  private prisma: PrismaClient;
+  private prisma = prisma;
   private cacheSeconds = 60; // 缓存 60 秒
   
   constructor() {
-    this.prisma = new PrismaClient();
   }
   
   /**

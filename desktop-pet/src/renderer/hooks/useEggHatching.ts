@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import storage from '../services/storage';
 
 // ==================== 类型定义 ====================
 
@@ -101,18 +102,30 @@ const INTERACTION_EFFECTS: Record<HatchInteractionType, {
 // ==================== Hook 实现 ====================
 
 export function useEggHatching(
-  _eggId: string,
+  eggId: string,
   initialHatchTime: number = DEFAULT_HATCH_TIME
 ): UseEggHatchingReturn {
+  const memoryKey = `zfrog_hatch_memory_${eggId}`;
+  const restoreMemory = (): HatchMemory | null => {
+    try {
+      const raw = localStorage.getItem(memoryKey);
+      if (!raw) return null;
+      return JSON.parse(raw) as HatchMemory;
+    } catch {
+      return null;
+    }
+  };
+  const cachedMemory = restoreMemory();
+
   // 内存状态
   const [memory, setMemory] = useState<HatchMemory>({
-    interactions: [],
-    totalInteractions: 0,
-    crackPatterns: [],
-    startTime: Date.now(),
-    estimatedHatchTime: initialHatchTime,
-    accelerationFactor: 1.0,
-    temperatureHistory: [],
+    interactions: cachedMemory?.interactions || [],
+    totalInteractions: cachedMemory?.totalInteractions || 0,
+    crackPatterns: cachedMemory?.crackPatterns || [],
+    startTime: cachedMemory?.startTime || Date.now(),
+    estimatedHatchTime: cachedMemory?.estimatedHatchTime || initialHatchTime,
+    accelerationFactor: cachedMemory?.accelerationFactor || 1.0,
+    temperatureHistory: cachedMemory?.temperatureHistory || [],
   });
 
   // 进度状态
@@ -156,6 +169,14 @@ export function useEggHatching(
         // 检查是否孵化完成
         if (newPercentage >= 100) {
           setIsHatching(false);
+          window.dispatchEvent(
+            new CustomEvent('desktop:frog-status-changed', {
+              detail: {
+                eggId,
+                stage: 'hatched',
+              },
+            })
+          );
         }
 
         return {
@@ -176,6 +197,14 @@ export function useEggHatching(
 
     return () => clearInterval(interval);
   }, [isHatching, memory]);
+
+  useEffect(() => {
+    localStorage.setItem(memoryKey, JSON.stringify(memory));
+    storage.setFrogStats({
+      hatchInteractions: memory.totalInteractions,
+      hatchAcceleration: memory.accelerationFactor,
+    });
+  }, [memory, memoryKey]);
 
   // 执行互动
   const executeInteraction = useCallback((

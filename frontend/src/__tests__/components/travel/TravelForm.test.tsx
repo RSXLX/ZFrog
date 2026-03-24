@@ -16,12 +16,6 @@ jest.mock('@/config/contracts', () => ({
   TRAVEL_ABI: ['mock-abi'],
 }));
 
-jest.mock('@/services/api', () => ({
-  api: {
-    post: jest.fn(),
-  },
-}));
-
 describe('TravelForm', () => {
   beforeEach(() => {
     mockUseWriteContract.mockReturnValue({

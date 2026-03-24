@@ -8,7 +8,7 @@ import {
   notifyGardenInteraction 
 } from '../../websocket/index';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * GET /api/garden/:frogId

@@ -39,6 +39,8 @@ import { useCollectionBook } from './hooks/useCollectionBook';
 import { useDecoration } from './hooks/useDecoration';
 import { useLongTermGoals } from './hooks/useLongTermGoals';
 import { useQuietMode } from '../hooks/useQuietMode';
+import { useEggLifecycle } from './features/pet-shell/useEggLifecycle';
+import { useNotificationFeed } from './features/notifications/useNotificationFeed';
 import api from './services/api';
 import storage from './services/storage';
 
@@ -84,7 +86,9 @@ function App() {
   const [showBubble, setShowBubble] = useState(false);
   const [quickMenu, setQuickMenu] = useState({ visible: false, x: 0, y: 0 });
   const [dialogs, setDialogs] = useState(initialDialogs);
-  const [walletAddress] = useState(() => storage.getWalletAddress() || '0x1234567890abcdef1234567890abcdef12345678');
+  const [walletAddress, setWalletAddress] = useState(
+    () => storage.getWalletAddress() || '0x1234567890abcdef1234567890abcdef12345678'
+  );
   const [tokenId, setTokenId] = useState(1);
   const [petName, setPetName] = useState(() => {
     try {
@@ -97,9 +101,11 @@ function App() {
   const loginCheckedRef = useRef(false);
   const handledMilestoneRef = useRef<string | null>(null);
   const travelReadyRef = useRef<string | null>(null);
+  const relationshipHintCooldownRef = useRef(0);
+  const eggLifecycle = useEggLifecycle(walletAddress);
 
   const frogState = useFrogState();
-  useLifeCycle(frogState);
+  const lifeCycle = useLifeCycle(frogState);
   const chainMonitor = useChainMonitor(frogState);
   const { remember } = useMemory();
   const timeSystem = useTimeSystem();
@@ -115,6 +121,9 @@ function App() {
   const collectionBook = useCollectionBook();
   const decoration = useDecoration();
   const { hibernation, recordInteraction, wakeUp, isHibernating } = useHibernation(frogState);
+  const notificationFeed = useNotificationFeed({
+    frogTokenId: tokenId || eggLifecycle.tokenId,
+  });
 
   const taskProgress = dailyTasks.getProgress();
   const totalTaskReward = dailyTasks.getTotalReward();
@@ -130,6 +139,38 @@ function App() {
     setBubbleMessage(message);
     setShowBubble(true);
   }, []);
+
+  const triggerRelationshipAwareHint = useCallback(async () => {
+    const settings = storage.getSettings();
+    if (settings.notifications === false || settings.relationshipAwareReminders === false) {
+      return;
+    }
+
+    const configuredThrottle = Number(settings.relationshipReminderThrottleMs);
+    const throttleMs = Number.isFinite(configuredThrottle)
+      ? Math.max(30000, Math.floor(configuredThrottle))
+      : 10 * 60 * 1000;
+
+    const now = Date.now();
+    if (now - relationshipHintCooldownRef.current < throttleMs) {
+      return;
+    }
+
+    const frogForChat = tokenId || eggLifecycle.tokenId;
+    if (!frogForChat) {
+      return;
+    }
+
+    relationshipHintCooldownRef.current = now;
+    const response = await api.sendRelationshipAwareChat({
+      frogId: frogForChat,
+      message: '请结合最近关系记忆，给我一句桌宠提醒，控制在30字以内。',
+    });
+    const content = response?.reply?.content?.trim();
+    if (content) {
+      showInteractionBubble(content);
+    }
+  }, [tokenId, eggLifecycle.tokenId, showInteractionBubble]);
 
   const handleInteractionSound = useCallback((type: 'pet' | 'poke' | 'feed') => {
     if (quietMode.behavior.playSounds) {
@@ -198,7 +239,7 @@ function App() {
   }, [decoration, inventory, showInteractionBubble]);
 
   const performPetInteraction = useCallback(() => {
-    frogState.interact('pet');
+    lifeCycle.play();
     handleInteractionSound('pet');
     showInteractionBubble('好舒服呀～');
     remember('interaction', 'pet', 0.7);
@@ -206,10 +247,10 @@ function App() {
     dailyTasks.completeTask('2');
     achievements.incrementProgress('first_pet');
     achievements.incrementProgress('pet_50');
-  }, [frogState, handleInteractionSound, showInteractionBubble, remember, petStats, dailyTasks, achievements]);
+  }, [lifeCycle, handleInteractionSound, showInteractionBubble, remember, petStats, dailyTasks, achievements]);
 
   const performFeedInteraction = useCallback(() => {
-    frogState.interact('feed');
+    lifeCycle.feed();
     handleInteractionSound('feed');
     showInteractionBubble('好吃！');
     remember('interaction', 'feed', 0.6);
@@ -217,7 +258,7 @@ function App() {
     petStats.addExp(3);
     dailyTasks.completeTask('1');
     achievements.incrementProgress('feed_10');
-  }, [frogState, handleInteractionSound, showInteractionBubble, remember, petStats, dailyTasks, achievements]);
+  }, [lifeCycle, handleInteractionSound, showInteractionBubble, remember, petStats, dailyTasks, achievements]);
 
   const handleMenuAction = useCallback((action: string) => {
     if (isHibernating && action !== 'quiet' && action !== 'settings') {
@@ -241,6 +282,7 @@ function App() {
       case 'friends':
         openDialog('friends');
         dailyTasks.completeTask('5');
+        void triggerRelationshipAwareHint();
         break;
       case 'badges':
         openDialog('badges');
@@ -266,7 +308,15 @@ function App() {
       default:
         break;
     }
-  }, [isHibernating, wakeUp, showInteractionBubble, recordInteraction, openDialog, dailyTasks]);
+  }, [
+    isHibernating,
+    wakeUp,
+    showInteractionBubble,
+    recordInteraction,
+    openDialog,
+    dailyTasks,
+    triggerRelationshipAwareHint,
+  ]);
 
   useEffect(() => {
     if (quietMode.behavior.frogState === 'sleeping') {
@@ -291,34 +341,63 @@ function App() {
   }, [hibernation.status, showInteractionBubble]);
 
   useEffect(() => {
+    if (!quietMode.behavior.showNotifications) return;
+    if (!notificationFeed.current) return;
+    showInteractionBubble(notificationFeed.current.message);
+  }, [notificationFeed.current, quietMode.behavior.showNotifications, showInteractionBubble]);
+
+  useEffect(() => {
+    const handleAuthUpdated = (event: Event) => {
+      const custom = event as CustomEvent<{
+        walletAddress?: string;
+        hasToken?: boolean;
+        frogTokenId?: number | null;
+      }>;
+      const nextWallet = custom.detail?.walletAddress?.toLowerCase();
+      if (nextWallet) {
+        setWalletAddress(nextWallet);
+      }
+
+      if (typeof custom.detail?.frogTokenId === 'number' && custom.detail.frogTokenId > 0) {
+        setTokenId(custom.detail.frogTokenId);
+      }
+
+      void eggLifecycle.refresh();
+    };
+
+    window.addEventListener('desktop:auth-updated', handleAuthUpdated as EventListener);
+    return () => {
+      window.removeEventListener('desktop:auth-updated', handleAuthUpdated as EventListener);
+    };
+  }, [eggLifecycle.refresh]);
+
+  useEffect(() => {
     if (window.electronAPI?.onMenuAction) {
       window.electronAPI.onMenuAction((action: string) => handleMenuAction(action));
     }
   }, [handleMenuAction]);
 
   useEffect(() => {
-    let cancelled = false;
+    if (eggLifecycle.loading) return;
 
-    const syncWebPrimaryFrog = async () => {
-      const frog = await api.getMyFrog(walletAddress);
-      if (!frog || cancelled) return;
+    if (eggLifecycle.tokenId) {
+      setTokenId(eggLifecycle.tokenId);
+    }
 
-      setTokenId(frog.tokenId);
+    if (eggLifecycle.frogName) {
       setPetName(prev => {
         try {
-          return localStorage.getItem('zfrog_pet_name') || frog.name || prev;
+          return localStorage.getItem('zfrog_pet_name') || eggLifecycle.frogName || prev;
         } catch {
-          return frog.name || prev;
+          return eggLifecycle.frogName || prev;
         }
       });
-    };
+    }
 
-    void syncWebPrimaryFrog();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [walletAddress]);
+    if (eggLifecycle.frogId) {
+      storage.setActiveFrogId(eggLifecycle.frogId);
+    }
+  }, [eggLifecycle.loading, eggLifecycle.tokenId, eggLifecycle.frogId, eggLifecycle.frogName]);
 
   useEffect(() => {
     const handleContextMenu = (event: MouseEvent) => {
@@ -470,14 +549,14 @@ function App() {
     if (item === 'patrol') {
       handlePatrolToggle();
     } else if (item === 'sleep') {
-      frogState.setCurrentState('sleeping');
+      lifeCycle.sleep();
       showInteractionBubble('晚安～');
     } else {
       handleMenuAction(item);
     }
 
     setShowMenu(false);
-  }, [handlePatrolToggle, frogState, showInteractionBubble, handleMenuAction]);
+  }, [handlePatrolToggle, lifeCycle, showInteractionBubble, handleMenuAction]);
 
   const handleQuickMenuSelect = useCallback((action: string) => {
     if (isHibernating) {
@@ -502,7 +581,7 @@ function App() {
         openDialog('travel');
         break;
       case 'sleep':
-        frogState.setCurrentState('sleeping');
+        lifeCycle.sleep();
         showInteractionBubble('晚安～');
         break;
       default:
@@ -517,7 +596,7 @@ function App() {
     performFeedInteraction,
     handlePatrolToggle,
     openDialog,
-    frogState,
+    lifeCycle,
   ]);
 
   const handleTravelStart = useCallback((destinationId: string, duration: number) => {
@@ -526,19 +605,21 @@ function App() {
 
     frogState.setCurrentState('traveling');
     showInteractionBubble(`出发去 ${selectedDestination.name}！`);
-    travel.startTravel({ ...selectedDestination, duration });
+    void travel.startTravel({ ...selectedDestination, duration });
     dailyTasks.completeTask('4');
   }, [travel, frogState, showInteractionBubble, dailyTasks]);
 
   const handleTravelComplete = useCallback(() => {
-    const result = travel.completeTravel();
-    if (!result) return;
+    void (async () => {
+      const result = await travel.completeTravel();
+      if (!result) return;
 
-    frogState.setCurrentState('happy');
-    petStats.addExp(result.exp);
-    result.items.forEach(itemId => inventory.addItem(itemId, 1));
-    achievements.incrementProgress('travel_3');
-    showInteractionBubble(`旅行归来，带回了 ${result.exp} EXP 和新的收获`);
+      frogState.setCurrentState('happy');
+      petStats.addExp(result.exp);
+      result.items.forEach(itemId => inventory.addItem(itemId, 1));
+      achievements.incrementProgress('travel_3');
+      showInteractionBubble(`旅行归来，带回了 ${result.exp} EXP 和新的收获`);
+    })();
   }, [travel, frogState, petStats, inventory, achievements, showInteractionBubble]);
 
   const profileData = {
@@ -649,7 +730,16 @@ function App() {
         petName={petName}
         travel={travel}
       />
-      <SettingsDialog visible={dialogs.settings} onClose={() => closeDialog('settings')} />
+      <SettingsDialog
+        visible={dialogs.settings}
+        onClose={() => closeDialog('settings')}
+        onAuthUpdated={(nextWallet) => {
+          if (nextWallet) {
+            setWalletAddress(nextWallet.toLowerCase());
+          }
+          void eggLifecycle.refresh();
+        }}
+      />
       <ChainMonitorPanel
         visible={dialogs.chainMonitor}
         onClose={() => closeDialog('chainMonitor')}

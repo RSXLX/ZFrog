@@ -81,10 +81,10 @@ export class IntentService {
     start_travel: '发起一次新的旅行探险',
     friend_list: '查看好友列表',
     friend_add: '添加新好友',
-    friend_visit: '拜访好友的家园',
+    friend_visit: '拜访好友的记忆空间',
     souvenirs_query: '查看收集的纪念品',
     badges_query: '查看获得的徽章/成就',
-    garden_query: '查看自己或他人的家园',
+    garden_query: '查看自己或他人的记忆空间',
     messages_query: '查看留言板消息',
     navigate: '导航到某个页面，如"打开好友页面"',
     help: '寻求帮助，了解功能',
@@ -140,7 +140,7 @@ ${intentList}
 - price_query: { "symbol": "代币符号如ETH/BTC" }
 - start_travel: { "duration": 秒数, "isRandom": true/false }
 - friend_add/friend_visit: { "targetName": "目标名称" }
-- navigate: { "target": "目标路由如/friends, /garden, /badges" }
+- navigate: { "target": "目标路由如/friends, /memory-palace/:frogId, /badges" }
 - 其他意图可以返回空 params: {}`;
 
     const userPrompt = `用户说：${message}

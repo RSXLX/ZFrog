@@ -10,7 +10,7 @@ import { AppError } from '../../middlewares/errorHandler';
 import { travelCommandServiceV1 } from '../../modules/travel/travel.command';
 import { travelQueryServiceV1 } from '../../modules/travel/travel.query';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * GET /api/v1/cross-chain/supported-chains

@@ -5,6 +5,7 @@ export interface OnchainMilestoneReadModel {
   id: string;
   frogId: number;
   travelId: number | null;
+  attestationId: string | null;
   type: string;
   milestoneType: string;
   chainId: number | null;
@@ -22,6 +23,7 @@ export interface OnchainMilestoneSummary {
 export interface RecordOnchainMilestoneInput {
   frogId: number;
   travelId?: number | null;
+  attestationId?: string | null;
   milestoneType: string;
   chainId?: number | null;
   txHash?: string | null;
@@ -39,6 +41,7 @@ const toReadModel = (row: {
   id: bigint;
   frogId: number;
   travelId: number | null;
+  attestationId: string | null;
   milestoneType: string;
   chainId: number | null;
   txHash: string | null;
@@ -49,6 +52,7 @@ const toReadModel = (row: {
   id: row.id.toString(),
   frogId: row.frogId,
   travelId: row.travelId,
+  attestationId: row.attestationId,
   type: row.milestoneType.toLowerCase(),
   milestoneType: row.milestoneType,
   chainId: row.chainId,
@@ -68,6 +72,7 @@ export class OnchainMilestoneService {
       data: {
         frogId: input.frogId,
         travelId: input.travelId ?? null,
+        attestationId: input.attestationId ?? null,
         milestoneType: input.milestoneType,
         chainId: input.chainId ?? null,
         txHash: input.txHash ?? null,
@@ -88,6 +93,7 @@ export class OnchainMilestoneService {
         eventType: 'OnchainMilestoneRecorded',
         payload: {
           milestoneId: created.id.toString(),
+          attestationId: input.attestationId ?? null,
           milestoneType: input.milestoneType,
           chainId: input.chainId ?? null,
           txHash: input.txHash ?? null,

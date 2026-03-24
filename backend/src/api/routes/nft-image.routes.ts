@@ -1,10 +1,9 @@
 import { Router } from 'express';
 import { NFTImageOrchestratorService } from '../../services/nft-image-orchestrator.service';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../database';
 
-const router = Router();
+const router: Router = Router();
 const orchestrator = new NFTImageOrchestratorService();
-const prisma = new PrismaClient();
 
 /**
  * POST /api/nft-image/generate

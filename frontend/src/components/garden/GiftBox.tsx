@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiService } from '../../services/api';
+import { gardenFeatureApi } from '../../features/garden/api';
 
 export interface Gift {
   id: string;
@@ -48,10 +48,8 @@ export const GiftBox: React.FC<GiftBoxProps> = ({
 
   const loadGifts = async () => {
     try {
-      const response = await apiService.get(`/homestead/${frogId}/gifts`);
-      if (response.success) {
-        setGifts(response.data?.gifts || []);
-      }
+      const data = await gardenFeatureApi.getGifts(frogId);
+      setGifts(data?.gifts || []);
     } catch (error) {
       console.error('Failed to load gifts:', error);
     } finally {
@@ -69,10 +67,10 @@ export const GiftBox: React.FC<GiftBoxProps> = ({
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     try {
-      const response = await apiService.post(`/homestead/${frogId}/gifts/${giftId}/open`);
-      
-      if (response.success) {
-        setOpenedGiftResult(response.data);
+      const gift = await gardenFeatureApi.openGift(frogId, giftId);
+
+      if (gift) {
+        setOpenedGiftResult(gift);
         setGifts(prevGifts =>
           prevGifts.map(g =>
             g.id === giftId ? { ...g, isOpened: true, openedAt: new Date().toISOString() } : g

@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiService } from '../../services/api';
+import { rewardFeatureApi } from '../../features/reward/api';
 
 interface TaskReward {
   lily?: number;
@@ -44,11 +44,9 @@ export function TaskPanel({ ownerAddress, onClaimed }: TaskPanelProps) {
   const fetchTasks = async () => {
     try {
       setLoading(true);
-      const response: any = await apiService.get(`/tasks/${ownerAddress}`);
-      if (response.success) {
-        setDailyTasks(response.data?.daily || []);
-        setWeeklyTasks(response.data?.weekly || []);
-      }
+      const taskData = await rewardFeatureApi.getTasks(ownerAddress);
+      setDailyTasks(taskData.daily || []);
+      setWeeklyTasks(taskData.weekly || []);
     } catch (err) {
       console.error('Failed to fetch tasks:', err);
       setError('加载任务失败');
@@ -67,8 +65,8 @@ export function TaskPanel({ ownerAddress, onClaimed }: TaskPanelProps) {
   const claimReward = async (taskId: string) => {
     try {
       setClaiming(taskId);
-      const response: any = await apiService.post(`/tasks/${ownerAddress}/claim`, { taskId });
-      if (response.success) {
+      const success = await rewardFeatureApi.claimTask(ownerAddress, taskId);
+      if (success) {
         // 刷新任务列表
         await fetchTasks();
         onClaimed?.();

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Frog } from '../../types';
-import { apiService } from '../../services/api';
+import { frogFeatureApi } from '../../features/frog/api';
+import { socialFeatureApi } from '../../features/social/api';
 
 interface AddFriendProps {
   currentFrogId: number;
@@ -23,23 +24,18 @@ const AddFriend: React.FC<AddFriendProps> = ({
 
     setSearching(true);
     try {
-      const response = await apiService.get(`/frogs/search`, {
-        params: {
-          query: searchTerm,
-          limit: 10
-        }
-      });
-      
-      if (response.success && response.data.length > 0) {
+      const searchResult = await frogFeatureApi.search(searchTerm, 10);
+
+      if (searchResult.length > 0) {
         // 过滤掉自己
-        const filteredResults = response.data.filter((frog: Frog) => 
+        const filteredResults = searchResult.filter((frog: Frog) => 
           frog.tokenId !== currentFrogId
         );
         
         // 获取当前青蛙的好友列表，进一步过滤
         try {
-          const friendsResponse = await apiService.get(`/friends/list/${currentFrogId}`);
-          const friendIds = friendsResponse.success ? friendsResponse.data.map((friend: any) => friend.tokenId) : [];
+          const friends = await socialFeatureApi.listFriends(currentFrogId);
+          const friendIds = friends.map((friend: any) => friend.tokenId);
           
           const finalResults = filteredResults.filter((frog: Frog) => 
             !friendIds.includes(frog.tokenId)
@@ -74,7 +70,7 @@ const AddFriend: React.FC<AddFriendProps> = ({
         requestData.addresseeId = targetFrogId;
       }
 
-      await apiService.post('/friends/request', requestData);
+      await socialFeatureApi.sendFriendRequest(requestData);
       
       // 从搜索结果中移除已发送请求的青蛙
       setSearchResults(searchResults.filter(frog => frog.tokenId !== targetFrogId));

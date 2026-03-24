@@ -8,10 +8,8 @@
  * 4. Verify discoveries are saved
  */
 
-import { PrismaClient } from '@prisma/client';
 import { omniTravelService } from '../services/omni-travel.service';
-
-const prisma = new PrismaClient();
+import { prisma } from '../database';
 
 async function testCrossChainFlow() {
   const tokenId = 3; // Test with Frog #3

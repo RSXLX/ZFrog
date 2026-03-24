@@ -5,6 +5,7 @@
 
 import { motion } from 'framer-motion';
 import { LucideIcon, Inbox, Users, MapPin, Gift, Trophy } from 'lucide-react';
+import { useI18n } from '../../i18n';
 
 interface EmptyStateProps {
   icon?: LucideIcon;
@@ -77,53 +78,58 @@ export function EmptyState({
 
 // 预设空状态
 export function EmptyTravels({ onStartTravel }: { onStartTravel?: () => void }) {
+  const { tr } = useI18n();
   return (
     <EmptyState
       emoji="🗺️"
-      title="还没有旅行记录"
-      description="让你的青蛙去探索世界吧！每次旅行都会带来惊喜。"
-      action={onStartTravel ? { label: '开始旅行', onClick: onStartTravel } : undefined}
+      title={tr('还没有旅行记录', 'No travel records yet')}
+      description={tr('让你的青蛙去探索世界吧！每次旅行都会带来惊喜。', 'Send your frog to explore the world. Every trip brings surprises.')}
+      action={onStartTravel ? { label: tr('开始旅行', 'Start Travel'), onClick: onStartTravel } : undefined}
     />
   );
 }
 
 export function EmptyFriends({ onAddFriend }: { onAddFriend?: () => void }) {
+  const { tr } = useI18n();
   return (
     <EmptyState
       icon={Users}
-      title="还没有好友"
-      description="添加好友一起玩耍，还能结伴旅行获得更多奖励！"
-      action={onAddFriend ? { label: '添加好友', onClick: onAddFriend } : undefined}
+      title={tr('还没有好友', 'No friends yet')}
+      description={tr('添加好友一起玩耍，还能结伴旅行获得更多奖励！', 'Add friends to play together and earn more rewards from group travel.')}
+      action={onAddFriend ? { label: tr('添加好友', 'Add Friend'), onClick: onAddFriend } : undefined}
     />
   );
 }
 
 export function EmptySouvenirs() {
+  const { tr } = useI18n();
   return (
     <EmptyState
       icon={Gift}
-      title="还没有纪念品"
-      description="旅行时有机会获得稀有纪念品，快去探险吧！"
+      title={tr('还没有纪念品', 'No souvenirs yet')}
+      description={tr('旅行时有机会获得稀有纪念品，快去探险吧！', 'Travel for a chance to discover rare souvenirs.')}
     />
   );
 }
 
 export function EmptyBadges() {
+  const { tr } = useI18n();
   return (
     <EmptyState
       icon={Trophy}
-      title="还没有徽章"
-      description="完成任务和成就可以获得徽章奖励。"
+      title={tr('还没有徽章', 'No badges yet')}
+      description={tr('完成任务和成就可以获得徽章奖励。', 'Complete missions and achievements to earn badges.')}
     />
   );
 }
 
 export function EmptyExplorations() {
+  const { tr } = useI18n();
   return (
     <EmptyState
       icon={MapPin}
-      title="暂无探索记录"
-      description="这次旅行还没有探索发现，耐心等待吧！"
+      title={tr('暂无探索记录', 'No discoveries yet')}
+      description={tr('这次旅行还没有探索发现，耐心等待吧！', 'No discoveries from this trip yet. Please wait a bit longer.')}
     />
   );
 }

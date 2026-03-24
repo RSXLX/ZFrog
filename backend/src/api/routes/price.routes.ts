@@ -3,7 +3,7 @@
 import { Router } from 'express';
 import { PriceService } from '../../services/defi/price.service';
 
-const router = Router();
+const router: Router = Router();
 const priceService = new PriceService();
 
 /**

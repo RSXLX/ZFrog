@@ -12,7 +12,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { FrogAppearanceParams } from '../../services/appearance.api';
+import { FrogAppearanceParams } from '../../features/appearance/api';
 
 interface FrogSvgGeneratedProps {
   params: FrogAppearanceParams;

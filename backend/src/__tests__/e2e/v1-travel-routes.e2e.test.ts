@@ -4,6 +4,7 @@ import travelsRoutes from '../../api/routes/v1/travels.routes';
 import { errorHandler, notFoundHandler } from '../../middlewares/errorHandler';
 import { travelCommandServiceV1 } from '../../modules/travel/travel.command';
 import { travelQueryServiceV1 } from '../../modules/travel/travel.query';
+import { ritualService } from '../../modules/social/ritual.service';
 
 jest.mock('../../middlewares/auth.middleware', () => ({
   authRequired: (req: any, _res: any, next: any) => {
@@ -28,10 +29,17 @@ jest.mock('../../modules/travel/travel.query', () => ({
   },
 }));
 
+jest.mock('../../modules/social/ritual.service', () => ({
+  ritualService: {
+    rescueTravel: jest.fn(),
+  },
+}));
+
 describe('V1 Travel Routes E2E', () => {
   const app = express();
   const mockCommand = travelCommandServiceV1 as jest.Mocked<typeof travelCommandServiceV1>;
   const mockQuery = travelQueryServiceV1 as jest.Mocked<typeof travelQueryServiceV1>;
+  const mockRitual = ritualService as jest.Mocked<typeof ritualService>;
 
   app.use(express.json());
   app.use('/api/v1/travels', travelsRoutes);
@@ -85,6 +93,13 @@ describe('V1 Travel Routes E2E', () => {
       progress: 100,
       souvenirId: 88,
       completedAt: new Date().toISOString(),
+    });
+
+    mockRitual.rescueTravel.mockResolvedValue({
+      success: true,
+      message: '好友救援成功！',
+      xpEarned: 15,
+      reputationEarned: 10,
     });
   });
 
@@ -162,6 +177,29 @@ describe('V1 Travel Routes E2E', () => {
       walletAddress: '0xabc0000000000000000000000000000000000001',
       source: 'web',
       requestId: undefined,
+    });
+  });
+
+  it('POST /api/v1/travels/:travelId/rescue delegates to ritualService.rescueTravel', async () => {
+    const response = await request(app)
+      .post('/api/v1/travels/101/rescue')
+      .send({ rescuerFrogId: 9, verificationId: 'verify-123' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data).toMatchObject({
+      success: true,
+      xpEarned: 15,
+      reputationEarned: 10,
+    });
+
+    expect(mockRitual.rescueTravel).toHaveBeenCalledWith({
+      travelId: 101,
+      rescuerFrogId: 9,
+      verificationId: 'verify-123',
+      walletAddress: '0xabc0000000000000000000000000000000000001',
+      requestId: undefined,
+      source: 'v1_travel_rescue_route',
     });
   });
 });

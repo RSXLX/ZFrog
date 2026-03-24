@@ -1,0 +1,66 @@
+{
+  "gateId": "v2-p1-escalation-timeout-gate",
+  "issue": {
+    "labels": ["p1", "v2", "release-health", "need-triage"],
+    "queryLabels": ["p1", "v2"],
+    "queryState": "open",
+    "requiredLabels": ["p1", "v2", "release-health"],
+    "titlePrefixes": [
+      "[V2-W15-17][P1 Escalation]",
+      "[V2-W15-16][P1 Escalation]",
+      "[V2-W15-14][P1 Escalation]",
+      "[V2-W15-13][P1 Escalation]",
+      "[V2-W15-12][P1 Escalation]",
+      "[V2-W15-11][P1 Escalation]",
+      "[V2-W15-10][P1 Escalation]",
+      "[V2-W15-09][P1 Escalation]",
+      "[V2-W15-08][P1 Escalation]",
+      "[V2-W15-07][P1 Escalation]",
+      "[V2-W15-06][P1 Escalation]",
+      "[V2-W15-05][P1 Escalation]"
+    ],
+    "maxLabelDriftIssues": 0,
+    "maxOpenHours": 72,
+    "maxIdleHours": 48,
+    "maxOverdueIssues": 0,
+    "candidateCloseouts": [
+      {
+        "enabled": true,
+        "reason": "p1-timeout-consecutive-failed-weeks",
+        "minOpenIssuesWhenTrendDetected": 1,
+        "minOpenIssuesBeforeRecoveryCloseout": 1,
+        "recoveryConsecutivePassedWeeks": 3,
+        "maxOpenIssuesAfterRecovery": 0,
+        "recoveryThresholdRatcheting": {
+          "enabled": true,
+          "minConsecutivePassedWeeksToRequireTarget": 2,
+          "targetRecoveryConsecutivePassedWeeks": 3
+        }
+      },
+      {
+        "enabled": true,
+        "reason": "p1-timeout-stability-consecutive-failed-weeks",
+        "minOpenIssuesWhenTrendDetected": 1,
+        "minOpenIssuesBeforeRecoveryCloseout": 1,
+        "recoveryConsecutivePassedWeeks": 2,
+        "maxOpenIssuesAfterRecovery": 0,
+        "recoveryThresholdRatcheting": {
+          "enabled": false,
+          "minConsecutivePassedWeeksToRequireTarget": 2,
+          "targetRecoveryConsecutivePassedWeeks": 2
+        }
+      }
+    ]
+  },
+  "reminder": {
+    "enabled": true,
+    "maxPerRun": 10,
+    "maxReminderFailures": 0
+  },
+  "summary": {
+    "requireGeneratedAt": true,
+    "maxAgeHours": 36,
+    "maxFutureSkewMinutes": 5
+  },
+  "notes": "Evaluate P1 escalation issues for timeout risk, enforce required-label compliance + timeout/timeout-stability candidate lifecycle (trend active must keep open, recovery window keeps open, recovery reached must close), ratchet timeout recovery threshold after stability window, enforce release summary freshness with future-skew guard, and auto-post reminder comments with workflow deep links when overdue."
+}

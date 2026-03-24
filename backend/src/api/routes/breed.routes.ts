@@ -5,7 +5,7 @@
 import { Router, Request, Response } from 'express';
 import * as breedService from '../../services/breed.service';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * POST /api/breed/check

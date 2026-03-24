@@ -52,6 +52,14 @@ export function useQuietModeIntegration(): UseQuietModeIntegrationReturn {
   useEffect(() => {
     const unsubscribe = quietModeManager.addListener((mode: QuietModeConfig) => {
       setCurrentMode(mode);
+      window.dispatchEvent(
+        new CustomEvent('desktop:frog-status-changed', {
+          detail: {
+            quietMode: mode.type,
+            frogState: mode.behavior.frogState,
+          },
+        })
+      );
       
       // Update focus timer if in focus mode
       if (mode.type === QuietModeType.FOCUS && mode.duration) {

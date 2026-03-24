@@ -10,20 +10,18 @@ import {
   WEEKLY_TASKS,
   DailyTaskProgress,
 } from '../../services/daily-task.service';
+import { ApiRes } from '../../utils/apiResponse';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * GET /api/tasks/config
  * 获取任务配置（静态数据）
  */
 router.get('/config', async (_req: Request, res: Response) => {
-  return res.json({
-    success: true,
-    data: {
-      daily: Object.values(DAILY_TASKS),
-      weekly: Object.values(WEEKLY_TASKS),
-    },
+  return ApiRes.success(res, {
+    daily: Object.values(DAILY_TASKS),
+    weekly: Object.values(WEEKLY_TASKS),
   });
 });
 
@@ -36,10 +34,7 @@ router.get('/:ownerAddress', async (req: Request, res: Response) => {
     const { ownerAddress } = req.params;
     
     if (!ownerAddress) {
-      return res.status(400).json({
-        success: false,
-        error: 'Owner address is required',
-      });
+      return ApiRes.validationError(res, 'Owner address is required');
     }
 
     const progress = await getDailyTaskProgress(ownerAddress);
@@ -55,21 +50,15 @@ router.get('/:ownerAddress', async (req: Request, res: Response) => {
       ...p,
     }));
 
-    return res.json({
-      success: true,
-      data: {
-        daily: dailyTasks,
-        weekly: weeklyTasks,
-        todayLoginTime: progress.todayLoginTime,
-        allDailyComplete: progress.allDailyComplete,
-      },
+    return ApiRes.success(res, {
+      daily: dailyTasks,
+      weekly: weeklyTasks,
+      todayLoginTime: progress.todayLoginTime,
+      allDailyComplete: progress.allDailyComplete,
     });
   } catch (error) {
     console.error('[Tasks] Get tasks error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to get tasks',
-    });
+    return ApiRes.serverError(res, error instanceof Error ? error : undefined);
   }
 });
 
@@ -83,31 +72,23 @@ router.post('/:ownerAddress/claim', async (req: Request, res: Response) => {
     const { taskId } = req.body;
 
     if (!ownerAddress || !taskId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Owner address and taskId are required',
-      });
+      return ApiRes.validationError(res, 'Owner address and taskId are required');
     }
 
     const result = await claimTaskReward(ownerAddress, taskId);
 
     if (!result.success) {
-      return res.status(400).json({
-        success: false,
-        error: result.error,
-      });
+      return ApiRes.validationError(res, result.error || 'Failed to claim reward');
     }
 
-    return res.json({
-      success: true,
-      reward: result.reward,
-    });
+    return ApiRes.success(
+      res,
+      { reward: result.reward },
+      'Reward claimed'
+    );
   } catch (error) {
     console.error('[Tasks] Claim reward error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to claim reward',
-    });
+    return ApiRes.serverError(res, error instanceof Error ? error : undefined);
   }
 });
 

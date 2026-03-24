@@ -10,9 +10,8 @@
  * - V2.0: 舒适度计算
  */
 
-import { PrismaClient, DecorationType } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { DecorationType } from '@prisma/client';
+import { prisma } from '../database';
 
 // ============ 类型定义 ============
 

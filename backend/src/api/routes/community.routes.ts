@@ -1,7 +1,25 @@
 import { Router, Request, Response } from 'express';
 import { communityService } from '../../services/community.service';
+import { authOptional } from '../../middlewares/auth.middleware';
+import { ApiRes } from '../../utils/apiResponse';
 
-const router = Router();
+const router: Router = Router();
+router.use(authOptional);
+
+function getRequestAddress(req: Request): string | undefined {
+  const bodyAddress = typeof req.body?.userAddress === 'string' ? req.body.userAddress : undefined;
+  if (bodyAddress) return bodyAddress.toLowerCase();
+
+  if (req.user?.address) return req.user.address.toLowerCase();
+
+  const rawHeaderAddress = req.headers['x-wallet-address'] ?? req.headers['x-admin-address'];
+  const headerAddress = Array.isArray(rawHeaderAddress) ? rawHeaderAddress[0] : rawHeaderAddress;
+  if (typeof headerAddress === 'string' && headerAddress) {
+    return headerAddress.toLowerCase();
+  }
+
+  return undefined;
+}
 
 /**
  * GET /communities/public
@@ -10,10 +28,10 @@ const router = Router();
 router.get('/public', async (req: Request, res: Response) => {
   try {
     const communities = await communityService.getPublicCommunities();
-    res.json({ success: true, data: communities });
+    return ApiRes.success(res, communities);
   } catch (error) {
     console.error('Error fetching public communities:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    return ApiRes.serverError(res, error instanceof Error ? error : undefined);
   }
 });
 
@@ -24,11 +42,14 @@ router.get('/public', async (req: Request, res: Response) => {
 router.get('/user/:address', async (req: Request, res: Response) => {
   try {
     const { address } = req.params;
+    if (!address) {
+      return ApiRes.validationError(res, 'Address is required');
+    }
     const communities = await communityService.getUserCommunities(address);
-    res.json({ success: true, data: communities });
+    return ApiRes.success(res, communities);
   } catch (error) {
     console.error('Error fetching user communities:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    return ApiRes.serverError(res, error instanceof Error ? error : undefined);
   }
 });
 
@@ -38,20 +59,22 @@ router.get('/user/:address', async (req: Request, res: Response) => {
  */
 router.post('/verify-credential', async (req: Request, res: Response) => {
   try {
-    const { credential, userAddress } = req.body;
+    const { credential } = req.body;
+    const userAddress = getRequestAddress(req);
     
     if (!credential || !userAddress) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Missing required fields: credential, userAddress' 
-      });
+      return ApiRes.validationError(res, 'Missing required fields: credential, userAddress');
     }
     
     const result = await communityService.verifyCredential(credential, userAddress);
-    res.json(result);
+    if (!result.success) {
+      return ApiRes.validationError(res, result.message || 'Credential verification failed');
+    }
+
+    return ApiRes.success(res, { community: result.community });
   } catch (error) {
     console.error('Error verifying credential:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    return ApiRes.serverError(res, error instanceof Error ? error : undefined);
   }
 });
 
@@ -61,20 +84,22 @@ router.post('/verify-credential', async (req: Request, res: Response) => {
  */
 router.post('/set-active', async (req: Request, res: Response) => {
   try {
-    const { userAddress, communityId } = req.body;
+    const userAddress = getRequestAddress(req);
+    const { communityId } = req.body;
     
     if (!userAddress || !communityId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Missing required fields: userAddress, communityId' 
-      });
+      return ApiRes.validationError(res, 'Missing required fields: userAddress, communityId');
     }
     
     const result = await communityService.setActiveCommunity(userAddress, communityId);
-    res.json(result);
+    if (!result.success) {
+      return ApiRes.validationError(res, 'Failed to set active community');
+    }
+
+    return ApiRes.success(res, result);
   } catch (error) {
     console.error('Error setting active community:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    return ApiRes.serverError(res, error instanceof Error ? error : undefined);
   }
 });
 
@@ -84,20 +109,22 @@ router.post('/set-active', async (req: Request, res: Response) => {
  */
 router.post('/leave', async (req: Request, res: Response) => {
   try {
-    const { userAddress, communityId } = req.body;
+    const userAddress = getRequestAddress(req);
+    const { communityId } = req.body;
     
     if (!userAddress || !communityId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Missing required fields: userAddress, communityId' 
-      });
+      return ApiRes.validationError(res, 'Missing required fields: userAddress, communityId');
     }
     
     const result = await communityService.leaveCommunity(userAddress, communityId);
-    res.json(result);
+    if (!result.success) {
+      return ApiRes.validationError(res, result.message || 'Failed to leave community');
+    }
+
+    return ApiRes.success(res, result);
   } catch (error) {
     console.error('Error leaving community:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    return ApiRes.serverError(res, error instanceof Error ? error : undefined);
   }
 });
 
@@ -108,16 +135,19 @@ router.post('/leave', async (req: Request, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!id) {
+      return ApiRes.validationError(res, 'Community id is required');
+    }
     const community = await communityService.getCommunityById(id);
     
     if (!community) {
-      return res.status(404).json({ success: false, message: 'Community not found' });
+      return ApiRes.notFound(res, 'Community not found');
     }
     
-    res.json({ success: true, data: community });
+    return ApiRes.success(res, community);
   } catch (error) {
     console.error('Error fetching community:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    return ApiRes.serverError(res, error instanceof Error ? error : undefined);
   }
 });
 
@@ -128,13 +158,17 @@ router.get('/:id', async (req: Request, res: Response) => {
 router.get('/:id/members', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const limit = parseInt(req.query.limit as string) || 50;
+    if (!id) {
+      return ApiRes.validationError(res, 'Community id is required');
+    }
+    const rawLimit = parseInt(req.query.limit as string, 10);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
     
     const members = await communityService.getCommunityMembers(id, limit);
-    res.json({ success: true, data: members });
+    return ApiRes.success(res, members);
   } catch (error) {
     console.error('Error fetching community members:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    return ApiRes.serverError(res, error instanceof Error ? error : undefined);
   }
 });
 

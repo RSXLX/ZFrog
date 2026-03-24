@@ -14,12 +14,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { decodeEventLog } from 'viem';
 import { ZETAFROG_ADDRESS, ZETAFROG_ABI } from '../../config/contracts';
 import { Button } from '../common/Button';
-import { apiService } from '../../services/api';
+import { frogFeatureApi } from '../../features/frog/api';
 import { useFrogAppearance } from '../../hooks/useFrogAppearance';
 import { FrogSvgGenerated } from './FrogSvgGenerated';
 import { FrogHatchingLoader } from './FrogHatchingLoader';
 import { RarityBorder } from './RarityBorder';
-import { getRarityDisplayText, getRarityColor, confirmAppearance } from '../../services/appearance.api';
+import { getRarityDisplayText, getRarityColor } from '../../features/appearance/api';
 
 interface FrogMintWithAppearanceProps {
   onSuccess?: () => void;
@@ -128,7 +128,7 @@ export function FrogMintWithAppearance({ onSuccess }: FrogMintWithAppearanceProp
               const tokenId = Number(args.tokenId);
               
               // 同步青蛙数据
-              await apiService.syncFrog(tokenId);
+              await frogFeatureApi.syncFrog(tokenId);
               
               // 确认外观参数
               await confirm(tokenId);

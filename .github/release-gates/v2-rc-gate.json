@@ -1,0 +1,20 @@
+{
+  "gateId": "v2-rc",
+  "nightly": {
+    "workflowFile": "v2-regression-nightly-matrix.yml",
+    "requiredConsecutiveSuccesses": 3,
+    "maxHoursSinceLatestSuccess": 30,
+    "sampleSize": 12
+  },
+  "defectBudget": {
+    "p0Open": 0,
+    "p1Open": 0
+  },
+  "defectSnapshot": {
+    "p0Open": 0,
+    "p1Open": 0,
+    "updatedAt": "2026-03-23T09:55:00Z",
+    "source": "manual-triage",
+    "notes": "RC gate baseline established for Week12 kickoff."
+  }
+}

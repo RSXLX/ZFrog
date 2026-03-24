@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { apiService, type Frog } from '../services/api';
+import { frogFeatureApi } from '../features/frog/api';
+import type { Frog } from '../types';
 
 export function useFrogData(tokenIdOrAddress: number | string | null | undefined) {
   const [frog, setFrog] = useState<Frog | null>(null);
@@ -15,10 +16,10 @@ export function useFrogData(tokenIdOrAddress: number | string | null | undefined
       
       if (typeof tokenIdOrAddress === 'string') {
         // 如果是address，获取该地址的青蛙（单钱包单青蛙）
-        data = await apiService.getMyFrog(tokenIdOrAddress);
+        data = await frogFeatureApi.getMyFrog(tokenIdOrAddress);
       } else {
         // 如果是tokenId，获取特定青蛙
-        data = await apiService.getFrogDetail(tokenIdOrAddress);
+        data = await frogFeatureApi.getFrogDetail(tokenIdOrAddress);
       }
       
       setFrog(data);

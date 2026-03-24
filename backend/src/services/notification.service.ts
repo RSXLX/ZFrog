@@ -13,6 +13,8 @@ export const NotificationType = {
   CLEAN_WARNING: 'clean_warning',
   SICK_WARNING: 'sick_warning',
   TRAVEL_COMPLETE: 'travel_complete',
+  BLESSING_COMPLETED: 'blessing_completed',
+  RESCUE_COMPLETED: 'rescue_completed',
   FRIEND_GIFT: 'friend_gift',
   FRIEND_VISIT: 'friend_visit',
   FRIEND_REQUEST: 'friend_request',
@@ -63,6 +65,18 @@ const NOTIFICATION_TEMPLATES: Record<string, {
     message: '✈️ {frogName}旅行归来！快来看看带回了什么',
     priority: NotificationPriority.HIGH,
     icon: '🎁',
+  },
+  [NotificationType.BLESSING_COMPLETED]: {
+    title: '祈福成功',
+    message: '🙏 {blesserName} 为 {frogName} 完成了一次祈福',
+    priority: NotificationPriority.MEDIUM,
+    icon: '🙏',
+  },
+  [NotificationType.RESCUE_COMPLETED]: {
+    title: '救援完成',
+    message: '🆘 {rescuerName} 成功救援了 {frogName}',
+    priority: NotificationPriority.HIGH,
+    icon: '🆘',
   },
   [NotificationType.FRIEND_GIFT]: {
     title: '收到礼物',
@@ -324,6 +338,36 @@ export async function sendStatusWarning(
   return notification;
 }
 
+export async function createBlessingCompletedNotification(
+  frogId: number,
+  params: {
+    frogName?: string | null;
+    blesserName?: string | null;
+  } = {}
+) {
+  const frogName = params.frogName || '你的青蛙';
+  const blesserName = params.blesserName || '好友';
+  return createNotification(frogId, NotificationType.BLESSING_COMPLETED, {
+    frogName,
+    blesserName,
+  });
+}
+
+export async function createRescueCompletedNotification(
+  frogId: number,
+  params: {
+    frogName?: string | null;
+    rescuerName?: string | null;
+  } = {}
+) {
+  const frogName = params.frogName || '你的青蛙';
+  const rescuerName = params.rescuerName || '热心蛙';
+  return createNotification(frogId, NotificationType.RESCUE_COMPLETED, {
+    frogName,
+    rescuerName,
+  });
+}
+
 export default {
   NotificationType,
   NotificationPriority,
@@ -335,4 +379,6 @@ export default {
   deleteNotification,
   cleanOldNotifications,
   sendStatusWarning,
+  createBlessingCompletedNotification,
+  createRescueCompletedNotification,
 };

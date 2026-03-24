@@ -3,9 +3,10 @@ import { asyncHandler, AppError } from '../../../middlewares/errorHandler';
 import { authRequired } from '../../../middlewares/auth.middleware';
 import { travelCommandServiceV1 } from '../../../modules/travel/travel.command';
 import { travelQueryServiceV1 } from '../../../modules/travel/travel.query';
+import { ritualService } from '../../../modules/social/ritual.service';
 import { respondSuccess } from '../../response';
 
-const router = Router();
+const router: Router = Router();
 
 const parsePositiveInt = (value: unknown, field: string): number => {
   const parsed = typeof value === 'number' ? value : Number(value);
@@ -73,6 +74,32 @@ router.get(
     const result = await travelQueryServiceV1.getTravel({
       travelId,
       walletAddress,
+    });
+
+    return respondSuccess(req, res, result);
+  })
+);
+
+router.post(
+  '/:travelId/rescue',
+  authRequired,
+  asyncHandler(async (req, res) => {
+    const walletAddress = getAuthWallet(req);
+    const travelId = parsePositiveInt(req.params.travelId, 'travelId');
+    const rescuerFrogId = parsePositiveInt(req.body?.rescuerFrogId, 'rescuerFrogId');
+    const verificationId = (req.body?.verificationId as string | undefined)?.trim();
+
+    if (!verificationId) {
+      throw new AppError(400, 'verificationId is required', 'INVALID_INPUT');
+    }
+
+    const result = await ritualService.rescueTravel({
+      travelId,
+      rescuerFrogId,
+      verificationId,
+      walletAddress,
+      requestId: req.requestId,
+      source: (req.body?.source as string | undefined) || 'v1_travel_rescue_route',
     });
 
     return respondSuccess(req, res, result);

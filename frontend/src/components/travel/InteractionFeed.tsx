@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import './InteractionFeed.css';
+import { travelFeatureApi } from '../../features/travel/api';
 
 interface Interaction {
   id?: number;
@@ -21,7 +22,6 @@ interface InteractionFeedProps {
   chainId: number;
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:3001';
 
 export function InteractionFeed({ travelId, tokenId, chainId }: InteractionFeedProps) {
@@ -41,13 +41,8 @@ export function InteractionFeed({ travelId, tokenId, chainId }: InteractionFeedP
   useEffect(() => {
     const fetchInteractions = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/travels/${travelId}/interactions`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && Array.isArray(data.data)) {
-            setInteractions(data.data.reverse());
-          }
-        }
+        const data = await travelFeatureApi.getInteractions(travelId);
+        setInteractions(data.slice().reverse());
       } catch (error) {
         console.error('[InteractionFeed] Failed to fetch interactions:', error);
       } finally {

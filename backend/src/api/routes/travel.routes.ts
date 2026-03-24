@@ -7,6 +7,7 @@ import { logger } from '../../utils/logger';
 import { parsePositiveInt, parseNonNegativeInt, isValidDuration } from '../../utils/validation';
 import { travelCommandServiceV1 } from '../../modules/travel/travel.command';
 import { travelQueryServiceV1 } from '../../modules/travel/travel.query';
+import { markLegacyDeprecated } from './legacy-deprecation';
 
 // 递归处理 BigInt 序列化问题
 // ... (原有代码)
@@ -25,7 +26,7 @@ function stringifyBigInt(obj: any): any {
     return obj;
 }
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * GET /api/travels/history
@@ -420,6 +421,7 @@ router.get('/:travelId/trajectory', async (req, res) => {
  */
 router.get('/journal/:travelId', async (req, res) => {
     try {
+        markLegacyDeprecated(res, '/api/v1/travels/:travelId');
         const travelId = parseInt(req.params.travelId);
         if (isNaN(travelId)) {
             return res.status(400).json({ error: 'Invalid travel ID' });
@@ -659,6 +661,7 @@ router.post('/start-p0', async (req, res) => {
  */
 router.get('/p0/:travelId', async (req, res) => {
     try {
+        markLegacyDeprecated(res, '/api/v1/travels/:travelId');
         const travelId = parseInt(req.params.travelId);
         if (isNaN(travelId)) {
             return res.status(400).json({

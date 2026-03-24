@@ -4,6 +4,7 @@ import * as notificationService from '../../services/notification.service';
 import { logger } from '../../utils/logger';
 import { lifeCommandService } from './life.command';
 import { resolveHibernationStatus } from './state-calculator';
+import { ritualService } from '../social/ritual.service';
 
 const DROWSY_THRESHOLD_HOURS = 72;
 const BASE_REVIVAL_COST = 100;
@@ -111,6 +112,28 @@ export class DormancyService {
       message: '青蛙已成功唤醒',
       cost: costInfo.finalCost,
     };
+  }
+
+  async blessDormant(input: {
+    targetFrogId: number;
+    blesserFrogId: number;
+    walletAddress: string;
+    verificationId: string;
+    requestId?: string;
+  }): Promise<{
+    success: boolean;
+    message: string;
+    blessingsReceived: number;
+    blesserEnergy: number;
+  }> {
+    return ritualService.blessDormant({
+      targetFrogId: input.targetFrogId,
+      blesserFrogId: input.blesserFrogId,
+      walletAddress: input.walletAddress,
+      verificationId: input.verificationId,
+      requestId: input.requestId,
+      source: 'dormancy.service.bless',
+    });
   }
 
   async batchCheckDormancy(): Promise<number> {

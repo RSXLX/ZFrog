@@ -5,7 +5,7 @@ import { Router } from 'express';
 import { addressAnalysisService } from '../../services/travel/address-analysis.service';
 import { logger } from '../../utils/logger';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * GET /api/address/analyze

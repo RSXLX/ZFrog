@@ -11,6 +11,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { calculatePunnettOffspring, PetGenotype, toLegacyGene } from './genetics';
 import { applyRareMutation, isMutationTrait } from './mutationRules';
 import { useCollectionBook } from './useCollectionBook';
+import storage from '../services/storage';
 
 // ==================== 类型定义 ====================
 
@@ -241,6 +242,12 @@ export function usePetEgg(): UsePetEggReturn {
   const saveToStorage = useCallback((petData: Pet) => {
     try {
       localStorage.setItem(`zfrog_pet_${petData.id}`, JSON.stringify(petData));
+      storage.setFrogStats({
+        hunger: petData.attributes.hunger,
+        happiness: petData.attributes.happiness,
+        health: petData.attributes.health,
+        energy: petData.attributes.energy,
+      });
     } catch (err) {
       console.error('Failed to save pet:', err);
     }
@@ -254,6 +261,12 @@ export function usePetEgg(): UsePetEggReturn {
         const loadedPet = JSON.parse(data) as Pet;
         setPet(loadedPet);
         startUpdateInterval();
+        storage.setFrogStats({
+          hunger: loadedPet.attributes.hunger,
+          happiness: loadedPet.attributes.happiness,
+          health: loadedPet.attributes.health,
+          energy: loadedPet.attributes.energy,
+        });
         return loadedPet;
       }
     } catch (err) {

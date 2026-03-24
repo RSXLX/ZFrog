@@ -3,8 +3,11 @@
  * 与后端 API 同步，支持持久化状态
  */
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { interactionApi, FrogStatus, FoodInventory, FOOD_CONFIG } from '../services/interaction.api';
+import { lifeFeatureApi, LegacyFrogInteractionStatus } from '../features/life/api';
 import { FoodItem } from '../types/frogAnimation';
+
+type FrogStatus = LegacyFrogInteractionStatus;
+type FoodInventory = Record<string, number>;
 
 export interface InteractionStats {
   totalClicks: number;
@@ -49,7 +52,7 @@ export function useFrogInteraction(options: UseFrogInteractionOptions = {}) {
     setError(null);
     
     try {
-      const status = await interactionApi.getStatus(tokenId);
+      const status = await lifeFeatureApi.getLegacyInteractionStatus(tokenId);
       setServerStatus(status);
     } catch (err) {
       console.error('Failed to load frog status:', err);
@@ -64,8 +67,8 @@ export function useFrogInteraction(options: UseFrogInteractionOptions = {}) {
     if (!tokenId) return;
     
     try {
-      const result = await interactionApi.getInventory(tokenId);
-      setInventory(result.inventory);
+      const result = await lifeFeatureApi.getLegacyInteractionInventory(tokenId);
+      setInventory(result.inventory || {});
     } catch (err) {
       console.error('Failed to load inventory:', err);
     }
@@ -122,7 +125,10 @@ export function useFrogInteraction(options: UseFrogInteractionOptions = {}) {
     // 同步到服务器
     if (tokenId && ownerAddress) {
       try {
-        const result = await interactionApi.interact(tokenId, 'pet', ownerAddress);
+        const result = await lifeFeatureApi.interactLegacyInteraction(tokenId, {
+          interactionType: 'pet',
+          ownerAddress,
+        });
         setServerStatus(prev => prev ? {
           ...prev,
           happiness: result.happiness,
@@ -155,7 +161,10 @@ export function useFrogInteraction(options: UseFrogInteractionOptions = {}) {
     // 同步到服务器
     if (tokenId && ownerAddress) {
       try {
-        const result = await interactionApi.feed(tokenId, foodType, ownerAddress);
+        const result = await lifeFeatureApi.feedLegacyInteraction(tokenId, {
+          foodType,
+          ownerAddress,
+        });
         
         // 更新服务器状态
         setServerStatus(prev => prev ? {

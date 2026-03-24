@@ -13,7 +13,14 @@ import { InteractionFeed } from '../components/travel/InteractionFeed';
 import { GroupTravelModal } from '../components/travel/GroupTravelModal';
 import { useWebSocket, useTravelEvents } from '../hooks/useWebSocket';
 import { useEffect, useState, useRef } from 'react';
-import { apiService, type Frog } from '../services/api';
+import type { Frog } from '../types';
+import { frogFeatureApi } from '../features/frog/api';
+import { travelFeatureApi } from '../features/travel/api';
+import { web3FeatureApi } from '../features/web3/api';
+import { lifeFeatureApi } from '../features/life/api';
+import { memoryPalaceApi, type MemoryPalaceLite } from '../features/memory-palace/api';
+import { buildMemoryPalacePath } from '../features/memory-palace/routes';
+import type { FrogWalletReadModel, OnchainMilestoneReadModel, LifeReadModel } from '../lib/api/contracts';
 import { useAccount } from 'wagmi';
 import FriendInteractionModal from '../components/frog/FriendInteraction';
 import { useFrogStore } from '../stores/frogStore';
@@ -26,6 +33,10 @@ import { RefreshCw, Home, Trophy, Gift, Users, Heart, Plane } from 'lucide-react
 import { HibernationBadge } from '../components/frog/HibernationBadge';
 import { ReviveModal } from '../components/frog/ReviveModal';
 import { useHibernation } from '../hooks/useHibernation';
+import { PetStatePanel } from '../features/life/components/PetStatePanel';
+import { CareActionPanel } from '../features/life/components/CareActionPanel';
+import { TravelSummaryCard } from '../features/travel/components/TravelSummaryCard';
+import { MemoryPalaceView } from '../features/memory-palace/components/MemoryPalaceView';
 
 
 interface TravelDetail {
@@ -57,6 +68,18 @@ interface TravelDetail {
     crossChainStatus?: 'LOCKED' | 'CROSSING_OUT' | 'ON_TARGET_CHAIN' | 'CROSSING_BACK' | 'UNLOCKED' | 'FAILED';
 }
 
+const shortAddress = (value?: string | null): string => {
+    if (!value) return '--';
+    if (value.length <= 12) return value;
+    return `${value.slice(0, 6)}...${value.slice(-4)}`;
+};
+
+const formatMilestoneType = (value: string): string =>
+    value
+        .replace(/_/g, ' ')
+        .toLowerCase()
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
 // @ts-ignore
 export function FrogDetail() {
     const { tokenId: tokenIdParam } = useParams<{ tokenId: string }>();
@@ -75,6 +98,13 @@ export function FrogDetail() {
     const { setCurrentFrog } = useFrogStore();
     const { toast } = useToast();
     const [userFrogs, setUserFrogs] = useState<Frog[]>([]);
+    const [walletSummary, setWalletSummary] = useState<FrogWalletReadModel | null>(null);
+    const [walletMilestones, setWalletMilestones] = useState<OnchainMilestoneReadModel[]>([]);
+    const [walletLoading, setWalletLoading] = useState(false);
+    const [lifeState, setLifeState] = useState<LifeReadModel | null>(null);
+    const [lifeLoading, setLifeLoading] = useState(false);
+    const [memoryPalace, setMemoryPalace] = useState<MemoryPalaceLite | null>(null);
+    const [memoryLoading, setMemoryLoading] = useState(false);
     
     // 互动相关状态
     const [showInteractionModal, setShowInteractionModal] = useState(false);
@@ -131,8 +161,12 @@ export function FrogDetail() {
             setActiveTravel(null);
             setTravels([]);
             setError(null);
+            setWalletSummary(null);
+            setWalletMilestones([]);
+            setLifeState(null);
+            setMemoryPalace(null);
             
-            const frogData = await apiService.getFrogDetail(tokenId, address);
+            const frogData = await frogFeatureApi.getFrogDetail(tokenId, address);
             const currentTravels = frogData?.travels || [];
             if (currentTravels.length > 0) {
                 lastKnownTravelsRef.current = currentTravels;
@@ -181,9 +215,8 @@ export function FrogDetail() {
                     if (pendingTravelRef.current && !activeTravel) {
                         // 保持当前的乐观 activeTravel，不做任何事
                     } else {
-                        const response = await apiService.get(`/travels/${tokenId}/active`);
-                        if (response.success && response.data) {
-                            const travelData = response.data;
+                        const travelData = await travelFeatureApi.getActiveByTokenId(tokenId);
+                        if (travelData) {
                             
                             // [DEBUG] Log unexpected state
                             console.log(`[FrogDetail] Active travel check: ${travelData ? 'Found' : 'Null'}, Status: ${travelData?.status}`);
@@ -237,9 +270,65 @@ export function FrogDetail() {
                 }
             }
 
+            const shouldLoadWallet = Boolean(
+                address && frogData?.ownerAddress.toLowerCase() === address.toLowerCase()
+            );
+            if (shouldLoadWallet && frogData) {
+                setWalletLoading(true);
+                try {
+                    const [wallet, milestones] = await Promise.all([
+                        web3FeatureApi.getFrogWallet(frogData.id),
+                        web3FeatureApi.getOnchainMilestones(frogData.id, 5),
+                    ]);
+                    setWalletSummary(wallet);
+                    setWalletMilestones(milestones);
+                } catch (walletError) {
+                    console.warn('[FrogDetail] Failed to load frog wallet summary:', walletError);
+                    setWalletSummary(null);
+                    setWalletMilestones([]);
+                } finally {
+                    setWalletLoading(false);
+                }
+            } else {
+                setWalletSummary(null);
+                setWalletMilestones([]);
+                setWalletLoading(false);
+            }
+
+            if (frogData) {
+                setMemoryLoading(true);
+                memoryPalaceApi
+                    .getByFrogId(frogData.id)
+                    .then((memory) => setMemoryPalace(memory))
+                    .catch((memoryError) => {
+                        console.warn('[FrogDetail] Failed to load memory palace:', memoryError);
+                        setMemoryPalace(null);
+                    })
+                    .finally(() => setMemoryLoading(false));
+            } else {
+                setMemoryPalace(null);
+                setMemoryLoading(false);
+            }
+
+            if (shouldLoadWallet && frogData) {
+                setLifeLoading(true);
+                try {
+                    const life = await lifeFeatureApi.getLife(frogData.id);
+                    setLifeState(life);
+                } catch (lifeError) {
+                    console.warn('[FrogDetail] Failed to load life state:', lifeError);
+                    setLifeState(null);
+                } finally {
+                    setLifeLoading(false);
+                }
+            } else {
+                setLifeState(null);
+                setLifeLoading(false);
+            }
+
             // 如果不是所有者且用户已登录，获取用户自己的青蛙以支持"加好友"
             if (address && frogData?.ownerAddress.toLowerCase() !== address.toLowerCase()) {
-                const myFrog = await apiService.getMyFrog(address);
+                const myFrog = await frogFeatureApi.getMyFrog(address);
                 setUserFrogs(myFrog ? [myFrog] : []);
             } else {
                 setUserFrogs([]);
@@ -254,7 +343,6 @@ export function FrogDetail() {
 
     useEffect(() => {
         fetchData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tokenId, address]);
 
     // WebSocket连接和旅行事件监听
@@ -324,17 +412,16 @@ export function FrogDetail() {
             
             try {
                 console.log(`[TravelSync] Polling active travel status (delay: ${Math.round(delay)}ms)...`);
-                // 使用 apiService.get 而不是直接调用 fetch
-                const response = await apiService.get(`/travels/${tokenId}/active`);
+                const response = await travelFeatureApi.getActiveByTokenId(tokenId);
                 
-                if (mounted && response.success && response.data) {
-                    console.log('[TravelSync] Travel synced! Switching to Active state.', response.data);
+                if (mounted && response) {
+                    console.log('[TravelSync] Travel synced! Switching to Active state.', response);
                     
                     // 后端已同步，清除 pending 标记
                     pendingTravelRef.current = false;
                     
                     // 更新为后端返回的正式数据
-                    const travelData = response.data;
+                    const travelData = response;
                     setActiveTravel({
                         ...travelData,
                         startTime: new Date(travelData.startTime).toISOString(),
@@ -427,7 +514,6 @@ export function FrogDetail() {
         return () => {
             window.removeEventListener('travel:started', handleTravelStarted);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tokenId, frog]);
 
     if (isLoading) {
@@ -448,7 +534,7 @@ export function FrogDetail() {
                         onClick={async () => {
                             setIsSyncing(true);
                             try {
-                                await apiService.post('/api/frogs/sync', { tokenId });
+                                await frogFeatureApi.syncFrog(tokenId);
                                 await fetchData();
                             } catch (e) {
                                 console.error(e);
@@ -467,6 +553,10 @@ export function FrogDetail() {
         );
     }
 
+    const latestCompletedTravel =
+        travels.find((travel) => travel.status === 'Completed' || Boolean(travel.completedAt)) ||
+        travels[0] ||
+        null;
 
     return (
         <>
@@ -504,7 +594,7 @@ export function FrogDetail() {
                                 showVisitorControls={isOwner}
                                 onGroupTravel={async (companion) => {
                                   try {
-                                    const response = await apiService.post('/travels/group', {
+                                    const response = await travelFeatureApi.startGroupTravel({
                                       leaderId: frog.tokenId,
                                       companionId: companion.tokenId,
                                       duration: 3600
@@ -547,12 +637,12 @@ export function FrogDetail() {
                                                 <span className="hidden sm:inline">刷新</span>
                                             </button>
                                             <button
-                                                onClick={() => navigate('/garden')}
-                                                aria-label="进入家园"
+                                                onClick={() => navigate(buildMemoryPalacePath(frog.id))}
+                                                aria-label="进入记忆空间"
                                                 className="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center justify-center gap-1 text-sm font-medium whitespace-nowrap"
                                             >
                                                 <Home size={16} />
-                                                <span className="hidden sm:inline">家园</span>
+                                                <span className="hidden sm:inline">空间</span>
                                             </button>
                                             <button
                                                 onClick={() => navigate('/badges')}
@@ -596,6 +686,117 @@ export function FrogDetail() {
                         </div>
                     </motion.div>
 
+                    {isOwner && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-white rounded-2xl shadow-lg p-6 mb-6"
+                        >
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-bold text-gray-800">🧾 Frog Wallet</h2>
+                                {walletSummary ? (
+                                    <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                                        Chain {walletSummary.chainId}
+                                    </span>
+                                ) : null}
+                            </div>
+
+                            {walletLoading ? (
+                                <p className="text-sm text-gray-500">加载钱包摘要中...</p>
+                            ) : walletSummary ? (
+                                <div className="space-y-4">
+                                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                                        <div className="text-xs text-gray-500 mb-1">TBA Address</div>
+                                        <div className="font-mono text-sm text-gray-800 break-all">
+                                            {walletSummary.tbaAddress}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-2">
+                                            Source: {walletSummary.tbaSource}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center">
+                                            <div className="text-xl font-bold text-amber-700">
+                                                {walletSummary.assets.souvenirs.length}
+                                            </div>
+                                            <div className="text-xs text-amber-600">Souvenirs</div>
+                                        </div>
+                                        <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-3 text-center">
+                                            <div className="text-xl font-bold text-indigo-700">
+                                                {walletSummary.assets.badges.length}
+                                            </div>
+                                            <div className="text-xs text-indigo-600">Badges</div>
+                                        </div>
+                                        <div className="rounded-xl bg-teal-50 border border-teal-100 p-3 text-center">
+                                            <div className="text-xl font-bold text-teal-700">
+                                                {walletSummary.assets.decorations.length}
+                                            </div>
+                                            <div className="text-xs text-teal-600">Decorations</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
+                                        <div className="flex items-center justify-between text-sm text-gray-700">
+                                            <span>Milestones</span>
+                                            <span className="font-semibold">{walletSummary.milestones.total}</span>
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                            最新记录：
+                                            {walletSummary.milestones.latestAt
+                                                ? new Date(walletSummary.milestones.latestAt).toLocaleString()
+                                                : '暂无'}
+                                        </div>
+                                        {walletMilestones.length > 0 ? (
+                                            <div className="mt-3 space-y-2">
+                                                {walletMilestones.map((milestone) => (
+                                                    <div
+                                                        key={milestone.id}
+                                                        className="flex items-center justify-between text-xs text-gray-600"
+                                                    >
+                                                        <span>{formatMilestoneType(milestone.milestoneType)}</span>
+                                                        <span>
+                                                            {milestone.chainId ? `#${milestone.chainId}` : '-'} ·{' '}
+                                                            {shortAddress(milestone.txHash)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-500">暂无可展示的钱包摘要。</p>
+                            )}
+                        </motion.div>
+                    )}
+
+                    {isOwner && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mb-6 grid gap-4 md:grid-cols-2"
+                        >
+                            <PetStatePanel
+                                life={lifeState}
+                                loading={lifeLoading}
+                                onRefresh={() => {
+                                    if (!isFetching) {
+                                        fetchData();
+                                    }
+                                }}
+                            />
+                            <CareActionPanel
+                                frogId={frog.id}
+                                onStateChanged={async () => {
+                                    await fetchData();
+                                }}
+                                onSuccess={(message) => toast.success(message)}
+                                onError={(message) => toast.error(message)}
+                            />
+                        </motion.div>
+                    )}
+
                     {/* 🐸 主 Tab 切换器 - 养成 / 旅行 */}
                     {isOwner && frog.status !== 'Traveling' && (
                         <div className="mb-6">
@@ -616,7 +817,8 @@ export function FrogDetail() {
                             <NurturePanel 
                                 frogId={frog.id} 
                                 frogTokenId={frog.tokenId}
-                                ownerAddress={frog.ownerAddress} 
+                                ownerAddress={frog.ownerAddress}
+                                mode="detail"
                             />
                         </div>
                     )}
@@ -804,8 +1006,25 @@ export function FrogDetail() {
                             )}
                         </div>
 
-                        {/* 右侧: 旅行历史 */}
+                        {/* 右侧: 旅行与记忆 */}
                         <div className="space-y-4">
+                            <TravelSummaryCard
+                                activeTravel={activeTravel}
+                                lastTravel={latestCompletedTravel}
+                                onOpenActive={(travelId) => {
+                                    if (travelId > 0) {
+                                        navigate(`/travel/${travelId}`);
+                                    }
+                                }}
+                                onOpenHistory={() => navigate('/travel-history')}
+                            />
+
+                            <MemoryPalaceView
+                                memoryPalace={memoryPalace}
+                                loading={memoryLoading}
+                                onOpenFull={() => navigate(`/memory-palace/${frog.id}`)}
+                            />
+
                             <h2 className="text-xl font-bold text-gray-800">📖 旅行日记</h2>
                             {travels.length > 0 ? (
                                 <div className="space-y-4 max-h-[600px] overflow-y-auto">

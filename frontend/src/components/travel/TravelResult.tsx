@@ -1,9 +1,12 @@
 // frontend/src/components/travel/TravelResult.tsx
 
+import { memo, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import type { Travel, SouvenirP0, Discovery, DiaryMood, UserBadge } from '../../types';
+import { travelFeatureApi } from '../../features/travel/api';
+import type { MemoryPalaceLite } from '../../features/memory-palace/api';
 
 interface TravelResultProps {
   travel: Travel;
@@ -13,6 +16,7 @@ interface TravelResultProps {
   diary?: string;
   diaryMood?: DiaryMood;
   newBadges?: UserBadge[];
+  memoryPalace?: MemoryPalaceLite | null;
 }
 
 const moodEmojis: Record<DiaryMood, string> = {
@@ -24,8 +28,12 @@ const moodEmojis: Record<DiaryMood, string> = {
   SLEEPY: '😴',
 };
 
-import { useEffect, useState, memo } from 'react';
-import { apiService } from '../../services/api';
+const allowedMoods = new Set(Object.keys(moodEmojis));
+
+const normalizeDiaryMood = (mood?: string): DiaryMood => {
+  const normalized = (mood || 'HAPPY').toUpperCase();
+  return allowedMoods.has(normalized) ? (normalized as DiaryMood) : 'HAPPY';
+};
 
 export const TravelResult = memo(function TravelResult({
   travel,
@@ -35,25 +43,33 @@ export const TravelResult = memo(function TravelResult({
   diary,
   diaryMood = 'HAPPY',
   newBadges = [],
+  memoryPalace = null,
 }: TravelResultProps) {
   const [souvenirImageUrl, setSouvenirImageUrl] = useState<string | undefined>();
+  const displayJournal = memoryPalace?.journal?.content || diary || '';
+  const displayJournalMood = normalizeDiaryMood(memoryPalace?.journal?.mood || diaryMood);
+  const displaySouvenir = memoryPalace?.souvenir || souvenir;
+  const displayHighlights = memoryPalace?.highlights || [];
 
   useEffect(() => {
     // 优先使用传入的 souvenir 对象查找，如果是 P0 则使用 ID 拼接
-    const sId = (travel?.souvenir as any)?.tokenId || 
-                (souvenir as any)?.tokenId || 
+    const sId = (travel?.souvenir as any)?.tokenId ||
+                (displaySouvenir as any)?.tokenId ||
+                (displaySouvenir as any)?.id ||
                 ((travel as any)?.souvenirData ? `p0-${travel.id}` : null);
-    
+
     if (sId) {
-      apiService.getSouvenirImageStatus(sId.toString())
+      travelFeatureApi.getSouvenirImageStatus(sId.toString())
         .then(res => {
           if (res.success && res.record) {
             setSouvenirImageUrl(res.record.gatewayUrl || res.record.imageUrl);
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          setSouvenirImageUrl(undefined);
+        });
     }
-  }, [travel, souvenir]);
+  }, [travel, displaySouvenir]);
 
   return (
     <motion.div
@@ -98,14 +114,31 @@ export const TravelResult = memo(function TravelResult({
         </div>
       </div>
 
+      {memoryPalace?.summary && (
+        <div className="bg-white rounded-2xl shadow-lg p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-3">🧠 记忆空间</h3>
+          {memoryPalace.title ? <p className="text-base font-semibold text-gray-700 mb-2">{memoryPalace.title}</p> : null}
+          <p className="text-gray-700 leading-relaxed">{memoryPalace.summary}</p>
+          {displayHighlights.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              {displayHighlights.map((highlight, index) => (
+                <div key={`${highlight}-${index}`} className="text-sm text-gray-600">
+                  • {highlight}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {/* 旅行日记 */}
-      {diary && (
+      {displayJournal && (
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-gray-800">📖 旅行日记</h3>
-            <span className="text-3xl">{moodEmojis[diaryMood]}</span>
+            <span className="text-3xl">{moodEmojis[displayJournalMood]}</span>
           </div>
-          <p className="text-gray-700 leading-relaxed whitespace-pre-line">{diary}</p>
+          <p className="text-gray-700 leading-relaxed whitespace-pre-line">{displayJournal}</p>
         </div>
       )}
 
@@ -130,7 +163,7 @@ export const TravelResult = memo(function TravelResult({
       )}
 
       {/* 纪念品 */}
-      {souvenir && (
+      {displaySouvenir && (
         <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl shadow-lg p-6 border border-yellow-100">
           <h3 className="text-lg font-bold text-yellow-800 mb-4 flex items-center">
             <span className="mr-2">🎁</span> 带回的纪念品
@@ -138,19 +171,25 @@ export const TravelResult = memo(function TravelResult({
           <div className="flex items-center space-x-4">
             <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center text-4xl shadow-inner border border-yellow-200 overflow-hidden">
               {souvenirImageUrl ? (
-                <img src={souvenirImageUrl} alt={souvenir.name} className="w-full h-full object-cover" />
+                <img src={souvenirImageUrl} alt={displaySouvenir.name || 'Souvenir'} className="w-full h-full object-cover" />
               ) : (
-                souvenir.emoji
+                (displaySouvenir as any).emoji || '🎁'
               )}
             </div>
             <div className="flex-1">
-              <h4 className="font-bold text-gray-800">{souvenir.name}</h4>
-              <p className="text-sm text-gray-600">{souvenir.description}</p>
+              <h4 className="font-bold text-gray-800">{displaySouvenir.name || '未知纪念品'}</h4>
+              {'description' in displaySouvenir && (displaySouvenir as any).description ? (
+                <p className="text-sm text-gray-600">{(displaySouvenir as any).description}</p>
+              ) : null}
               <div className="mt-2 flex items-center space-x-2">
-                <span className="text-xs px-2 py-1 bg-yellow-200 text-yellow-800 rounded-full font-semibold">
-                  {'⭐'.repeat(souvenir.rarity)}
-                </span>
-                <span className="text-xs text-gray-500">来自 {souvenir.chainOrigin}</span>
+                {'rarity' in displaySouvenir && typeof (displaySouvenir as any).rarity === 'number' ? (
+                  <span className="text-xs px-2 py-1 bg-yellow-200 text-yellow-800 rounded-full font-semibold">
+                    {'⭐'.repeat(Math.max(1, Math.min(5, Math.floor((displaySouvenir as any).rarity))))}
+                  </span>
+                ) : null}
+                {'chainOrigin' in displaySouvenir && (displaySouvenir as any).chainOrigin ? (
+                  <span className="text-xs text-gray-500">来自 {(displaySouvenir as any).chainOrigin}</span>
+                ) : null}
               </div>
             </div>
           </div>

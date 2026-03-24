@@ -1,0 +1,9 @@
+{
+  "name": "ZFrog Mobile Lite",
+  "short_name": "ZFrog Lite",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0f172a",
+  "description": "ZFrog Mobile Lite PWA shell with client-sdk integration"
+}

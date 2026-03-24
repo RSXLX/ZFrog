@@ -8,11 +8,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { useAccount, useSignMessage } from 'wagmi';
 import {
   FrogAppearanceParams,
-  generateAppearance,
-  getAppearance,
-  getPendingAppearance,
-  confirmAppearance,
-} from '../services/appearance.api';
+  appearanceFeatureApi,
+} from '../features/appearance/api';
 
 // 生成阶段
 export type GenerationStage = 'init' | 'reading' | 'computing' | 'generating' | 'done';
@@ -127,7 +124,7 @@ export function useFrogAppearance(options: UseFrogAppearanceOptions = {}): UseFr
         }
       }
       
-      const response = await generateAppearance(address, signature, message);
+      const response = await appearanceFeatureApi.generateAppearance(address, signature, message);
       
       if (response.success) {
         // 等待进度动画完成
@@ -185,7 +182,7 @@ export function useFrogAppearance(options: UseFrogAppearanceOptions = {}): UseFr
     if (!address) return;
     
     try {
-      await confirmAppearance(address, tokenId);
+      await appearanceFeatureApi.confirmAppearance(address, tokenId);
     } catch (err) {
       console.error('Confirm appearance error:', err);
     }
@@ -199,7 +196,7 @@ export function useFrogAppearance(options: UseFrogAppearanceOptions = {}): UseFr
     setError(null);
     
     try {
-      const response = await getAppearance(tokenId);
+      const response = await appearanceFeatureApi.getAppearance(tokenId);
       if (response.success && response.params) {
         setParams(response.params);
         setStage('done');
@@ -221,7 +218,7 @@ export function useFrogAppearance(options: UseFrogAppearanceOptions = {}): UseFr
     
     const interval = setInterval(async () => {
       try {
-        const response = await getPendingAppearance(address);
+        const response = await appearanceFeatureApi.getPendingAppearance(address);
         if (response.ready && response.params) {
           setParams(response.params);
           setDescriptionPending(false);

@@ -12,6 +12,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type { Pet, PetAttributes, PetGene } from './usePetEgg';
 import type { TadpoleStage, TadpoleFeatures, WaterEnvironment } from '../components/Tadpole/Tadpole';
+import storage from '../services/storage';
 
 // ==================== 类型定义 ====================
 
@@ -130,6 +131,10 @@ export function useTadpoleState(initialPet?: Pet): UseTadpoleStateReturn {
     
     // 更新特征
     setFeatures(calculateFeatures(growth, pet.gene, newStage));
+    storage.setFrogStats({
+      tadpoleGrowth: growth,
+      tadpoleStage: newStage,
+    });
     
     // 环境可以从宠物属性恢复（如果有存储）
     const storedEnv = localStorage.getItem(`zfrog_tadpole_env_${pet.id}`);
@@ -197,6 +202,11 @@ export function useTadpoleState(initialPet?: Pet): UseTadpoleStateReturn {
       if (petRef.current) {
         localStorage.setItem(`zfrog_tadpole_env_${petRef.current.id}`, JSON.stringify(newEnv));
       }
+      storage.setFrogStats({
+        waterTemperature: newEnv.temperature,
+        waterOxygen: newEnv.oxygen,
+        waterCleanliness: newEnv.cleanliness,
+      });
       
       return newEnv;
     });
@@ -221,6 +231,14 @@ export function useTadpoleState(initialPet?: Pet): UseTadpoleStateReturn {
     
     // 更新特征
     setFeatures(calculateFeatures(growthRef.current, petRef.current.gene, newStage));
+    window.dispatchEvent(
+      new CustomEvent('desktop:frog-status-changed', {
+        detail: {
+          stage: newStage,
+          growth: growthRef.current,
+        },
+      })
+    );
     
     // 环境变化（喂食略微降低水质）
     updateEnvironment({
@@ -246,6 +264,15 @@ export function useTadpoleState(initialPet?: Pet): UseTadpoleStateReturn {
     
     // 更新特征
     setFeatures(calculateFeatures(growthRef.current, petRef.current.gene, newStage));
+    window.dispatchEvent(
+      new CustomEvent('desktop:frog-status-changed', {
+        detail: {
+          stage: newStage,
+          growth: growthRef.current,
+          interaction: type,
+        },
+      })
+    );
   }, [tadpoleStage]);
   
   // 获取健康状态

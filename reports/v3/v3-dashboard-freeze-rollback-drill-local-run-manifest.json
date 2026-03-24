@@ -1,0 +1,34 @@
+{
+  "runId": "local",
+  "runUrl": "n/a",
+  "workflowName": "v3-beta-regression-matrix",
+  "workflowFile": ".github/workflows/v3-beta-regression-matrix.yml",
+  "eventName": "sandbox",
+  "repository": "local/zfrog",
+  "ref": "local",
+  "sha": "local",
+  "runAttempt": "1",
+  "generatedAt": "2026-03-24T01:50:46.006Z",
+  "artifactDigests": {
+    "drillReportMd": {
+      "path": "./reports/v3/v3-dashboard-freeze-rollback-drill-local.md",
+      "sha256": "3007bbba371a5971b7477ce08e2a3b00d3fcb7b88a3b5d53666088d6a0f89eea",
+      "bytes": 1697
+    },
+    "drillJson": {
+      "path": "./reports/v3/v3-dashboard-freeze-rollback-drill-local.json",
+      "sha256": "051816d219bd8e086ce761f91ba8b1198ce6ea02c890153732f76b1f3d7c5b9b",
+      "bytes": 806
+    },
+    "backlogSnippetMd": {
+      "path": "./reports/v3/v3-dashboard-freeze-rollback-drill-local-backlog.md",
+      "sha256": "372eaaf56a11455a98f8c185e337b7f84a59d21c4cee0c105d95e2df5d97440a",
+      "bytes": 486
+    },
+    "backlogAppliedMd": {
+      "path": "./reports/v3/v3-dashboard-freeze-rollback-drill-local-backlog-applied.md",
+      "sha256": "d57e2fee7c76c87ed9be41f377e33674d9fb0263e899727c5c7ed0514c762d38",
+      "bytes": 65098
+    }
+  }
+}

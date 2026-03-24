@@ -1,0 +1,108 @@
+{
+  "generatedAt": "2026-03-23T12:00:00.000Z",
+  "verdict": "PASS",
+  "rcRunSource": "fixture:./scripts/ci/fixtures/v2-regression-runs.sample.json",
+  "rcPassed": true,
+  "fallbackPassed": true,
+  "dispatchQualityRunSource": "fixture:./scripts/ci/fixtures/v2-dispatch-quality-runs.sample.json",
+  "dispatchQualityPassed": true,
+  "dispatchQualityLatestRunFailed": false,
+  "dispatchQualityConsecutiveFailureDetected": false,
+  "dispatchQualityConsecutiveFailedWeeks": 0,
+  "dispatchQualityConsecutivePassedWeeks": 1,
+  "timeoutRunSource": "fixture:./scripts/ci/fixtures/v2-p1-timeout-runs.sample.json",
+  "timeoutPassed": true,
+  "timeoutLatestRunFailed": false,
+  "timeoutConsecutiveFailureDetected": false,
+  "timeoutConsecutiveFailedWeeks": 0,
+  "timeoutConsecutivePassedWeeks": 1,
+  "timeoutStabilityRunSource": "fixture:./scripts/ci/fixtures/v2-p1-timeout-stability-runs.sample.json",
+  "timeoutStabilityPassed": true,
+  "timeoutStabilityLatestRunFailed": false,
+  "timeoutStabilityConsecutiveFailureDetected": false,
+  "timeoutStabilityConsecutiveFailedWeeks": 0,
+  "timeoutStabilityConsecutivePassedWeeks": 1,
+  "dispatchQualityLatestRun": {
+    "event": "schedule",
+    "conclusion": "success",
+    "updatedAt": "2026-03-23T08:00:00Z",
+    "url": "https://example.test/zfrog/actions/runs/303"
+  },
+  "timeoutLatestRun": {
+    "event": "schedule",
+    "conclusion": "success",
+    "updatedAt": "2026-03-23T06:00:00Z",
+    "url": "https://example.test/zfrog/actions/runs/503"
+  },
+  "timeoutStabilityLatestRun": {
+    "event": "schedule",
+    "conclusion": "success",
+    "updatedAt": "2026-03-23T05:00:00Z",
+    "url": "https://example.test/zfrog/actions/runs/603"
+  },
+  "reasonIncreaseDetected": true,
+  "consecutiveReasonIncreaseDetected": true,
+  "attentionReasons": [
+    {
+      "reason": "workspace-startup-failed",
+      "current": 3,
+      "previous": 2,
+      "delta": 1,
+      "budget": 1,
+      "history": [3, 2, 1],
+      "signals": ["budget-exceeded", "week-over-week-up", "consecutive-weekly-up"]
+    }
+  ],
+  "p1CandidateReasons": [
+    {
+      "reason": "workspace-startup-failed",
+      "current": 3,
+      "previous": 2,
+      "delta": 1,
+      "budget": 1,
+      "history": [3, 2, 1],
+      "signals": ["budget-exceeded", "week-over-week-up", "consecutive-weekly-up"]
+    }
+  ],
+  "policy": {
+    "trackReasonIncrease": true,
+    "failOnReasonIncrease": false,
+    "trackConsecutiveReasonIncrease": true,
+    "consecutiveIncreaseWindows": 2,
+    "failOnConsecutiveReasonIncrease": false,
+    "dispatchQuality": {
+      "events": [
+        "schedule"
+      ],
+      "trackConsecutiveFailureWeeks": true,
+      "consecutiveFailureWeeks": 2,
+      "failOnConsecutiveFailureWeeks": true,
+      "failOnLatestFailure": true
+    },
+    "timeout": {
+      "events": [
+        "schedule"
+      ],
+      "trackConsecutiveFailureWeeks": true,
+      "consecutiveFailureWeeks": 2,
+      "failOnConsecutiveFailureWeeks": true,
+      "failOnLatestFailure": false
+    },
+    "timeoutStability": {
+      "events": [
+        "schedule"
+      ],
+      "trackConsecutiveFailureWeeks": true,
+      "consecutiveFailureWeeks": 2,
+      "failOnConsecutiveFailureWeeks": true,
+      "failOnLatestFailure": false
+    }
+  },
+  "windows": {
+    "windowDays": 7,
+    "trendWindows": 2,
+    "now": "2026-03-23T12:00:00.000Z",
+    "currentWindowStart": "2026-03-16T12:00:00.000Z",
+    "previousWindowStart": "2026-03-09T12:00:00.000Z"
+  }
+}

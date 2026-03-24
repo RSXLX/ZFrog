@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useConnect } from 'wagmi';
 import { QRCodeModal } from './QRCodeModal';
+import { useI18n } from '../../i18n';
 
 interface WalletModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface WalletModalProps {
 }
 
 export function WalletModal({ isOpen, onClose }: WalletModalProps) {
+  const { tr } = useI18n();
   const { connectors, connectAsync } = useConnect();
   const [showQR, setShowQR] = useState(false);
   const [uri, setUri] = useState('');
@@ -69,8 +71,8 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
 
               <div className="text-center mb-8">
                 <span className="text-4xl mb-4 block">🐸</span>
-                <h3 className="text-2xl font-bold text-gray-800">连接 ZetaFrog</h3>
-                <p className="text-gray-500 mt-2">选择您想要连接钱包的方式</p>
+                <h3 className="text-2xl font-bold text-gray-800">{tr('连接 ZetaFrog', 'Connect ZetaFrog')}</h3>
+                <p className="text-gray-500 mt-2">{tr('选择您想要连接钱包的方式', 'Choose a wallet connection method')}</p>
               </div>
 
               <div className="grid gap-3">
@@ -89,7 +91,9 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
                           {connector.name}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {connector.id === 'walletConnect' ? '手机扫码连接' : '浏览器插件'}
+                          {connector.id === 'walletConnect'
+                            ? tr('手机扫码连接', 'Scan QR with mobile wallet')
+                            : tr('浏览器插件', 'Browser extension')}
                         </div>
                       </div>
                     </div>
@@ -99,7 +103,7 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
               </div>
 
               <p className="mt-8 text-center text-xs text-gray-400">
-                连接即表示您同意我们的服务条款和隐私政策
+                {tr('连接即表示您同意我们的服务条款和隐私政策', 'By connecting, you agree to our Terms and Privacy Policy')}
               </p>
             </motion.div>
           </motion.div>

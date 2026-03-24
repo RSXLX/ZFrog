@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { apiService } from '../../services/api';
+import { frogFeatureApi } from '../../features/frog/api';
+import { socialFeatureApi } from '../../features/social/api';
 
 interface AddFriendByWalletProps {
   currentFrogId: number;
@@ -38,15 +39,10 @@ const AddFriendByWallet: React.FC<AddFriendByWalletProps> = ({
     setFoundFrog(null);
 
     try {
-      const response = await apiService.get(`/frogs/search`, {
-        params: {
-          query: walletAddress,
-          limit: 1
-        }
-      });
+      const searchResult = await frogFeatureApi.search(walletAddress, 1);
 
-      if (response.success && response.data.length > 0) {
-        const frog = response.data[0];
+      if (searchResult.length > 0) {
+        const frog = searchResult[0];
         
         // 检查是否是自己的青蛙
         if (frog.tokenId === currentFrogId) {
@@ -56,8 +52,8 @@ const AddFriendByWallet: React.FC<AddFriendByWalletProps> = ({
 
         // 检查是否已经是好友
         try {
-          const friendsResponse = await apiService.get(`/friends/list/${currentFrogId}`);
-          const friendIds = friendsResponse.success ? friendsResponse.data.map((friend: any) => friend.tokenId) : [];
+          const friends = await socialFeatureApi.listFriends(currentFrogId);
+          const friendIds = friends.map((friend: any) => friend.tokenId);
           
           if (friendIds.includes(frog.tokenId)) {
             setError('该青蛙已经是您的好友');
@@ -84,7 +80,7 @@ const AddFriendByWallet: React.FC<AddFriendByWalletProps> = ({
 
     setLoading(true);
     try {
-      await apiService.post('/friends/request', {
+      await socialFeatureApi.sendFriendRequest({
         requesterId: currentFrogId,
         walletAddress: foundFrog.ownerAddress
       });

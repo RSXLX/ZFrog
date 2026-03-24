@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Home } from './pages/Home';
 import { MyFrog } from './pages/MyFrog';
+import { EggClaimPage } from './pages/EggClaimPage';
 import { FrogDetail } from './pages/FrogDetail';
 import { Desktop } from './pages/Desktop';
 import { Friends } from './pages/Friends';
@@ -12,14 +13,25 @@ import { ToastProvider } from './components/common/ToastProvider';
 import { FrogPet } from './components/frog/FrogPet';
 import { useWalletConnect } from './hooks/useWalletConnect';
 import { FriendFloatPanel } from './components/friend-float';
+import { useI18n } from './i18n';
 
 
 // Lazy loaded pages for code splitting
 const TravelResultPage = lazy(() => import('./pages/TravelResultPage').then(m => ({ default: m.TravelResultPage })));
 const TravelHistoryPage = lazy(() => import('./pages/TravelHistoryPage').then(m => ({ default: m.TravelHistoryPage })));
 const TravelDetailPage = lazy(() => import('./pages/TravelDetailPage').then(m => ({ default: m.TravelDetailPage })));
+const MemoryPalacePage = lazy(() => import('./pages/MemoryPalacePage').then(m => ({ default: m.MemoryPalacePage })));
 const BadgesPage = lazy(() => import('./pages/BadgesPage').then(m => ({ default: m.BadgesPage })));
 const SouvenirsPage = lazy(() => import('./pages/SouvenirsPage').then(m => ({ default: m.SouvenirsPage })));
+const FamiliesPage = lazy(() => import('./pages/FamiliesPage').then(m => ({ default: m.FamiliesPage })));
+const CommunitiesPage = lazy(() => import('./pages/CommunitiesPage').then(m => ({ default: m.CommunitiesPage })));
+const JourneyPage = lazy(() => import('./pages/JourneyPage').then(m => ({ default: m.JourneyPage })));
+const CouncilPage = lazy(() => import('./pages/CouncilPage').then(m => ({ default: m.CouncilPage })));
+const MemoryWorldPage = lazy(() => import('./pages/MemoryWorldPage').then(m => ({ default: m.MemoryWorldPage })));
+const CreatorPage = lazy(() => import('./pages/CreatorPage').then(m => ({ default: m.CreatorPage })));
+const RelationshipGraphPage = lazy(() =>
+  import('./pages/RelationshipGraphPage').then(m => ({ default: m.RelationshipGraphPage }))
+);
 const AnimationDemoPage = lazy(() => import('./pages/AnimationDemoPage').then(m => ({ default: m.AnimationDemoPage })));
 const HomeScenePage = lazy(() => import('./pages/HomeScenePage').then(m => ({ default: m.HomeScenePage })));
 
@@ -33,6 +45,7 @@ function WalletInitializer() {
 }
 
 export function App() {
+  const { t, tr } = useI18n();
   const [isFrogWindow, setIsFrogWindow] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -64,7 +77,7 @@ export function App() {
     return (
       <>
         <WalletInitializer />
-        <FrogPet frogId={0} name="Desktop Frog" />
+        <FrogPet frogId={0} name={tr('桌宠青蛙', 'Desktop Frog')} />
       </>
     );
   }
@@ -83,12 +96,17 @@ export function App() {
                 
                 {/* 我的青蛙（每个钱包一个） */}
                 <Route path="/my-frog" element={<MyFrog />} />
+
+                {/* 认领青蛙蛋入口 */}
+                <Route path="/egg-claim" element={<EggClaimPage />} />
                 
                 {/* 查看青蛙详情（支持查看他人青蛙） */}
                 <Route path="/frog/:tokenId" element={<FrogDetail />} />
                 
                 {/* 好友系统（自动获取当前用户青蛙） */}
                 <Route path="/friends" element={<Friends />} />
+                <Route path="/families" element={<FamiliesPage />} />
+                <Route path="/communities" element={<CommunitiesPage />} />
                 
                 {/* 我的家园（自动获取当前用户青蛙） */}
                 <Route path="/garden" element={<GardenPage />} />
@@ -107,6 +125,14 @@ export function App() {
                 <Route path="/travel-result/:travelId" element={<TravelResultPage />} />
                 <Route path="/travel-detail/:travelId" element={<TravelDetailPage />} />
                 <Route path="/travel-history" element={<TravelHistoryPage />} />
+                <Route path="/journeys" element={<JourneyPage />} />
+                <Route path="/council" element={<CouncilPage />} />
+                <Route path="/memory-world" element={<MemoryWorldPage />} />
+                <Route path="/memory-world/:worldId" element={<MemoryWorldPage />} />
+                <Route path="/creator" element={<CreatorPage />} />
+                <Route path="/relationship-graph" element={<RelationshipGraphPage />} />
+                <Route path="/relationship-graph/:frogId" element={<RelationshipGraphPage />} />
+                <Route path="/memory-palace/:frogId" element={<MemoryPalacePage />} />
                 <Route path="/souvenirs/:frogId" element={<SouvenirsPage />} />
                 
                 {/* 其他 */}
@@ -119,8 +145,8 @@ export function App() {
           
           {/* Footer */}
           <footer className="py-8 text-center text-slate-500 text-sm">
-            <p>🐸 ZetaFrog - Hop Across Chains, Collect Stories</p>
-            <p className="mt-1">Built with ❤️ on ZetaChain</p>
+            <p>{t('app.footer.line1')}</p>
+            <p className="mt-1">{t('app.footer.line2')}</p>
           </footer>
         </div>
         

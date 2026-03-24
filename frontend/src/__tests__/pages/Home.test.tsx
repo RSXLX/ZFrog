@@ -43,8 +43,8 @@ jest.mock('@/stores/frogStore', () => ({
   }),
 }));
 
-jest.mock('@/services/api', () => ({
-  apiService: {
+jest.mock('@/features/frog/api', () => ({
+  frogFeatureApi: {
     getMyFrog: (...args: unknown[]) => mockGetMyFrog(...args),
   },
 }));

@@ -1,10 +1,9 @@
-import { PrismaClient, ImageGenerationStatus } from '@prisma/client';
+import { ImageGenerationStatus } from '@prisma/client';
 import { DashScopeImageService, MODEL_CONFIG, SIZE_OPTIONS } from './dashscope-image.service';
 import { PromptBuilderService } from './prompt-builder.service';
 import { ipfsService } from './ipfs.service';
 import { ImageProcessorService } from './image-processor.service';
-
-const prisma = new PrismaClient();
+import { prisma } from '../database';
 
 export interface GenerateSouvenirImageInput {
   odosId: string;             // 青蛙 ID

@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
-import { getInbox } from '../../services/message.api';
+import { messageFeatureApi } from '../../features/message/api';
 import './MessageBadge.css';
 
 interface MessageBadgeProps {
@@ -23,7 +23,7 @@ export const MessageBadge: React.FC<MessageBadgeProps> = ({
     if (!address) return;
     
     try {
-      const data = await getInbox(address, { limit: 1 });
+      const data = await messageFeatureApi.getInbox(address, { limit: 1 });
       setUnreadCount(data.unreadCount);
     } catch (error) {
       console.error('Failed to fetch unread count:', error);

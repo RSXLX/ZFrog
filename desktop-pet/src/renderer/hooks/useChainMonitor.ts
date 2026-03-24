@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useChainMonitorIntegration, type ChainEventType } from './useChainMonitorIntegration';
 
-// Chain event types
-type ChainEvent = 'large_buy' | 'large_sell' | 'price_up' | 'price_down' | 'gas_high';
+type ChainEvent = ChainEventType;
 
 interface UseChainMonitorReturn {
   isMonitoring: boolean;
@@ -12,79 +12,47 @@ interface UseChainMonitorReturn {
   simulateEvent: (event: ChainEvent) => void;
 }
 
-// Mock data for demo (in production, use real APIs)
-const mockEvents: ChainEvent[] = ['large_buy', 'large_sell', 'price_up', 'price_down'];
-
 export function useChainMonitor(frogState: any): UseChainMonitorReturn {
-  const [isMonitoring, setIsMonitoring] = useState(false);
-  const [lastEvent, setLastEvent] = useState<ChainEvent | null>(null);
-  const [lastEventTime, setLastEventTime] = useState<Date | null>(null);
-  
-  const monitorIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const integration = useChainMonitorIntegration();
+  const latest = integration.recentEvents[0];
 
-  const handleChainEvent = useCallback((event: ChainEvent) => {
-    console.log('[ChainMonitor] Event:', event);
-    setLastEvent(event);
-    setLastEventTime(new Date());
-    
-    // Trigger frog reaction
-    if (frogState?.setChainEvent) {
-      frogState.setChainEvent(event);
-    }
-  }, [frogState]);
-
-  const startMonitoring = useCallback(() => {
-    if (isMonitoring) return;
-    
-    console.log('[ChainMonitor] Starting monitoring...');
-    setIsMonitoring(true);
-    
-    // Simulate random chain events for demo
-    // In production, this would connect to:
-    // - Web3.js for wallet monitoring
-    // - CoinGecko API for price checks
-    // - Gas API for gas monitoring
-    monitorIntervalRef.current = setInterval(() => {
-      // Random event simulation (for demo)
-      if (Math.random() > 0.7) {
-        const randomEvent = mockEvents[Math.floor(Math.random() * mockEvents.length)];
-        handleChainEvent(randomEvent);
+  const applyFrogReaction = useCallback(
+    (event: ChainEvent) => {
+      if (frogState?.setChainEvent) {
+        // useFrogState supports these 4 core types; gas_high falls back to price_down behavior.
+        const mapped = event === 'gas_high' ? 'price_down' : event;
+        frogState.setChainEvent(mapped);
       }
-    }, 30000); // Check every 30 seconds
-    
-  }, [isMonitoring, handleChainEvent]);
+    },
+    [frogState]
+  );
 
-  const stopMonitoring = useCallback(() => {
-    console.log('[ChainMonitor] Stopping monitoring...');
-    setIsMonitoring(false);
-    
-    if (monitorIntervalRef.current) {
-      clearInterval(monitorIntervalRef.current);
-      monitorIntervalRef.current = null;
-    }
-  }, []);
+  const simulateEvent = useCallback(
+    (event: ChainEvent) => {
+      applyFrogReaction(event);
+      window.dispatchEvent(
+        new CustomEvent('desktop:chain-event', {
+          detail: {
+            type: event,
+            timestamp: Date.now(),
+          },
+        })
+      );
+    },
+    [applyFrogReaction]
+  );
 
-  const simulateEvent = useCallback((event: ChainEvent) => {
-    handleChainEvent(event);
-  }, [handleChainEvent]);
-
-  // Auto-start monitoring
-  useEffect(() => {
-    // startMonitoring();
-    
-    return () => {
-      if (monitorIntervalRef.current) {
-        clearInterval(monitorIntervalRef.current);
-      }
-    };
-  }, []);
-
-  return {
-    isMonitoring,
-    lastEvent,
-    lastEventTime,
-    startMonitoring,
-    stopMonitoring,
-    simulateEvent,
-  };
+  return useMemo(
+    () => ({
+      isMonitoring: integration.isMonitoring,
+      lastEvent: latest?.type || null,
+      lastEventTime: latest ? new Date(latest.timestamp) : null,
+      startMonitoring: integration.startMonitoring,
+      stopMonitoring: () => {
+        void integration.stopMonitoring();
+      },
+      simulateEvent,
+    }),
+    [integration, latest, simulateEvent]
+  );
 }

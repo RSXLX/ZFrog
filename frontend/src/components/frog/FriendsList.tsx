@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Frog, FriendInteraction } from '../../types';
 import { useFriendWebSocket } from '../../hooks/useFriendWebSocket';
-import { apiService } from '../../services/api';
+import { socialFeatureApi } from '../../features/social/api';
+import { buildMemoryPalacePath } from '../../features/memory-palace/routes';
 import { FriendCardSkeleton } from '../common/Skeleton';
 import { EmptyFriends } from '../common/EmptyState';
 import { PulseIndicator } from '../common/MicroInteractions';
@@ -70,8 +71,8 @@ const FriendsList: React.FC<FriendsListProps> = ({
   const fetchFriends = async () => {
     try {
       setLoading(true);
-      const response = await apiService.get(`/friends/list/${frogId}`);
-      setFriends(response.success ? response.data : []);
+      const list = await socialFeatureApi.listFriends(frogId);
+      setFriends(list as any);
       setError(null);
     } catch (err) {
       console.error('Error fetching friends:', err);
@@ -85,7 +86,7 @@ const FriendsList: React.FC<FriendsListProps> = ({
     if (!confirm('确定要删除这个好友吗？')) return;
 
     try {
-      await apiService.delete(`/friends/${friendshipId}`);
+      await socialFeatureApi.removeFriend(friendshipId);
       setFriends(friends.filter(f => f.friendshipId !== friendshipId));
     } catch (err) {
       console.error('Error removing friend:', err);
@@ -176,8 +177,8 @@ const FriendsList: React.FC<FriendsListProps> = ({
               </button>
               <button
                 className="action-btn"
-                onClick={() => navigate(`/visit/${friend.ownerAddress}`)}
-                title="家园"
+                onClick={() => navigate(buildMemoryPalacePath(friend.id))}
+                title="空间"
               >
                 🏠
               </button>

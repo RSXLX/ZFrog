@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Layout, Menu } from 'antd';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import {
@@ -8,20 +8,49 @@ import {
   TrophyOutlined,
   TeamOutlined,
   RocketOutlined,
+  SafetyCertificateOutlined,
+  AuditOutlined,
+  FireOutlined,
+  BookOutlined,
+  LinkOutlined,
+  PoweroffOutlined,
+  AppstoreOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
+import { isRelationshipGraphAdminBetaEnabled } from '../../features/relationship-graph/runtime';
+import { isV3DashboardAdminBetaEnabled } from '../../features/v3-dashboard/runtime';
 
 const { Sider, Content, Header } = Layout;
 
-const menuItems = [
+const baseMenuItems = [
   { key: '/', icon: <DashboardOutlined />, label: '仪表盘' },
   { key: '/contracts', icon: <ApiOutlined />, label: '合约管理' },
   { key: '/frogs', icon: <BugOutlined />, label: '青蛙管理' },
   { key: '/badges', icon: <TrophyOutlined />, label: '徽章管理' },
   { key: '/friends', icon: <TeamOutlined />, label: '好友管理' },
   { key: '/travels', icon: <RocketOutlined />, label: '旅行管理' },
+  { key: '/verifications', icon: <SafetyCertificateOutlined />, label: '验证观测' },
+  { key: '/attestations', icon: <LinkOutlined />, label: '关系证明' },
+  { key: '/rituals', icon: <FireOutlined />, label: '仪式观测' },
+  { key: '/memory-palaces', icon: <BookOutlined />, label: '记忆宫殿' },
+  { key: '/v3-ops', icon: <PoweroffOutlined />, label: 'V3 Runtime' },
+  { key: '/council-audit', icon: <AuditOutlined />, label: 'Council 审计' },
+  { key: '/creators', icon: <AuditOutlined />, label: 'Creator 审核' },
+  { key: '/partners', icon: <AuditOutlined />, label: 'Partner Campaign' },
   { key: '/config', icon: <SettingOutlined />, label: '系统配置' },
 ];
+
+const relationshipGraphMenuItem = {
+  key: '/relationship-graph',
+  icon: <AuditOutlined />,
+  label: 'Relationship Graph',
+};
+
+const v3DashboardMenuItem = {
+  key: '/v3-dashboard',
+  icon: <AppstoreOutlined />,
+  label: 'V3 Dashboard',
+};
 
 const pageTitles: Record<string, string> = {
   '/': '仪表盘',
@@ -30,6 +59,16 @@ const pageTitles: Record<string, string> = {
   '/badges': '徽章管理',
   '/friends': '好友管理',
   '/travels': '旅行管理',
+  '/verifications': '验证观测',
+  '/attestations': '关系证明',
+  '/rituals': '仪式观测',
+  '/memory-palaces': '记忆宫殿',
+  '/v3-ops': 'V3 Runtime',
+  '/council-audit': 'Council 审计',
+  '/creators': 'Creator 审核',
+  '/partners': 'Partner Campaign',
+  '/relationship-graph': 'Relationship Graph',
+  '/v3-dashboard': 'V3 Dashboard',
   '/config': '系统配置',
 };
 
@@ -37,9 +76,36 @@ const MainLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const relationshipGraphEnabled = useMemo(() => isRelationshipGraphAdminBetaEnabled(), []);
+  const v3DashboardEnabled = useMemo(() => isV3DashboardAdminBetaEnabled(), []);
 
   const currentPath = location.pathname;
-  const pageTitle = pageTitles[currentPath] || 'ZetaFrog Admin';
+  const selectedMenuKey = currentPath.startsWith('/relationship-graph')
+    ? '/relationship-graph'
+    : currentPath;
+  const pageTitle =
+    currentPath.startsWith('/relationship-graph')
+      ? pageTitles['/relationship-graph']
+      : pageTitles[currentPath] || 'ZetaFrog Admin';
+  const menuItems = useMemo(() => {
+    if (!relationshipGraphEnabled && !v3DashboardEnabled) {
+      return baseMenuItems;
+    }
+
+    const configItem = baseMenuItems.find((item) => item.key === '/config');
+    const withoutConfig = baseMenuItems.filter((item) => item.key !== '/config');
+    const appended = [...withoutConfig];
+
+    if (v3DashboardEnabled) {
+      appended.push(v3DashboardMenuItem);
+    }
+
+    if (relationshipGraphEnabled) {
+      appended.push(relationshipGraphMenuItem);
+    }
+
+    return configItem ? [...appended, configItem] : appended;
+  }, [relationshipGraphEnabled, v3DashboardEnabled]);
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -74,7 +140,7 @@ const MainLayout: React.FC = () => {
         <Menu
           theme="dark"
           mode="inline"
-          selectedKeys={[currentPath]}
+          selectedKeys={[selectedMenuKey]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
           style={{

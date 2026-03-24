@@ -4,7 +4,7 @@ import { parseNonNegativeInt, parsePositiveInt } from '../../utils/validation';
 import { logger } from '../../utils/logger';
 import { travelCommandServiceV1 } from '../../modules/travel/travel.command';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * POST /api/group-travel/prepare

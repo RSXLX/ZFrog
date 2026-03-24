@@ -5,7 +5,8 @@ import { TravelHistoryPage } from '@/pages/TravelHistoryPage';
 
 const mockNavigate = jest.fn();
 const mockUseMyFrog = jest.fn();
-const mockApiGet = jest.fn();
+const mockGetHistory = jest.fn();
+const mockGetStats = jest.fn();
 const mockGetSouvenirImageStatus = jest.fn();
 
 jest.mock('react-router-dom', () => {
@@ -20,9 +21,10 @@ jest.mock('@/hooks/useMyFrog', () => ({
   useMyFrog: () => mockUseMyFrog(),
 }));
 
-jest.mock('@/services/api', () => ({
-  apiService: {
-    get: (...args: unknown[]) => mockApiGet(...args),
+jest.mock('@/features/travel/api', () => ({
+  travelFeatureApi: {
+    getHistory: (...args: unknown[]) => mockGetHistory(...args),
+    getStats: (...args: unknown[]) => mockGetStats(...args),
     getSouvenirImageStatus: (...args: unknown[]) => mockGetSouvenirImageStatus(...args),
   },
 }));
@@ -44,7 +46,8 @@ describe('TravelHistoryPage', () => {
       isConnected: false,
       hasFrog: false,
     });
-    mockApiGet.mockResolvedValue({ success: true, data: null });
+    mockGetHistory.mockResolvedValue({ travels: [], total: 0 });
+    mockGetStats.mockResolvedValue(null);
     mockGetSouvenirImageStatus.mockResolvedValue({ success: false });
   });
 
@@ -98,26 +101,8 @@ describe('TravelHistoryPage', () => {
       hasFrog: true,
     });
 
-    mockApiGet.mockImplementation((endpoint: string) => {
-      if (endpoint === '/travels/history') {
-        return Promise.resolve({
-          success: true,
-          data: {
-            travels: [],
-            total: 0,
-          },
-        });
-      }
-
-      if (endpoint === '/travels/stats') {
-        return Promise.resolve({
-          success: true,
-          data: null,
-        });
-      }
-
-      return Promise.resolve({ success: true, data: null });
-    });
+    mockGetHistory.mockResolvedValue({ travels: [], total: 0 });
+    mockGetStats.mockResolvedValue(null);
 
     render(
       <MemoryRouter>
@@ -126,18 +111,16 @@ describe('TravelHistoryPage', () => {
     );
 
     await waitFor(() => {
-      expect(mockApiGet).toHaveBeenCalledWith('/travels/history', {
-        params: {
-          address: '0xowner',
-          limit: 10,
-          offset: 0,
-        },
+      expect(mockGetHistory).toHaveBeenCalledWith({
+        address: '0xowner',
+        limit: 10,
+        offset: 0,
       });
     });
 
-    expect(await screen.findByText('还没有旅行记录')).toBeInTheDocument();
+    expect(await screen.findByText('No travel records yet')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: '开始旅行' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start Travel' }));
 
     expect(mockNavigate).toHaveBeenCalledWith('/frog/17');
   });
@@ -159,23 +142,8 @@ describe('TravelHistoryPage', () => {
       hasFrog: true,
     });
 
-    mockApiGet.mockImplementation((endpoint: string) => {
-      if (endpoint === '/travels/history') {
-        return Promise.resolve({
-          success: true,
-          data: { travels: [], total: 0 },
-        });
-      }
-
-      if (endpoint === '/travels/stats') {
-        return Promise.resolve({
-          success: true,
-          data: null,
-        });
-      }
-
-      return Promise.resolve({ success: true, data: null });
-    });
+    mockGetHistory.mockResolvedValue({ travels: [], total: 0 });
+    mockGetStats.mockResolvedValue(null);
 
     render(
       <MemoryRouter initialEntries={['/travel-history?frogId=17']}>
@@ -186,9 +154,9 @@ describe('TravelHistoryPage', () => {
     );
 
     await waitFor(() => {
-      const historyCalls = mockApiGet.mock.calls.filter((call: unknown[]) => call[0] === '/travels/history');
+      const historyCalls = mockGetHistory.mock.calls;
       expect(historyCalls.length).toBeGreaterThan(0);
-      const firstParams = (historyCalls[0][1] as any).params;
+      const firstParams = historyCalls[0][0] as any;
       expect(firstParams.frogId).toBe('17');
     });
 
@@ -196,9 +164,9 @@ describe('TravelHistoryPage', () => {
     await userEvent.selectOptions(filterSelect, 'all');
 
     await waitFor(() => {
-      const historyCalls = mockApiGet.mock.calls.filter((call: unknown[]) => call[0] === '/travels/history');
+      const historyCalls = mockGetHistory.mock.calls;
       expect(historyCalls.length).toBeGreaterThan(1);
-      const lastParams = (historyCalls[historyCalls.length - 1][1] as any).params;
+      const lastParams = historyCalls[historyCalls.length - 1][0] as any;
       expect(lastParams.frogId).toBeUndefined();
     });
   });

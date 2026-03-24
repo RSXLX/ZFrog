@@ -1,0 +1,55 @@
+name: v2-rc-release-gate
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - v2-regression-nightly-matrix
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  gate:
+    name: RC Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Evaluate RC gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node ./scripts/ci/v2-rc-gate-check.mjs --report reports/v2-rc-gate-report.md
+
+      - name: Publish report summary
+        if: always()
+        run: cat reports/v2-rc-gate-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Archive RC gate evidence
+        if: always()
+        run: node ./scripts/ci/v2-rc-gate-archive.mjs --report reports/v2-rc-gate-report.md --out-dir reports/history/v2-rc-gate
+
+      - name: Upload RC gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-rc-gate-report
+          path: reports/v2-rc-gate-report.md
+
+      - name: Upload RC gate evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-rc-gate-evidence
+          path: reports/history/v2-rc-gate

@@ -1,0 +1,8 @@
+[
+  {
+    "number": 101,
+    "title": "[V2-W15-06][P1 Escalation] workspace-startup-failed",
+    "html_url": "https://example.test/zfrog/issues/101",
+    "body": "<!-- v2-p1-reason:workspace-startup-failed -->\nexisting issue"
+  }
+]

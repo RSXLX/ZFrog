@@ -4,7 +4,7 @@ import { prisma } from '../../database';
 import { ChainKey, CHAIN_KEYS, SUPPORTED_CHAINS } from '../../config/chains';
 import { explorationService, Discovery } from './exploration.service';
 import { souvenirGenerator } from './souvenir.generator';
-import { badgeService } from '../badge/badge.service';
+import { badgeMaintenanceService } from '../badge/badge-maintenance.service';
 import { aiService } from '../ai.service';
 import { logger } from '../../utils/logger';
 import { notifyTravelStarted, notifyTravelProgress, notifyTravelCompleted } from '../../websocket';
@@ -184,11 +184,14 @@ class TravelP0Service {
       // 8. 检查徽章
       const travel = await prisma.travel.findUnique({ where: { id: travelId } });
       if (travel) {
-        await badgeService.checkAndUnlock(travel.frogId, {
-          chain,
-          travelId,
-          discoveries: exploration.discoveries,
-        });
+        await badgeMaintenanceService.reconcileFrogBadges(
+          { frogId: travel.frogId },
+          {
+            syncDefinitions: false,
+            syncStats: false,
+            unlockedByTravelId: travelId,
+          }
+        );
       }
 
       // 9. 发送完成通知

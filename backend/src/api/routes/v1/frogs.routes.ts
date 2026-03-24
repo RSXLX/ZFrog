@@ -9,7 +9,7 @@ import { eggQueryService } from '../../../modules/life/egg.query';
 import { normalizeWalletAddress } from '../../../modules/identity/nonce.service';
 import { frogWalletQueryService } from '../../../modules/web3/frog-wallet.query';
 
-const router = Router();
+const router: Router = Router();
 
 router.get('/status', (req, res) =>
   respondSuccess(req, res, {

@@ -1,7 +1,6 @@
 
-import { PrismaClient, BadgeUnlockType } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { BadgeUnlockType } from '@prisma/client';
+import { prisma } from '../database';
 
 async function main() {
   console.log('🌱 Seeding Travel Badges...');

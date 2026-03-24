@@ -18,7 +18,6 @@ import { SOUVENIR_ABI, TRAVEL_ABI } from '../../config/contracts';
 import { ChainKey, CHAIN_ID_TO_KEY, getChainConfig } from '../../config/chains';
 import { travelP0Service } from './travel-p0.service';
 import { NFTImageOrchestratorService } from '../nft-image-orchestrator.service';
-import { badgeService } from '../badge/badge.service';
 
 // 批量处理配置
 const BATCH_CONFIG = {

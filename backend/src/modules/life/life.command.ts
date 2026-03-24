@@ -3,6 +3,7 @@ import { prisma } from '../../database';
 import { AppError } from '../../middlewares/errorHandler';
 import { normalizeWalletAddress } from '../identity/nonce.service';
 import { worldVerifyService } from '../identity/world-verify.service';
+import { relationshipEventService } from '../social/relationship-event.service';
 import {
   applyLifeDecay,
   calculateRestRecovery,
@@ -920,16 +921,16 @@ export class LifeCommandService {
         },
       });
 
-      await tx.relationshipEvent.create({
-        data: {
-          frogId: target.id,
-          actorFrogId: blesser.id,
-          counterpartyFrogId: target.id,
-          eventType: 'BLESSING',
-          payload: {
-            blessingsReceived: nextBlessings,
-          },
+      await relationshipEventService.record(tx, {
+        frogId: target.id,
+        actorFrogId: blesser.id,
+        counterpartyFrogId: target.id,
+        eventType: 'BLESSING',
+        payload: {
+          blessingsReceived: nextBlessings,
         },
+        requestId: input.requestId,
+        source: 'life.command.bless',
       });
 
       await this.writeDomainEvent(

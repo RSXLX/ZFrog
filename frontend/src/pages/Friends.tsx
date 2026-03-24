@@ -7,7 +7,8 @@ import FriendInteractionModal from '../components/frog/FriendInteraction';
 import AddFriend from '../components/frog/AddFriend';
 import AddFriendByWallet from '../components/frog/AddFriendByWallet';
 import WorldOnlineList from '../components/frog/WorldOnlineList';
-import { RescueCenter } from '../components/travel/RescueCenter';
+import { BlessingPanel } from '../features/social/components/BlessingPanel';
+import { RescuePanel } from '../features/social/components/RescuePanel';
 import { Frog } from '../types';
 import '../styles/friend-system.css';
 
@@ -20,13 +21,13 @@ export const Friends: React.FC = () => {
   const [showAddFriendByWallet, setShowAddFriendByWallet] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<Frog | null>(null);
   const [selectedFriendshipId, setSelectedFriendshipId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'world' | 'rescue'>('friends');
+  const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'world' | 'rituals' | 'rescue'>('friends');
   const [refreshKey, setRefreshKey] = useState(0);
 
   // V2.0: URL 参数支持 - 支持 /friends?tab=rescue 直接跳转
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab === 'rescue' || tab === 'friends' || tab === 'requests' || tab === 'world') {
+    if (tab === 'rescue' || tab === 'rituals' || tab === 'friends' || tab === 'requests' || tab === 'world') {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -179,6 +180,13 @@ export const Friends: React.FC = () => {
               世界在线
             </button>
             <button 
+              className={`friend-tab-btn ${activeTab === 'rituals' ? 'active' : ''}`}
+              onClick={() => setActiveTab('rituals')}
+              style={{ background: activeTab === 'rituals' ? 'linear-gradient(135deg, #10b981 0%, #14b8a6 100%)' : undefined }}
+            >
+              🙏 祈福仪式
+            </button>
+            <button 
               className={`friend-tab-btn ${activeTab === 'rescue' ? 'active' : ''}`}
               onClick={() => setActiveTab('rescue')}
               style={{ background: activeTab === 'rescue' ? 'linear-gradient(135deg, #ff6b6b 0%, #ff9a56 100%)' : undefined }}
@@ -222,13 +230,25 @@ export const Friends: React.FC = () => {
               </div>
             )}
 
+            {activeTab === 'rituals' && (
+              <div className="friend-tab-pane active">
+                <BlessingPanel
+                  myFrogId={frog.id}
+                  myFrogTokenId={frog.tokenId}
+                  onBlessingCompleted={() => setRefreshKey(prev => prev + 1)}
+                />
+              </div>
+            )}
+
             {/* V2.0: 救援中心 */}
             {activeTab === 'rescue' && (
               <div className="friend-tab-pane active">
-                <RescueCenter
+                <RescuePanel
                   myFrogId={frog.id}
-                  onRescueSuccess={(xp) => {
-                    console.log(`Rescue successful! Earned ${xp} XP`);
+                  onRescueCompleted={(result) => {
+                    if (result.success) {
+                      console.log(`Rescue successful! Earned ${result.xpEarned || 0} XP`);
+                    }
                     setRefreshKey(prev => prev + 1);
                   }}
                 />

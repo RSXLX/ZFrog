@@ -1,9 +1,14 @@
-export function getApiErrorMessage(error: any, fallback = '请求失败') {
-  return (
-    error?.response?.data?.error ||
-    error?.response?.data?.message ||
-    error?.message ||
-    fallback
-  );
-}
+type MaybeApiError = {
+  response?: {
+    data?: {
+      error?: string;
+      message?: string;
+    };
+  };
+  message?: string;
+};
 
+export function getApiErrorMessage(error: unknown, fallback = '请求失败') {
+  const err = error as MaybeApiError;
+  return err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
+}

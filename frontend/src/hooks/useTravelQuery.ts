@@ -1,6 +1,6 @@
 // frontend/src/hooks/useTravelQuery.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiService } from '../services/api';
+import { travelFeatureApi } from '../features/travel/api';
 import { useTravelStore } from '../stores/travelStore';
 import type { Travel } from '../types';
 
@@ -25,7 +25,7 @@ export function useFrogTravels(frogId: number, enabled = true) {
   return useQuery({
     queryKey: travelKeys.detail(frogId),
     queryFn: async () => {
-      const travels = await apiService.getFrogsTravels(frogId);
+      const travels = await travelFeatureApi.getFrogTravels(frogId);
       setTravelHistory(travels);
       return travels;
     },
@@ -44,8 +44,11 @@ export function useTravelHistory(address: string, frogId?: number, enabled = tru
   return useQuery({
     queryKey: travelKeys.history(address, frogId),
     queryFn: async () => {
-      const history = await apiService.getTravelHistory(address, frogId);
-      setTravelHistory(history);
+      const history = await travelFeatureApi.getHistory({
+        address,
+        ...(frogId ? { frogId: String(frogId) } : {}),
+      });
+      setTravelHistory((history?.travels || []) as unknown as Travel[]);
       return history;
     },
     enabled: enabled && !!address,
@@ -59,7 +62,6 @@ export function useTravelHistory(address: string, frogId?: number, enabled = tru
  */
 export function useStartRandomTravel() {
   const queryClient = useQueryClient();
-  const addTravel = useTravelStore((state) => state.addTravel);
   
   return useMutation({
     mutationFn: async ({ 
@@ -71,7 +73,7 @@ export function useStartRandomTravel() {
       targetChain: string; 
       duration: number;
     }) => {
-      return apiService.startRandomTravel(frogId, targetChain, duration);
+      return travelFeatureApi.startRandomTravel(frogId, targetChain, duration);
     },
     onSuccess: (data, variables) => {
       // 使相关查询失效
@@ -99,7 +101,7 @@ export function useStartTargetedTravel() {
       targetAddress: string;
       duration: number;
     }) => {
-      return apiService.startTargetedTravel(frogId, targetChain, targetAddress, duration);
+      return travelFeatureApi.startTargetedTravel(frogId, targetChain, targetAddress, duration);
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: travelKeys.detail(variables.frogId) });
@@ -117,7 +119,7 @@ export function usePrefetchTravels() {
   const prefetchFrogTravels = async (frogId: number) => {
     await queryClient.prefetchQuery({
       queryKey: travelKeys.detail(frogId),
-      queryFn: () => apiService.getFrogsTravels(frogId),
+      queryFn: () => travelFeatureApi.getFrogTravels(frogId),
       staleTime: 30 * 1000,
     });
   };

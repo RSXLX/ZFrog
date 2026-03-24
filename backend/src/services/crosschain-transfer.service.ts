@@ -7,10 +7,8 @@
  * - 成就解锁触发
  */
 
-import { PrismaClient } from '@prisma/client';
 import { ethers } from 'ethers';
-
-const prisma = new PrismaClient();
+import { prisma } from '../database';
 
 // ============ 类型定义 ============
 

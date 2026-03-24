@@ -12,7 +12,7 @@ describe("FrogConnector - Smart Return Thresholds", function () {
     const MOCK_ZETA_TOKEN = "0x0000000000000000000000000000000000000002";
     const MOCK_OMNI_TRAVEL = "0x1234567890123456789012345678901234567890";
 
-    const GAS_PER_EXPLORATION = ethers.parseEther("0.00005");
+    const DEFAULT_GAS_PER_EXPLORATION = 50000n;
     const EMERGENCY_THRESHOLD = ethers.parseEther("0.005");
     const RETURN_BUFFER = ethers.parseEther("0.002");
 
@@ -77,7 +77,7 @@ describe("FrogConnector - Smart Return Thresholds", function () {
             // For a non-visiting frog, values should be mostly zero
             const status = await frogConnector.getProvisionsStatus(999);
             
-            expect(status.explorationCost).to.equal(GAS_PER_EXPLORATION);
+            expect(status.explorationCost).to.equal(DEFAULT_GAS_PER_EXPLORATION);
             expect(status.returnCost).to.equal(EMERGENCY_THRESHOLD + RETURN_BUFFER);
         });
     });
@@ -89,16 +89,19 @@ describe("FrogConnector - Smart Return Thresholds", function () {
             expect(requiredForReturn).to.equal(expectedValue);
         });
 
-        it("should determine correct explorations remaining", async function () {
+        it("should determine correct explorations remaining with wei-based exploration cost", async function () {
             // With 0.02 ETH provisions:
             // - Required for return: 0.007 ETH
             // - Available for exploration: 0.013 ETH
             // - Explorations at 0.00005 ETH each: 260 explorations
 
+            const explorationCost = ethers.parseEther("0.00005");
+            await frogConnector.setExplorationConfig(300, explorationCost);
+
             const provisions = ethers.parseEther("0.02");
             const requiredForReturn = EMERGENCY_THRESHOLD + RETURN_BUFFER;
             const availableForExploration = provisions - requiredForReturn;
-            const explorationsRemaining = availableForExploration / GAS_PER_EXPLORATION;
+            const explorationsRemaining = availableForExploration / explorationCost;
 
             expect(explorationsRemaining).to.equal(260n);
         });

@@ -7,9 +7,8 @@
  * - NFT 礼物追踪
  */
 
-import { PrismaClient, GiftType } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { GiftType } from '@prisma/client';
+import { prisma } from '../database';
 
 // ============ 类型定义 ============
 

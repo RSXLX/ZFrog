@@ -10,8 +10,9 @@ import lilyService from '../../services/lily.service';
 import { lifeCommandService } from '../../modules/life/life.command';
 import { lifeQueryService } from '../../modules/life/life.query';
 import { logger } from '../../utils/logger';
+import { markLegacyDeprecated } from './legacy-deprecation';
 
-const router = Router();
+const router: Router = Router();
 
 async function recordProgress(ownerAddress: string, action: 'feed' | 'clean' | 'game') {
   try {
@@ -27,6 +28,7 @@ async function recordProgress(ownerAddress: string, action: 'feed' | 'clean' | '
  */
 router.get('/:frogId/status', async (req, res) => {
   try {
+    markLegacyDeprecated(res, '/api/v1/frogs/:frogId/life');
     const frogId = parseInt(req.params.frogId);
     
     if (isNaN(frogId)) {

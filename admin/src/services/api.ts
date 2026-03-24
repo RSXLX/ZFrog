@@ -3,7 +3,7 @@ import axios from 'axios';
 const TOKEN_KEYS = ['authToken', 'token', 'jwt', 'accessToken'];
 const ADDRESS_KEYS = ['walletAddress', 'address', 'ownerAddress'];
 
-function readFirstLocalStorage(keys: string[]): string | null {
+function readFirstStorage(keys: string[]): string | null {
   if (typeof window === 'undefined') return null;
   for (const key of keys) {
     const value = window.localStorage.getItem(key);
@@ -12,6 +12,51 @@ function readFirstLocalStorage(keys: string[]): string | null {
     if (sessionValue) return sessionValue;
   }
   return null;
+}
+
+export function getStoredAdminToken(): string | null {
+  return readFirstStorage(TOKEN_KEYS);
+}
+
+export function getConfiguredAdminAddress(): string | null {
+  const envAddress = import.meta.env.VITE_ADMIN_ADDRESS as string | undefined;
+  const normalized = envAddress?.trim().toLowerCase();
+  return normalized && normalized.startsWith('0x') ? normalized : null;
+}
+
+export function getStoredAdminAddress(): string | null {
+  return readFirstStorage(ADDRESS_KEYS) || getConfiguredAdminAddress();
+}
+
+export function hasAdminAuthContext(): boolean {
+  return Boolean(getStoredAdminToken() || getStoredAdminAddress());
+}
+
+export function persistAdminSession(params: { token?: string | null; address?: string | null }) {
+  if (typeof window === 'undefined') return;
+
+  const token = params.token?.trim();
+  const address = params.address?.trim().toLowerCase();
+
+  if (token) {
+    window.localStorage.setItem('authToken', token);
+    window.localStorage.setItem('token', token);
+  }
+
+  if (address) {
+    window.localStorage.setItem('walletAddress', address);
+    window.localStorage.setItem('address', address);
+    window.localStorage.setItem('ownerAddress', address);
+  }
+}
+
+export function clearAdminSession() {
+  if (typeof window === 'undefined') return;
+
+  for (const key of [...TOKEN_KEYS, ...ADDRESS_KEYS]) {
+    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
+  }
 }
 
 const api = axios.create({
@@ -25,10 +70,8 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   (config) => {
-    const token = readFirstLocalStorage(TOKEN_KEYS);
-    const walletAddress = readFirstLocalStorage(ADDRESS_KEYS);
-    const envAddress = import.meta.env.VITE_ADMIN_ADDRESS as string | undefined;
-    const authAddress = walletAddress || envAddress;
+    const token = getStoredAdminToken();
+    const authAddress = getStoredAdminAddress();
 
     if (token) {
       config.headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
@@ -68,6 +111,11 @@ api.interceptors.response.use(
     return payload;
   },
   (error) => {
+    const status = error.response?.status;
+    if (typeof window !== 'undefined' && status === 401) {
+      clearAdminSession();
+      window.dispatchEvent(new CustomEvent('zfrog-admin-auth-required'));
+    }
     console.error('API Error:', error.response?.data || error.message);
     return Promise.reject(error);
   }

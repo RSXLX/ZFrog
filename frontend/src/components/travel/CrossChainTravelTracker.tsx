@@ -12,7 +12,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWebSocket } from '../../hooks/useWebSocket';
-import { getCrossChainTravelStatus } from '../../services/cross-chain.api';
+import { crossChainTransferFeatureApi } from '../../features/crosschain-transfer/api';
 import { OnChainStats } from './OnChainStats';
 import { DiscoveryList } from './DiscoveryList';
 import { DiscoveryData } from './DiscoveryCard';
@@ -20,6 +20,7 @@ import { InteractionFeed } from './InteractionFeed';
 import { CrossChainBridgeAnimation } from './CrossChainBridgeAnimation';
 import { TravelCompletionModal, CompletionData } from './TravelCompletionModal';
 import { useNavigate } from 'react-router-dom';
+import { travelFeatureApi } from '../../features/travel/api';
 
 interface Discovery {
   id: string;
@@ -172,7 +173,7 @@ export function CrossChainTravelTracker({
 
     const fetchStatus = async () => {
       try {
-        const status = await getCrossChainTravelStatus(tokenId);
+        const status = await crossChainTransferFeatureApi.getTravelStatus(tokenId);
         
         if (status.database) {
           const dbStatus = status.database.crossChainStatus;
@@ -208,13 +209,14 @@ export function CrossChainTravelTracker({
             
             // 获取完成数据并显示庆祝弹窗
             try {
-              const resultRes = await fetch(`/api/travels/journal/${travelId}`);
-              const resultData = await resultRes.json();
+              const resultData = await travelFeatureApi.getJournalEnvelope(travelId);
               if (resultData.success || resultData.data) {
-                const travel = resultData.data || resultData;
+                const travel = (resultData.data || resultData) as Record<string, any>;
                 setCompletionData({
-                  frogName: travel.frog?.name || '小呱',
-                  xpEarned: travel.crossChainXpEarned || discoveries.reduce((sum, d) => sum + (d.rarity || 1), 0) * 10,
+                  frogName: travel.frog?.name || (travel.frogName as string) || '小呱',
+                  xpEarned:
+                    (travel.crossChainXpEarned as number) ||
+                    discoveries.reduce((sum, d) => sum + (d.rarity || 1), 0) * 10,
                   refundAmount: travel.refundAmount,
                   refundFormatted: travel.refundAmount ? `${(Number(travel.refundAmount) / 1e18).toFixed(4)} ZETA` : undefined,
                   souvenir: travel.souvenirData || travel.souvenir,
@@ -240,17 +242,16 @@ export function CrossChainTravelTracker({
 
         // Fetch discoveries and on-chain data
         try {
-          const discoveriesRes = await fetch(`/api/cross-chain/travel/${travelId}/discoveries`);
-          const discoveriesData = await discoveriesRes.json();
-          
-          if (discoveriesData.success && discoveriesData.data) {
-            setDbDiscoveries(discoveriesData.data.discoveries || []);
-            
-            if (discoveriesData.data.onChainStats) {
+          const discoveriesData = await travelFeatureApi.getCrossChainDiscoveries(travelId);
+
+          if (discoveriesData) {
+            setDbDiscoveries((discoveriesData.discoveries || []) as DiscoveryData[]);
+
+            if (discoveriesData.onChainStats) {
               setOnChainData({
-                blockHeight: discoveriesData.data.onChainStats.exploredBlock,
-                gasUsed: discoveriesData.data.onChainStats.gasUsed,
-                exploredAddress: discoveriesData.data.onChainStats.exploredAddress,
+                blockHeight: discoveriesData.onChainStats.exploredBlock,
+                gasUsed: discoveriesData.onChainStats.gasUsed,
+                exploredAddress: discoveriesData.onChainStats.exploredAddress,
               });
             }
           }

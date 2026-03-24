@@ -7,10 +7,8 @@
  * - Weekly mission tracking
  */
 
-import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger';
-
-const prisma = new PrismaClient();
+import { prisma } from '../database';
 
 // Constants
 const FAMILY_CONFIG = {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, Tag, Spin, Alert, Descriptions, Badge } from 'antd';
+import { Card, Row, Col, Statistic, Tag, Spin, Alert, Descriptions, Badge, List } from 'antd';
 import {
   BugOutlined,
   RocketOutlined,
@@ -34,6 +34,16 @@ interface DashboardData {
     address: string;
     isDeployed: boolean;
     version?: string;
+  }[];
+  recentDomainEvents: {
+    id: string;
+    aggregateType: string;
+    aggregateId?: string | null;
+    eventType: string;
+    frogId?: number | null;
+    travelId?: number | null;
+    source?: string | null;
+    occurredAt: string;
   }[];
 }
 
@@ -208,6 +218,37 @@ const Dashboard: React.FC = () => {
           </Row>
         ) : (
           <span style={{ color: '#888' }}>暂无合约数据</span>
+        )}
+      </Card>
+
+      <Card title="🧾 最近关键事件" size="small" style={{ marginTop: 24 }}>
+        {data?.recentDomainEvents && data.recentDomainEvents.length > 0 ? (
+          <List
+            size="small"
+            dataSource={data.recentDomainEvents}
+            renderItem={(event) => (
+              <List.Item>
+                <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Tag color="blue">{event.eventType}</Tag>
+                    <Tag>{event.aggregateType}</Tag>
+                    {event.frogId !== null && event.frogId !== undefined && <Tag>frog:{event.frogId}</Tag>}
+                    {event.travelId !== null && event.travelId !== undefined && <Tag>travel:{event.travelId}</Tag>}
+                    {event.source && (
+                      <span style={{ color: '#999', fontSize: 12 }}>
+                        {event.source}
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ color: '#888', fontSize: 12 }}>
+                    {new Date(event.occurredAt).toLocaleString()}
+                  </span>
+                </div>
+              </List.Item>
+            )}
+          />
+        ) : (
+          <span style={{ color: '#888' }}>暂无关键事件</span>
         )}
       </Card>
     </div>

@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiService } from '../../services/api';
+import { notificationFeatureApi } from '../../features/notification/api';
 import { useMyFrog } from '../../hooks/useMyFrog';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { NotificationCenter } from './NotificationCenter';
@@ -38,10 +38,8 @@ export const NotificationBell: React.FC = () => {
     if (!frog?.tokenId) return;
     
     try {
-      const response = await apiService.get(`/notifications/${frog.tokenId}/unread-count`);
-      if (response.success) {
-        setUnreadCount(response.data.count || 0);
-      }
+      const count = await notificationFeatureApi.getUnreadCount(frog.tokenId);
+      setUnreadCount(count);
     } catch (err) {
       console.error('Error fetching unread count:', err);
     }
@@ -128,4 +126,3 @@ export const NotificationBell: React.FC = () => {
 };
 
 export default NotificationBell;
-

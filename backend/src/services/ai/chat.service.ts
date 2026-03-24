@@ -1,6 +1,6 @@
 // backend/src/services/ai/chat.service.ts
 
-import { PrismaClient, ChatIntent, Personality, FrogStatus } from '@prisma/client';
+import { ChatIntent, Personality, FrogStatus } from '@prisma/client';
 import { IntentService } from './intent.service';
 import { contextService, ChatContext } from './context.service';
 import { PriceService } from '../defi/price.service';
@@ -9,6 +9,7 @@ import { aiService } from '../ai.service';
 import { buildSystemPrompt } from './prompts/system.prompt';
 import { buildResponsePrompt } from './prompts/response.prompt';
 import { logger } from '../../utils/logger';
+import { prisma } from '../../database';
 
 export interface ChatResponse {
   sessionId: number;
@@ -21,13 +22,12 @@ export interface ChatResponse {
 }
 
 export class ChatService {
-  private prisma: PrismaClient;
+  private prisma = prisma;
   private intentService: IntentService;
   private priceService: PriceService;
   private assetService: AssetService;
   
   constructor() {
-    this.prisma = new PrismaClient();
     this.intentService = new IntentService();
     this.priceService = new PriceService();
     this.assetService = new AssetService();
@@ -465,8 +465,8 @@ export class ChatService {
             if (targetFrog) {
               return {
                 action: 'NAVIGATE',
-                target: `/visit/${targetFrog.ownerAddress}`,
-                message: `找到了 ${targetFrog.name}！点击可以去拜访~`
+                target: `/memory-palace/${targetFrog.id}`,
+                message: `找到了 ${targetFrog.name} 的记忆空间！点击可以去看看~`
               };
             }
           }
@@ -498,10 +498,17 @@ export class ChatService {
           return { badges: [], count: 0 };
           
         case 'garden_query':
+          if (frogId) {
+            return {
+              action: 'NAVIGATE',
+              target: `/memory-palace/${frogId}`,
+              message: '去记忆空间看看吧！'
+            };
+          }
           return {
             action: 'NAVIGATE',
-            target: '/garden',
-            message: '去家园看看吧！'
+            target: '/my-frog',
+            message: '先找到你的青蛙，再进入记忆空间吧！'
           };
           
         case 'messages_query':
@@ -664,7 +671,7 @@ export class ChatService {
       friend_visit: '呵！我帮你找找这位朋友...',
       souvenirs_query: '呵！我的纪念品都很珍贵呢~',
       badges_query: '呵！荣誉徽章正在加载...',
-      garden_query: '呵！家园很舒适的~',
+      garden_query: '呵！记忆空间已经准备好了~',
       messages_query: '呵...正在查看留言板...',
       navigate: '呵！我带你去~',
       chitchat: '呵！今天天气真好，适合聊天！',

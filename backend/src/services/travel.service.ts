@@ -17,18 +17,17 @@
  */
 // TypeScript migration of travel.service.js (DEPRECATED)
 
-import { PrismaClient, TravelStatus } from '@prisma/client';
+import { TravelStatus } from '@prisma/client';
 import { ethers, JsonRpcProvider, Wallet, Contract, parseEther } from 'ethers';
 import { addSafeErrorHandler } from '../utils/provider';
 import axios from 'axios';
 import { config } from '../config';
 import { logger } from '../utils/logger';
-import { badgeService } from './badge/badge.service';
+import { badgeMaintenanceService } from './badge/badge-maintenance.service';
 import { travelP0Service } from './travel/travel-p0.service';
 import { ChainKey } from '../config/chains';
 import { ZETAFROG_ABI, TRAVEL_ABI } from '../config/contracts';
-
-const prisma = new PrismaClient();
+import { prisma } from '../database';
 
 // Type definitions
 interface WalletObservation {
@@ -285,11 +284,15 @@ class TravelService {
                     logger.info(`[TravelService] Updated frog stats for travel ${travelId}`);
                     
                     // Then check badges
-                    const unlockedBadges = await badgeService.checkAndUnlock(travel.frog.id, {
-                        chain: chainKey,
-                        travelId: travelId,
-                        discoveries: [] // Local travel has no discoveries
-                    });
+                    const badgeResult = await badgeMaintenanceService.reconcileFrogBadges(
+                        { frogId: travel.frog.id },
+                        {
+                            syncDefinitions: false,
+                            syncStats: false,
+                            unlockedByTravelId: travelId,
+                        }
+                    );
+                    const unlockedBadges = badgeResult.unlockedBadges;
                     if (unlockedBadges.length > 0) {
                         logger.info(`[TravelService] Unlocked badges: ${unlockedBadges.join(', ')}`);
                     } else {

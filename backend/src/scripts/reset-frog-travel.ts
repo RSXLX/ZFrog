@@ -1,7 +1,5 @@
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../database';
 
 async function main() {
   const tokenId = 3; // Target Frog #3

@@ -3,7 +3,7 @@
 import { Router } from 'express';
 import { ChatService } from '../../services/ai/chat.service';
 
-const router = Router();
+const router: Router = Router();
 const chatService = new ChatService();
 
 /**

@@ -14,7 +14,7 @@ import { SOUVENIR_ABI, TRAVEL_ABI } from '../config/contracts';
 import { ChainKey, CHAIN_ID_TO_KEY, getChainConfig } from '../config/chains';
 import { travelP0Service } from '../services/travel/travel-p0.service';
 import { NFTImageOrchestratorService } from '../services/nft-image-orchestrator.service';
-import { badgeService } from '../services/badge/badge.service';
+import { badgeMaintenanceService } from '../services/badge/badge-maintenance.service';
 import { notifyTravelCompleted, notifyTravelProgress, notifyFriendInteraction } from '../websocket';
 // 🆕 V2.0 服务
 import { addressAnalysisService } from '../services/travel/address-analysis.service';
@@ -775,11 +775,14 @@ class TravelProcessor {
                             BigInt(0),
                             new Date()
                         );
-                        await badgeService.checkAndUnlock(travel.groupTravel.companionId, {
-                            chain: chainKey,
-                            travelId,
-                            discoveries: [],
-                        });
+                        await badgeMaintenanceService.reconcileFrogBadges(
+                            { frogId: travel.groupTravel.companionId },
+                            {
+                                syncDefinitions: false,
+                                syncStats: false,
+                                unlockedByTravelId: travelId,
+                            }
+                        );
                     } catch (companionError) {
                         logger.warn(`[GroupTravel] Failed to update companion stats:`, companionError);
                     }
@@ -805,23 +808,14 @@ class TravelProcessor {
                     new Date()
                 );
 
-                const discoveries = observation?.notableEvents?.map((event: any, index: number) => ({
-                    id: index,
-                    travelId,
-                    type: 'tx_action' as const,
-                    title: event.type || 'Transaction',
-                    description: event.description || `Discovered on ${chainKey}`,
-                    content: event.description || event.type,
-                    rarity: event.value && BigInt(event.value) > BigInt('1000000000000000000') ? 2 : 1, 
-                    timestamp: new Date(),
-                    metadata: { txHash: event.txHash, value: event.value }
-                })) || [];
-                
-                await badgeService.checkAndUnlock(frog.id, {
-                    chain: chainKey,
-                    travelId,
-                    discoveries,
-                });
+                await badgeMaintenanceService.reconcileFrogBadges(
+                    { frogId: frog.id },
+                    {
+                        syncDefinitions: false,
+                        syncStats: false,
+                        unlockedByTravelId: travelId,
+                    }
+                );
             }
 
             if (this.io) {

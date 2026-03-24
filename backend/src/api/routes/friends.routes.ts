@@ -9,8 +9,10 @@ import {
 } from '../../websocket/index';
 import * as intimacyService from '../../services/intimacy.service';
 import * as notificationService from '../../services/notification.service';
+import { badgeMaintenanceService } from '../../services/badge/badge-maintenance.service';
+import { ApiRes, ErrorCode } from '../../utils/apiResponse';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * POST /api/friends/request
@@ -27,7 +29,7 @@ router.post('/request', async (req, res) => {
 
         // 严格检查 requesterId（支持 tokenId = 0 的情况）
         if (requesterId === undefined || requesterId === null) {
-            return res.status(400).json({ error: 'Requester ID is required' });
+            return ApiRes.validationError(res, 'Requester ID is required');
         }
 
         // 将 requesterId (tokenId) 转换为数据库 ID
@@ -36,7 +38,7 @@ router.post('/request', async (req, res) => {
         });
 
         if (!requesterFrog) {
-            return res.status(404).json({ error: 'Requester frog not found' });
+            return ApiRes.notFound(res, 'Requester frog not found');
         }
 
         let targetAddresseeFrog = null;
@@ -53,7 +55,7 @@ router.post('/request', async (req, res) => {
             });
 
             if (!targetAddresseeFrog) {
-                return res.status(404).json({ error: 'No frog found with this wallet address' });
+                return ApiRes.notFound(res, 'No frog found with this wallet address');
             }
         } else if (addresseeId) {
             // 将 addresseeId (tokenId) 转换为数据库 ID
@@ -62,17 +64,17 @@ router.post('/request', async (req, res) => {
             });
 
             if (!targetAddresseeFrog) {
-                return res.status(404).json({ error: 'Addressee frog not found' });
+                return ApiRes.notFound(res, 'Addressee frog not found');
             }
         }
 
         if (!targetAddresseeFrog) {
-            return res.status(400).json({ error: 'Addressee ID or wallet address is required' });
+            return ApiRes.validationError(res, 'Addressee ID or wallet address is required');
         }
 
         // 使用数据库 ID 进行比较
         if (requesterFrog.id === targetAddresseeFrog.id) {
-            return res.status(400).json({ error: 'Cannot send friend request to yourself' });
+            return ApiRes.validationError(res, 'Cannot send friend request to yourself');
         }
 
         // 检查是否已存在好友关系
@@ -87,9 +89,9 @@ router.post('/request', async (req, res) => {
 
         if (existingFriendship) {
             if (existingFriendship.status === 'Accepted') {
-                return res.status(400).json({ error: 'Already friends' });
+                return ApiRes.validationError(res, 'Already friends');
             } else if (existingFriendship.status === 'Pending') {
-                return res.status(400).json({ error: 'Friend request already pending' });
+                return ApiRes.validationError(res, 'Friend request already pending');
             } else {
                 // 如果是之前拒绝或拉黑的关系，更新为待处理
                 const friendship = await prisma.friendship.update({
@@ -100,7 +102,7 @@ router.post('/request', async (req, res) => {
                         addressee: true
                     }
                 });
-                return res.json(friendship);
+                return ApiRes.success(res, friendship, 'Friend request resent');
             }
         }
 
@@ -120,10 +122,10 @@ router.post('/request', async (req, res) => {
         // 发送WebSocket通知给接收者（使用数据库 ID）
         notifyFriendRequestReceived(targetAddresseeFrog.id, friendship);
 
-        res.status(201).json(friendship);
+        return ApiRes.created(res, friendship, 'Friend request sent');
     } catch (error) {
         console.error('Error sending friend request:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        return ApiRes.serverError(res, error as Error);
     }
 });
 
@@ -137,7 +139,7 @@ router.put('/request/:id/respond', async (req, res) => {
     const { status, message } = req.body;
 
     if (!['Accepted', 'Declined'].includes(status)) {
-      return res.status(400).json({ error: 'Status must be Accepted or Declined' });
+      return ApiRes.validationError(res, 'Status must be Accepted or Declined');
     }
 
     const friendship = await prisma.friendship.update({
@@ -162,15 +164,28 @@ router.put('/request/:id/respond', async (req, res) => {
           message: message || '我们成为朋友啦！🐸'
         }
       });
+
+      try {
+        await badgeMaintenanceService.reconcileFrogBadges(
+          { frogId: friendship.requesterId },
+          { syncDefinitions: false, syncStats: false }
+        );
+        await badgeMaintenanceService.reconcileFrogBadges(
+          { frogId: friendship.addresseeId },
+          { syncDefinitions: false, syncStats: false }
+        );
+      } catch (badgeError) {
+        console.warn('[Friends] Failed to reconcile badge progress:', badgeError);
+      }
     }
 
     // 发送WebSocket通知给请求者
     notifyFriendRequestStatusChanged(friendship.requesterId, friendship.addresseeId, status);
 
-    res.json(friendship);
+    return ApiRes.success(res, friendship, `Friend request ${status.toLowerCase()}`);
   } catch (error) {
     console.error('Error responding to friend request:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return ApiRes.serverError(res, error as Error);
   }
 });
 
@@ -183,6 +198,9 @@ router.get('/list/:frogId', async (req, res) => {
   try {
     const tokenId = parseInt(req.params.frogId);
     const { isFrogOnline } = require('../../websocket');
+    if (isNaN(tokenId)) {
+      return ApiRes.validationError(res, 'Invalid frogId');
+    }
     
     // 先根据 tokenId 查找青蛙
     const frog = await prisma.frog.findUnique({
@@ -190,7 +208,7 @@ router.get('/list/:frogId', async (req, res) => {
     });
     
     if (!frog) {
-      return res.status(404).json({ error: 'Frog not found' });
+      return ApiRes.notFound(res, 'Frog not found');
     }
     
     const dbFrogId = frog.id;
@@ -244,10 +262,10 @@ router.get('/list/:frogId', async (req, res) => {
       };
     });
 
-    res.json(friends);
+    return ApiRes.success(res, friends);
   } catch (error) {
     console.error('Error fetching friends list:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return ApiRes.serverError(res, error as Error);
   }
 });
 
@@ -259,6 +277,9 @@ router.get('/list/:frogId', async (req, res) => {
 router.get('/requests/:frogId', async (req, res) => {
   try {
     const tokenId = parseInt(req.params.frogId);
+    if (isNaN(tokenId)) {
+      return ApiRes.validationError(res, 'Invalid frogId');
+    }
     
     // 先根据 tokenId 查找青蛙
     const frog = await prisma.frog.findUnique({
@@ -266,7 +287,7 @@ router.get('/requests/:frogId', async (req, res) => {
     });
     
     if (!frog) {
-      return res.status(404).json({ error: 'Frog not found' });
+      return ApiRes.notFound(res, 'Frog not found');
     }
 
     const requests = await prisma.friendship.findMany({
@@ -288,10 +309,10 @@ router.get('/requests/:frogId', async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    res.json(requests);
+    return ApiRes.success(res, requests);
   } catch (error) {
     console.error('Error fetching friend requests:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return ApiRes.serverError(res, error as Error);
   }
 });
 
@@ -302,33 +323,37 @@ router.get('/requests/:frogId', async (req, res) => {
 router.delete('/:friendshipId', async (req, res) => {
   try {
     const { friendshipId } = req.params;
+    const id = parseInt(friendshipId);
+    if (isNaN(id)) {
+      return ApiRes.validationError(res, 'Invalid friendshipId');
+    }
 
     // 检查好友关系是否存在
     const friendship = await prisma.friendship.findUnique({
-      where: { id: parseInt(friendshipId) }
+      where: { id }
     });
 
     if (!friendship) {
-      return res.status(404).json({ error: 'Friendship not found' });
+      return ApiRes.notFound(res, 'Friendship not found');
     }
 
     // 删除相关的互动记录
     await prisma.friendInteraction.deleteMany({
-      where: { friendshipId: parseInt(friendshipId) }
+      where: { friendshipId: id }
     });
 
     // 删除好友关系
     await prisma.friendship.delete({
-      where: { id: parseInt(friendshipId) }
+      where: { id }
     });
 
     // 发送WebSocket通知给双方
     notifyFriendRemoved(friendship.requesterId, friendship.addresseeId);
 
-    res.json({ success: true });
+    return ApiRes.deleted(res, 'Friendship deleted');
   } catch (error) {
     console.error('Error deleting friendship:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return ApiRes.serverError(res, error as Error);
   }
 });
 
@@ -340,32 +365,36 @@ router.post('/:friendshipId/interact', async (req, res) => {
   try {
     const { friendshipId } = req.params;
     const { actorId, type, message, metadata } = req.body;
+    const id = parseInt(friendshipId);
+    if (isNaN(id)) {
+      return ApiRes.validationError(res, 'Invalid friendshipId');
+    }
 
     if (!actorId || !type) {
-      return res.status(400).json({ error: 'Actor ID and interaction type are required' });
+      return ApiRes.validationError(res, 'Actor ID and interaction type are required');
     }
 
     if (!Object.values(InteractionType).includes(type)) {
-      return res.status(400).json({ error: 'Invalid interaction type' });
+      return ApiRes.validationError(res, 'Invalid interaction type');
     }
 
     // 验证好友关系
     const friendship = await prisma.friendship.findUnique({
-      where: { id: parseInt(friendshipId) }
+      where: { id }
     });
 
     if (!friendship || friendship.status !== FriendshipStatus.Accepted) {
-      return res.status(404).json({ error: 'Friendship not found or not accepted' });
+      return ApiRes.notFound(res, 'Friendship not found or not accepted');
     }
 
     if (friendship.requesterId !== actorId && friendship.addresseeId !== actorId) {
-      return res.status(403).json({ error: 'Not authorized to interact in this friendship' });
+      return ApiRes.error(res, ErrorCode.FORBIDDEN, 'Not authorized to interact in this friendship', 403);
     }
 
     // 创建互动记录
     const interaction = await prisma.friendInteraction.create({
       data: {
-        friendshipId: parseInt(friendshipId),
+        friendshipId: id,
         actorId,
         type: type as InteractionType,
         message,
@@ -384,7 +413,7 @@ router.post('/:friendshipId/interact', async (req, res) => {
 
     // 记录亲密度
     const intimacyResult = await intimacyService.recordInteraction(
-      parseInt(friendshipId),
+      id,
       type as InteractionType,
       metadata?.giftValue
     );
@@ -407,15 +436,19 @@ router.post('/:friendshipId/interact', async (req, res) => {
     const targetId = friendship.requesterId === actorId 
       ? friendship.addresseeId 
       : friendship.requesterId;
-    notifyFriendInteraction(parseInt(friendshipId), actorId, targetId, interaction);
+    notifyFriendInteraction(id, actorId, targetId, interaction);
 
-    res.status(201).json({
-      ...interaction,
-      intimacy: intimacyResult,
-    });
+    return ApiRes.created(
+      res,
+      {
+        ...interaction,
+        intimacy: intimacyResult,
+      },
+      'Interaction created'
+    );
   } catch (error) {
     console.error('Error creating interaction:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return ApiRes.serverError(res, error as Error);
   }
 });
 
@@ -427,9 +460,13 @@ router.get('/:friendshipId/interactions', async (req, res) => {
   try {
     const { friendshipId } = req.params;
     const { limit = 20, offset = 0 } = req.query;
+    const id = parseInt(friendshipId);
+    if (isNaN(id)) {
+      return ApiRes.validationError(res, 'Invalid friendshipId');
+    }
 
     const interactions = await prisma.friendInteraction.findMany({
-      where: { friendshipId: parseInt(friendshipId) },
+      where: { friendshipId: id },
       include: {
         actor: true
       },
@@ -438,10 +475,10 @@ router.get('/:friendshipId/interactions', async (req, res) => {
       skip: parseInt(offset as string)
     });
 
-    res.json(interactions);
+    return ApiRes.success(res, interactions);
   } catch (error) {
     console.error('Error fetching interactions:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return ApiRes.serverError(res, error as Error);
   }
 });
 
@@ -452,17 +489,20 @@ router.get('/:friendshipId/interactions', async (req, res) => {
 router.get('/:friendshipId/intimacy', async (req, res) => {
   try {
     const friendshipId = parseInt(req.params.friendshipId);
+    if (isNaN(friendshipId)) {
+      return ApiRes.validationError(res, 'Invalid friendshipId');
+    }
     
     const intimacyDetails = await intimacyService.getFriendshipIntimacy(friendshipId);
     
     if (!intimacyDetails) {
-      return res.status(404).json({ error: 'Friendship not found' });
+      return ApiRes.notFound(res, 'Friendship not found');
     }
     
-    res.json(intimacyDetails);
+    return ApiRes.success(res, intimacyDetails);
   } catch (error) {
     console.error('Error fetching intimacy details:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return ApiRes.serverError(res, error as Error);
   }
 });
 
@@ -474,13 +514,16 @@ router.get('/:friendshipId/daily-limit/:type', async (req, res) => {
   try {
     const friendshipId = parseInt(req.params.friendshipId);
     const type = req.params.type as InteractionType;
+    if (isNaN(friendshipId)) {
+      return ApiRes.validationError(res, 'Invalid friendshipId');
+    }
     
     const limitCheck = await intimacyService.checkDailyLimit(friendshipId, type);
     
-    res.json(limitCheck);
+    return ApiRes.success(res, limitCheck);
   } catch (error) {
     console.error('Error checking daily limit:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return ApiRes.serverError(res, error as Error);
   }
 });
 

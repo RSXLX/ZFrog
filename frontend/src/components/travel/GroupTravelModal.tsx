@@ -10,8 +10,9 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiService, Frog } from '../../services/api';
-import { travelApi } from '../../services/travel.api';
+import type { Frog } from '../../types';
+import { travelFeatureApi } from '../../features/travel/api';
+import { socialFeatureApi } from '../../features/social/api';
 import { useGroupCrossChainTravel, TARGET_CHAINS } from '../../hooks/useGroupCrossChainTravel';
 import { formatEther, parseEther } from 'viem';
 import { useAccount } from 'wagmi';
@@ -94,10 +95,8 @@ export function GroupTravelModal({
     if (tokenId === undefined || tokenId === null) return;
     setLoading(true);
     try {
-      const response = await apiService.get(`/friends/list/${tokenId}`);
-      if (response.success) {
-        setFriends(response.data || []);
-      }
+      const list = await socialFeatureApi.listFriends(tokenId);
+      setFriends((list || []) as FriendWithStatus[]);
     } catch (err) {
       console.error('Failed to load friends:', err);
     } finally {
@@ -129,7 +128,7 @@ export function GroupTravelModal({
     if (!selectedFriend || !selectedChain || !txHash) return;
     
     try {
-      const result = await travelApi.confirmGroupCrossChainTravel({
+      const result = await travelFeatureApi.confirmGroupCrossChainTravel({
         txHash,
         leaderTokenId: tokenId,
         companionTokenId: selectedFriend.tokenId,

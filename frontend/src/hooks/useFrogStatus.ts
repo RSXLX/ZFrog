@@ -3,7 +3,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useReadContract, useWatchContractEvent } from 'wagmi';
 import { ZETAFROG_ABI, ZETAFROG_ADDRESS } from '../config/contracts';
 import { useWebSocket } from './useWebSocket';
-import { apiService } from '../services/api';
+import { frogFeatureApi } from '../features/frog/api';
+import { travelFeatureApi } from '../features/travel/api';
 
 type FrogStatus = 'Idle' | 'Traveling' | 'Returning';
 
@@ -144,16 +145,15 @@ export function useFrogStatus(frogId: number | undefined): UseFrogStatusReturn {
   const fetchBackendData = useCallback(async () => {
     if (frogId === undefined) return;
     try {
-      const response = await apiService.get(`/frogs/${frogId}`);
-      const data = response.data;
+      const data = await frogFeatureApi.getRuntimeState(frogId);
+      if (!data) return;
       setBackendData(data);
       
       // 如果后端显示正在旅行，则更新本地状态（兼容 P0）
       if (data.status === 'Traveling') {
         setStatus('Traveling');
         // 尝试获取活跃旅行详情
-        const response = await apiService.get(`/travels/${frogId}/active`);
-        const travelDetail = response.data;
+        const travelDetail = await travelFeatureApi.getActiveByTokenId(frogId);
         if (travelDetail) {
           setTravel({
             startTime: new Date(travelDetail.startTime).getTime(),

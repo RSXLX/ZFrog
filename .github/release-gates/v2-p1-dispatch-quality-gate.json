@@ -1,0 +1,12 @@
+{
+  "gateId": "v2-p1-dispatch-quality-gate",
+  "thresholds": {
+    "maxFailedCreatesPerRun": 0,
+    "maxRetryExhausted": 0,
+    "maxIdempotencyParseErrors": 0
+  },
+  "idempotency": {
+    "logPath": "reports/v2-p1-escalation-dispatch-idempotency.jsonl"
+  },
+  "notes": "Gate dispatch execution quality by enforcing failed-create and retry-exhausted budgets, while tracking idempotency log integrity stats."
+}

@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import './TravelTrajectoryMap.css';
+import { travelFeatureApi } from '../../features/travel/api';
 
 interface TrajectoryPoint {
   id?: number;
@@ -19,8 +20,6 @@ interface TravelTrajectoryMapProps {
   travelId: number;
   isCompleted?: boolean;
 }
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 // 链名称和颜色映射
 const CHAIN_CONFIG: Record<number, { name: string; color: string; icon: string }> = {
@@ -38,13 +37,8 @@ export function TravelTrajectoryMap({ travelId, isCompleted }: TravelTrajectoryM
   useEffect(() => {
     const fetchTrajectory = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/travels/${travelId}/trajectory`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && Array.isArray(data.points)) {
-            setPoints(data.points);
-          }
-        }
+        const data = await travelFeatureApi.getTrajectory(travelId);
+        setPoints(data);
       } catch (error) {
         console.error('[TravelTrajectoryMap] Failed to fetch trajectory:', error);
       } finally {

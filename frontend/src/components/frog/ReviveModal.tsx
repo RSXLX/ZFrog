@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { hibernationApi } from '../../services/hibernation.api';
+import { lifeFeatureApi } from '../../features/life/api';
 
 interface ReviveModalProps {
   isOpen: boolean;
@@ -43,7 +43,7 @@ export const ReviveModal: React.FC<ReviveModalProps> = ({
     if (isOpen && frogId) {
       setLoading(true);
       setError(null);
-      hibernationApi.getRevivalCost(frogId)
+      lifeFeatureApi.getLegacyRevivalCost(frogId)
         .then(setCostInfo)
         .catch((err) => setError(err.message || '获取费用失败'))
         .finally(() => setLoading(false));
@@ -55,7 +55,7 @@ export const ReviveModal: React.FC<ReviveModalProps> = ({
     setReviving(true);
     setError(null);
     try {
-      const result = await hibernationApi.reviveFrog(frogId);
+      const result = await lifeFeatureApi.reviveLegacy(frogId);
       if (result.success) {
         onSuccess?.();
         onClose();

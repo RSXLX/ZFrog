@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiService } from '../../services/api';
+import { gardenFeatureApi } from '../../features/garden/api';
 import { useToast } from '../common/ToastProvider';
 
 export interface Achievement {
@@ -79,18 +79,13 @@ export const AchievementWall: React.FC<AchievementWallProps> = ({
   const loadAchievements = async () => {
     try {
       const [frogResponse, allResponse] = await Promise.all([
-        apiService.get(`/homestead/${frogId}/achievements`),
-        apiService.get('/homestead/achievements'),
+        gardenFeatureApi.getEarnedAchievements(frogId),
+        gardenFeatureApi.getAchievementCatalog(),
       ]);
 
-      if (frogResponse.success) {
-        setEarned(frogResponse.data?.earned || []);
-        setProgress(frogResponse.data?.progress || { total: 0, earned: 0, percentage: 0 });
-      }
-
-      if (allResponse.success) {
-        setAllAchievements(allResponse.data || []);
-      }
+      setEarned(frogResponse?.earned || []);
+      setProgress(frogResponse?.progress || { total: 0, earned: 0, percentage: 0 });
+      setAllAchievements(allResponse || []);
     } catch (error) {
       console.error('Failed to load achievements:', error);
     } finally {
@@ -126,8 +121,9 @@ export const AchievementWall: React.FC<AchievementWallProps> = ({
         sbtTxHash: buildFallbackTxHash(),
       };
 
-      const response = await apiService.post(
-        `/homestead/${frogId}/achievements/${earnedAchievement.achievement.id}/mint-sbt`,
+      const response = await gardenFeatureApi.mintAchievementSbt(
+        frogId,
+        earnedAchievement.achievement.id,
         payload
       );
 

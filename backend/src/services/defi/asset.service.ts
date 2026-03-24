@@ -1,12 +1,12 @@
 // backend/src/services/defi/asset.service.ts
 
-import { PrismaClient } from '@prisma/client';
 import { createPublicClient, http, formatEther, formatUnits } from 'viem';
 import { sepolia, bscTestnet, polygonAmoy } from 'viem/chains';
 import { defineChain } from 'viem';
 import { PriceService } from './price.service';
 import { getChainConfig } from '../../config/chains';
 import { logger } from '../../utils/logger';
+import { prisma } from '../../database';
 
 // 定义ZetaChain Athens测试网
 const zetachainAthens = defineChain({
@@ -94,12 +94,11 @@ export interface NFTBalance {
 }
 
 export class AssetService {
-  private prisma: PrismaClient;
+  private prisma = prisma;
   private priceService: PriceService;
   private clients: Map<number, any>;
   
   constructor() {
-    this.prisma = new PrismaClient();
     this.priceService = new PriceService();
     
     // 初始化测试网客户端

@@ -12,7 +12,7 @@ import {
 // 本地定义商店分类类型
 type ShopCategory = 'FOOD' | 'MEDICINE' | 'BOOST' | 'DECORATION' | 'SPECIAL';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * GET /api/shop/items

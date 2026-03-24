@@ -8,11 +8,12 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { hibernationApi, HibernationStatus, HibernationStatusResponse } from '../services/hibernation.api';
+import { lifeFeatureApi } from '../features/life/api';
+import type { LifeHibernationStatus } from '../lib/api/contracts';
 
 interface UseHibernationResult {
   // 状态
-  status: HibernationStatus;
+  status: LifeHibernationStatus;
   hibernatedAt: Date | null;
   blessingsReceived: number;
   revivalCost: {
@@ -37,7 +38,7 @@ interface UseHibernationResult {
 }
 
 export function useHibernation(frogId: number | null): UseHibernationResult {
-  const [status, setStatus] = useState<HibernationStatus>('ACTIVE');
+  const [status, setStatus] = useState<LifeHibernationStatus>('ACTIVE');
   const [hibernatedAt, setHibernatedAt] = useState<Date | null>(null);
   const [blessingsReceived, setBlessingsReceived] = useState(0);
   const [revivalCost, setRevivalCost] = useState<{
@@ -57,10 +58,10 @@ export function useHibernation(frogId: number | null): UseHibernationResult {
     setError(null);
     
     try {
-      const data = await hibernationApi.getHibernationStatus(frogId);
+      const data = await lifeFeatureApi.getLegacyHibernationStatus(frogId);
       setStatus(data.status);
       setHibernatedAt(data.hibernatedAt ? new Date(data.hibernatedAt) : null);
-      setBlessingsReceived(data.blessingsReceived);
+      setBlessingsReceived(data.blessingsReceived || 0);
       
       if (data.revivalCost) {
         setRevivalCost(data.revivalCost);
@@ -82,7 +83,7 @@ export function useHibernation(frogId: number | null): UseHibernationResult {
     if (!frogId) return false;
     
     try {
-      const result = await hibernationApi.reviveFrog(frogId);
+      const result = await lifeFeatureApi.reviveLegacy(frogId);
       if (result.success) {
         setStatus('ACTIVE');
         setHibernatedAt(null);
@@ -102,7 +103,7 @@ export function useHibernation(frogId: number | null): UseHibernationResult {
     if (!frogId) return false;
     
     try {
-      const result = await hibernationApi.blessFrog(blesserFrogId, frogId);
+      const result = await lifeFeatureApi.blessLegacy(frogId, { blesserFrogId });
       if (result.success) {
         setBlessingsReceived(prev => prev + 1);
         // 重新获取费用信息

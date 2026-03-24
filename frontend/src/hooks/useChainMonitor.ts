@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { ChainEvent, WhaleAlert, ChainMonitorState } from '../types/frogAnimation';
-import { apiService } from '../services/api';
+import { systemFeatureApi } from '../features/system/api';
 
 const MONITOR_CONFIG = {
   priceAlertThreshold: 2, // 2% 触发价格预警
@@ -78,7 +78,7 @@ export function useChainMonitor() {
 
   const checkApiHealth = useCallback(async () => {
     try {
-      await Promise.all(API_HEALTH_ENDPOINTS.map((endpoint) => apiService.get(endpoint)));
+      await systemFeatureApi.checkHealth(API_HEALTH_ENDPOINTS);
       setConnected(true);
     } catch (error) {
       console.error('Chain monitor health check failed:', error);
@@ -88,10 +88,10 @@ export function useChainMonitor() {
 
   const monitorLargeTransfers = useCallback(async () => {
     try {
-      const response = await apiService.get('/price/ZETA');
-      if (!response?.success || !response?.data) return;
+      const data = await systemFeatureApi.getPrice('ZETA');
+      if (!data) return;
 
-      const change24h = Number(response.data.change24h || 0);
+      const change24h = Number(data.change24h || 0);
       if (!Number.isFinite(change24h)) return;
 
       if (Math.abs(change24h) >= MONITOR_CONFIG.largeTradeThresholdPercent) {
@@ -122,12 +122,12 @@ export function useChainMonitor() {
     try {
       const symbols = ['ZETA', 'ETH', 'BTC', 'BNB'];
       const responses = await Promise.all(
-        symbols.map((symbol) => apiService.get(`/price/${symbol}`))
+        symbols.map((symbol) => systemFeatureApi.getPrice(symbol))
       );
 
       const prices = responses
-        .filter((res) => res?.success && res?.data)
-        .map((res) => res.data) as Array<{
+        .filter((res) => Boolean(res))
+        .map((res) => res as any) as Array<{
         symbol: string;
         priceUsd: number;
         change24h?: number;

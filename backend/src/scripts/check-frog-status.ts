@@ -1,7 +1,5 @@
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../database';
 
 async function main() {
   console.log('=== Frog #3 Full Status ===\n');

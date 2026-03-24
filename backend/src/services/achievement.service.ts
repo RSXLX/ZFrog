@@ -7,9 +7,8 @@
  * - SBT 铸造记录
  */
 
-import { PrismaClient, AchievementCategory } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { AchievementCategory } from '@prisma/client';
+import { prisma } from '../database';
 
 // ============ 类型定义 ============
 

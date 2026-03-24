@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card, Table, Tag, Button, Space, message, Popconfirm, Select, Modal, Descriptions, Spin, Alert } from 'antd';
 import { ReloadOutlined, CheckCircleOutlined, EyeOutlined } from '@ant-design/icons';
 import api from '../../services/api';
@@ -29,6 +29,18 @@ interface TravelDetail extends TravelRecord {
   discoveries?: { type: string; title: string; description: string; rarity: number }[];
 }
 
+interface MemoryRebuildReceipt {
+  travelId: number;
+  frogId: number;
+  memoryPalace: {
+    id: number;
+    frogId: number;
+    recapText: string | null;
+    updatedAt: string;
+  };
+  rebuiltAt: string;
+}
+
 const statusColors: Record<string, string> = {
   Active: 'processing',
   Processing: 'warning',
@@ -55,12 +67,10 @@ const Travels: React.FC = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedTravel, setSelectedTravel] = useState<TravelDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [rebuildingTravelId, setRebuildingTravelId] = useState<number | null>(null);
+  const [rebuildReceipt, setRebuildReceipt] = useState<MemoryRebuildReceipt | null>(null);
 
-  useEffect(() => {
-    fetchTravels();
-  }, [statusFilter]);
-
-  const fetchTravels = async () => {
+  const fetchTravels = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get('/api/admin/travels', {
@@ -74,7 +84,11 @@ const Travels: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
+
+  useEffect(() => {
+    fetchTravels();
+  }, [fetchTravels]);
 
   const handleViewDetail = async (record: TravelRecord) => {
     setDetailVisible(true);
@@ -98,6 +112,20 @@ const Travels: React.FC = () => {
       fetchTravels();
     } catch (err) {
       message.error(getApiErrorMessage(err, '强制完成失败'));
+    }
+  };
+
+  const handleRebuildMemory = async (record: TravelRecord) => {
+    try {
+      setRebuildingTravelId(record.id);
+      const response = await api.post(`/api/admin/travels/${record.id}/rebuild-memory`);
+      const result = response as unknown as MemoryRebuildReceipt;
+      setRebuildReceipt(result);
+      message.success(`记忆重建完成：旅行 #${result.travelId} -> 宫殿 #${result.memoryPalace.id}`);
+    } catch (err) {
+      message.error(getApiErrorMessage(err, '重建记忆失败'));
+    } finally {
+      setRebuildingTravelId(null);
     }
   };
 
@@ -146,6 +174,15 @@ const Travels: React.FC = () => {
               </Button>
             </Popconfirm>
           )}
+          {record.status === 'Completed' && (
+            <Button
+              size="small"
+              loading={rebuildingTravelId === record.id}
+              onClick={() => handleRebuildMemory(record)}
+            >
+              重建记忆
+            </Button>
+          )}
         </Space>
       ),
     },
@@ -181,6 +218,17 @@ const Travels: React.FC = () => {
             showIcon
             message="加载失败"
             description={loadError}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        {rebuildReceipt && (
+          <Alert
+            type="success"
+            showIcon
+            closable
+            onClose={() => setRebuildReceipt(null)}
+            message={`记忆重建回执：旅行 #${rebuildReceipt.travelId}`}
+            description={`frogId=${rebuildReceipt.frogId} | memoryPalaceId=${rebuildReceipt.memoryPalace.id} | updatedAt=${new Date(rebuildReceipt.memoryPalace.updatedAt).toLocaleString()} | rebuiltAt=${new Date(rebuildReceipt.rebuiltAt).toLocaleString()}`}
             style={{ marginBottom: 16 }}
           />
         )}

@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet } from '../../hooks/useWallet';
 import { WalletModal } from './WalletModal';
+import { useI18n } from '../../i18n';
 
 interface ConnectButtonProps {
   className?: string;
@@ -8,6 +9,7 @@ interface ConnectButtonProps {
 }
 
 export function ConnectButton({ className = '', showBalance = true }: ConnectButtonProps) {
+  const { tr } = useI18n();
   const {
     address,
     shortAddress,
@@ -55,7 +57,7 @@ export function ConnectButton({ className = '', showBalance = true }: ConnectBut
                 className="flex items-center gap-2"
               >
                 <LoadingSpinner size={18} />
-                连接中...
+                {tr('连接中...', 'Connecting...')}
               </motion.span>
             ) : (
               <motion.span
@@ -66,7 +68,7 @@ export function ConnectButton({ className = '', showBalance = true }: ConnectBut
                 className="flex items-center gap-2"
               >
                 <WalletIcon size={18} />
-                连接钱包
+                {tr('连接钱包', 'Connect Wallet')}
               </motion.span>
             )}
           </AnimatePresence>
@@ -100,7 +102,7 @@ export function ConnectButton({ className = '', showBalance = true }: ConnectBut
       >
         <span className="flex items-center gap-2">
           <AlertIcon size={18} />
-          切换到 ZetaChain
+          {tr('切换到 ZetaChain', 'Switch to ZetaChain')}
         </span>
       </motion.button>
     );
@@ -156,7 +158,7 @@ export function ConnectButton({ className = '', showBalance = true }: ConnectBut
           whileTap={{ scale: 0.9 }}
           onClick={disconnect}
           className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-          title="断开连接"
+          title={tr('断开连接', 'Disconnect')}
         >
           <DisconnectIcon size={16} className="text-gray-400 hover:text-gray-600" />
         </motion.button>

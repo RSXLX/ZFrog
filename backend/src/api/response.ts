@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ApiErrorBody, ApiErrorResponse, ApiMeta, ApiSuccessResponse } from '../types/api';
+import { ApiErrorBody, ApiErrorCode, ApiErrorResponse, ApiMeta, ApiSuccessResponse } from '../types/api';
 import { getOrCreateRequestId } from '../utils/request-id';
 
 const createMeta = (req: Request, extra?: Record<string, unknown>): ApiMeta => ({
@@ -40,7 +40,7 @@ export const respondError = (
   req: Request,
   res: Response,
   statusCode: number,
-  code: string,
+  code: ApiErrorCode,
   message: string,
   details?: unknown,
   extraMeta?: Record<string, unknown>

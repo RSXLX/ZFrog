@@ -128,6 +128,36 @@ describe('Legacy Travel Route Delegation E2E', () => {
     mockQuery.getGroupTravelByTravelId.mockResolvedValue({ id: 1, travelId: 101 } as any);
     mockQuery.getPublicRescueRequests.mockResolvedValue([{ id: 10 }] as any);
     mockQuery.getFriendRescueRequests.mockResolvedValue([{ id: 11 }] as any);
+    mockQuery.getTravel.mockResolvedValue({
+      travelId: 101,
+      frogId: 1,
+      tokenId: 1,
+      frogName: 'Leader',
+      walletAddress: '0xabc0000000000000000000000000000000000001',
+      status: 'COMPLETED',
+      currentStage: 'COMPLETED',
+      progress: 100,
+      travelType: 'random',
+      targetWallet: '0x0000000000000000000000000000000000000000',
+      targetChain: 'ZETACHAIN_ATHENS',
+      chainId: 7001,
+      duration: 3600,
+      startTime: new Date(Date.now() - 60_000).toISOString(),
+      endTime: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      souvenirId: null,
+      souvenir: null,
+      journal: {
+        title: '旅行日志',
+        content: '今天看到了很多新地址',
+        mood: 'PEACEFUL',
+      },
+      discoveries: [],
+      statusMessages: [],
+      companion: null,
+      errorMessage: null,
+    } as any);
 
     mockCommand.startTravel.mockResolvedValue({
       travelId: 101,
@@ -226,6 +256,21 @@ describe('Legacy Travel Route Delegation E2E', () => {
       walletAddress: '0xabc0000000000000000000000000000000000001',
       frogTokenId: 1,
     });
+  });
+
+  it('legacy read endpoints /journal/:travelId and /p0/:travelId expose deprecation headers', async () => {
+    const journalResp = await request(app).get('/api/travels/journal/101');
+    const p0Resp = await request(app).get('/api/travels/p0/101');
+
+    expect(journalResp.status).toBe(200);
+    expect(p0Resp.status).toBe(200);
+    expect(journalResp.header.deprecation).toBe('true');
+    expect(p0Resp.header.deprecation).toBe('true');
+    expect(journalResp.header['x-api-deprecated']).toBe('true');
+    expect(p0Resp.header['x-api-deprecated']).toBe('true');
+    expect(journalResp.header.link).toContain('/api/v1/travels/:travelId');
+    expect(p0Resp.header.link).toContain('/api/v1/travels/:travelId');
+    expect(mockQuery.getTravel).toHaveBeenCalledTimes(2);
   });
 
   it('POST /api/travels/start delegates to travel.command.startTravel', async () => {

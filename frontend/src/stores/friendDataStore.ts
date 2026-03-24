@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Frog } from '../types';
-import { apiService } from '../services/api';
+import { socialFeatureApi } from '../features/social/api';
 
 interface Friend extends Frog {
   friendshipId: number;
@@ -115,12 +115,8 @@ export const useFriendDataStore = create<FriendDataState>()((set, get) => ({
   fetchFriends: async (frogId: number) => {
     set({ loading: true, error: null });
     try {
-      const response = await apiService.get(`/friends/list/${frogId}`);
-      if (response.success) {
-        set({ friends: response.data || [], loading: false });
-      } else {
-        set({ error: response.message || 'Failed to fetch friends', loading: false });
-      }
+      const friends = await socialFeatureApi.listFriends(frogId);
+      set({ friends: (friends || []) as Friend[], loading: false });
     } catch (error) {
       set({ error: 'Network error', loading: false });
     }
@@ -128,14 +124,11 @@ export const useFriendDataStore = create<FriendDataState>()((set, get) => ({
 
   fetchRequests: async (frogId: number) => {
     try {
-      const response = await apiService.get(`/friends/requests/${frogId}`);
-      if (response.success) {
-        const requests = response.data || [];
-        set({ 
-          requests,
-          pendingRequestCount: requests.length 
-        });
-      }
+      const requests = await socialFeatureApi.getFriendRequests(frogId);
+      set({
+        requests: (requests || []) as FriendRequest[],
+        pendingRequestCount: requests?.length || 0,
+      });
     } catch (error) {
       console.error('Failed to fetch requests:', error);
     }

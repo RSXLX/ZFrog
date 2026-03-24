@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiService } from '../../services/api';
+import { breedFeatureApi } from '../../features/breed/api';
 import { useMyFrog } from '../../hooks/useMyFrog';
 
 interface BreedPanelProps {
@@ -55,13 +55,11 @@ export const BreedPanel: React.FC<BreedPanelProps> = ({
 
   const checkEligibility = async () => {
     try {
-      const response = await apiService.post('/breed/check', {
+      const data = await breedFeatureApi.check({
         frogId1: frog?.id,
         frogId2: friendFrogId,
       });
-      if (response.success) {
-        setEligibility(response.data);
-      }
+      if (data) setEligibility(data);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -71,17 +69,15 @@ export const BreedPanel: React.FC<BreedPanelProps> = ({
 
   const fetchRequests = async () => {
     try {
-      const response = await apiService.get(`/breed/requests/${frog?.id}`);
-      if (response.success) {
-        setPendingRequests(
-          response.data.filter(
-            (r: BreedRequest) =>
-              (r.requester.id === friendFrogId || r.partner.id === friendFrogId) &&
-              r.status !== 'Completed' &&
-              r.status !== 'Rejected'
-          )
-        );
-      }
+      const requests = await breedFeatureApi.getRequests(frog?.id || 0);
+      setPendingRequests(
+        requests.filter(
+          (r: BreedRequest) =>
+            (r.requester.id === friendFrogId || r.partner.id === friendFrogId) &&
+            r.status !== 'Completed' &&
+            r.status !== 'Rejected'
+        )
+      );
     } catch (err) {
       console.error('Error fetching breed requests:', err);
     }
@@ -90,11 +86,11 @@ export const BreedPanel: React.FC<BreedPanelProps> = ({
   const sendRequest = async () => {
     setSending(true);
     try {
-      const response = await apiService.post('/breed/request', {
+      const success = await breedFeatureApi.request({
         requesterId: frog?.id,
         partnerId: friendFrogId,
       });
-      if (response.success) {
+      if (success) {
         await fetchRequests();
         setError(null);
       }
@@ -107,7 +103,7 @@ export const BreedPanel: React.FC<BreedPanelProps> = ({
 
   const handleAccept = async (requestId: number) => {
     try {
-      await apiService.put(`/breed/${requestId}/accept`);
+      await breedFeatureApi.accept(requestId);
       await fetchRequests();
     } catch (err: any) {
       setError(err.message);
@@ -116,7 +112,7 @@ export const BreedPanel: React.FC<BreedPanelProps> = ({
 
   const handleReject = async (requestId: number) => {
     try {
-      await apiService.put(`/breed/${requestId}/reject`);
+      await breedFeatureApi.reject(requestId);
       await fetchRequests();
     } catch (err: any) {
       setError(err.message);

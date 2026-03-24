@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
-import { getInbox, markAsRead, markAllAsRead, VisitorMessage } from '../../services/message.api';
+import { messageFeatureApi, VisitorMessage } from '../../features/message/api';
 import './MessageInbox.css';
 
 interface MessageInboxProps {
@@ -29,7 +29,7 @@ export const MessageInbox: React.FC<MessageInboxProps> = ({ onClose }) => {
     
     setLoading(true);
     try {
-      const data = await getInbox(address);
+      const data = await messageFeatureApi.getInbox(address);
       setMessages(data.messages);
       setUnreadCount(data.unreadCount);
       setTotal(data.total);
@@ -42,7 +42,7 @@ export const MessageInbox: React.FC<MessageInboxProps> = ({ onClose }) => {
 
   const handleMarkAsRead = async (messageId: number) => {
     try {
-      await markAsRead(messageId);
+      await messageFeatureApi.markAsRead(messageId);
       setMessages(prev => 
         prev.map(m => m.id === messageId ? { ...m, isRead: true } : m)
       );
@@ -56,7 +56,7 @@ export const MessageInbox: React.FC<MessageInboxProps> = ({ onClose }) => {
     if (!address) return;
     
     try {
-      await markAllAsRead(address);
+      await messageFeatureApi.markAllAsRead(address);
       setMessages(prev => prev.map(m => ({ ...m, isRead: true })));
       setUnreadCount(0);
     } catch (error) {

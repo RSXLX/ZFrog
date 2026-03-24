@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { hibernationApi } from '../../services/hibernation.api';
+import { lifeFeatureApi } from '../../features/life/api';
 
 interface BlessButtonProps {
   targetFrogId: number;
@@ -35,7 +35,9 @@ export const BlessButton: React.FC<BlessButtonProps> = ({
     setError(null);
     
     try {
-      const result = await hibernationApi.blessFrog(currentUserFrogId, targetFrogId);
+      const result = await lifeFeatureApi.blessLegacy(targetFrogId, {
+        blesserFrogId: currentUserFrogId,
+      });
       if (result.success) {
         setBlessed(true);
         onSuccess?.();

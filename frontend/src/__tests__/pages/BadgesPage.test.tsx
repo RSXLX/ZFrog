@@ -8,6 +8,8 @@ const mockUseMyFrog = jest.fn();
 const mockGetBadges = jest.fn();
 const mockGetPendingRewards = jest.fn();
 const mockClaimAllRewards = jest.fn();
+const mockToastSuccess = jest.fn();
+const mockToastError = jest.fn();
 
 jest.mock('react-router-dom', () => {
   const actual = jest.requireActual('react-router-dom');
@@ -21,12 +23,21 @@ jest.mock('@/hooks/useMyFrog', () => ({
   useMyFrog: () => mockUseMyFrog(),
 }));
 
-jest.mock('@/services/api', () => ({
-  apiService: {
+jest.mock('@/features/reward/api', () => ({
+  rewardFeatureApi: {
     getBadges: (...args: unknown[]) => mockGetBadges(...args),
     getPendingRewards: (...args: unknown[]) => mockGetPendingRewards(...args),
     claimAllRewards: (...args: unknown[]) => mockClaimAllRewards(...args),
   },
+}));
+
+jest.mock('@/components/common/ToastProvider', () => ({
+  useToast: () => ({
+    toast: {
+      success: mockToastSuccess,
+      error: mockToastError,
+    },
+  }),
 }));
 
 describe('BadgesPage', () => {

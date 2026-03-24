@@ -1,0 +1,289 @@
+name: v2-regression-nightly-matrix
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 19 * * *'
+
+concurrency:
+  group: v2-regression-nightly-matrix
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Contract Layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install client-sdk dependencies
+        run: npm install --prefix packages/client-sdk
+
+      - id: contract-tests
+        name: Run contract tests
+        continue-on-error: true
+        run: npm --prefix packages/client-sdk run test:contract
+
+      - name: Generate contract layer report
+        if: always()
+        env:
+          STATUS: ${{ steps.contract-tests.outcome }}
+        run: |
+          mkdir -p reports
+          generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          cat > reports/contract.json <<EOF
+          {"layer":"contract","status":"${STATUS}","generatedAt":"${generated_at}","command":"npm --prefix packages/client-sdk run test:contract"}
+          EOF
+
+      - name: Upload contract report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-layer-report-contract
+          path: reports/contract.json
+
+      - name: Fail if contract tests failed
+        if: steps.contract-tests.outcome != 'success'
+        run: exit 1
+
+  integration:
+    name: Integration Layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Generate Prisma client
+        run: npm --prefix backend run db:generate
+
+      - id: integration-tests
+        name: Run integration tests
+        continue-on-error: true
+        run: npm --prefix backend run test:integration
+
+      - name: Generate integration layer report
+        if: always()
+        env:
+          STATUS: ${{ steps.integration-tests.outcome }}
+        run: |
+          mkdir -p reports
+          generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          cat > reports/integration.json <<EOF
+          {"layer":"integration","status":"${STATUS}","generatedAt":"${generated_at}","command":"npm --prefix backend run test:integration"}
+          EOF
+
+      - name: Upload integration report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-layer-report-integration
+          path: reports/integration.json
+
+      - name: Fail if integration tests failed
+        if: steps.integration-tests.outcome != 'success'
+        run: exit 1
+
+  e2e:
+    name: E2E Layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Generate Prisma client
+        run: npm --prefix backend run db:generate
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Install Playwright Chromium
+        run: npm --prefix frontend exec playwright install --with-deps chromium
+
+      - id: e2e-tests
+        name: Run e2e tests
+        continue-on-error: true
+        env:
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+        run: |
+          npm --prefix backend run test -- --runInBand --testPathPattern=v2-social-contract-routes.e2e.test.ts
+          if [ -n "${TEST_DATABASE_URL}" ]; then
+            npm --prefix backend run test -- --runInBand --testPathPattern=v2-attestation-routes.e2e.test.ts
+          else
+            echo "TEST_DATABASE_URL is not set; skip real-db attestation e2e."
+          fi
+          npm --prefix frontend run test:e2e -- --grep @social-main
+
+      - name: Generate e2e layer report
+        if: always()
+        env:
+          STATUS: ${{ steps.e2e-tests.outcome }}
+        run: |
+          mkdir -p reports
+          generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          cat > reports/e2e.json <<EOF
+          {"layer":"e2e","status":"${STATUS}","generatedAt":"${generated_at}","command":"backend:v2-social-contract-routes + frontend:@social-main (+ optional real-db attestation e2e)"}
+          EOF
+
+      - name: Upload e2e report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-layer-report-e2e
+          path: reports/e2e.json
+
+      - name: Fail if e2e tests failed
+        if: steps.e2e-tests.outcome != 'success'
+        run: exit 1
+
+  smoke:
+    name: Smoke Layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - id: legacy-smoke
+        name: Run legacy entry smoke
+        continue-on-error: true
+        run: npm run ci:smoke:legacy
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - id: workspace-smoke
+        name: Run workspace entry smoke
+        continue-on-error: true
+        run: npm run ci:smoke:workspace
+
+      - name: Generate smoke layer report
+        if: always()
+        env:
+          LEGACY_STATUS: ${{ steps.legacy-smoke.outcome }}
+          WORKSPACE_STATUS: ${{ steps.workspace-smoke.outcome }}
+        run: |
+          mkdir -p reports
+          generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          overall_status="success"
+          if [ "${LEGACY_STATUS}" != "success" ] || [ "${WORKSPACE_STATUS}" != "success" ]; then
+            overall_status="failure"
+          fi
+          cat > reports/smoke.json <<EOF
+          {"layer":"smoke","status":"${overall_status}","generatedAt":"${generated_at}","command":"npm run ci:smoke:legacy && npm run ci:smoke:workspace","legacy":"${LEGACY_STATUS}","workspace":"${WORKSPACE_STATUS}"}
+          EOF
+
+      - name: Upload smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-layer-report-smoke
+          path: reports/smoke.json
+
+      - name: Fail if smoke checks failed
+        if: steps.legacy-smoke.outcome != 'success' || steps.workspace-smoke.outcome != 'success'
+        run: exit 1
+
+  summary:
+    name: Matrix Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - contract
+      - integration
+      - e2e
+      - smoke
+
+    steps:
+      - name: Download layer reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: regression-layer-report-*
+          merge-multiple: true
+          path: reports
+
+      - name: Generate matrix markdown report
+        env:
+          CONTRACT_RESULT: ${{ needs.contract.result }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          report_file="v2-regression-matrix-report.md"
+          generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          cat > "${report_file}" <<EOF
+          # V2 Regression Matrix Report
+
+          Generated at: ${generated_at} (UTC)
+
+          | Layer | Result | Command |
+          | --- | --- | --- |
+          | Contract | ${CONTRACT_RESULT} | \`npm --prefix packages/client-sdk run test:contract\` |
+          | Integration | ${INTEGRATION_RESULT} | \`npm --prefix backend run test:integration\` |
+          | E2E | ${E2E_RESULT} | \`backend:v2-social-contract-routes + frontend:@social-main\` |
+          | Smoke | ${SMOKE_RESULT} | \`npm run ci:smoke:legacy\` + \`npm run ci:smoke:workspace\` |
+
+          Layer JSON artifacts: \`reports/*.json\`
+
+          Run URL: ${RUN_URL}
+          EOF
+
+          cat "${report_file}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload matrix report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-regression-matrix-report
+          path: |
+            v2-regression-matrix-report.md
+            reports/*.json
+
+      - name: Fail workflow when any layer failed
+        env:
+          CONTRACT_RESULT: ${{ needs.contract.result }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        run: |
+          for result in "$CONTRACT_RESULT" "$INTEGRATION_RESULT" "$E2E_RESULT" "$SMOKE_RESULT"; do
+            if [ "$result" != "success" ]; then
+              echo "Regression matrix failed because at least one layer is not successful."
+              exit 1
+            fi
+          done

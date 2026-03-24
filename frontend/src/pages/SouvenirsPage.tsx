@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMyFrog } from '../hooks/useMyFrog';
-import { apiService } from '../services/api';
+import { rewardFeatureApi } from '../features/reward/api';
 import { Loading } from '../components/common/Loading';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -48,7 +48,7 @@ export function SouvenirsPage() {
                 setIsLoading(true);
                 const allSouvenirs: SouvenirDisplay[] = [];
                 
-                const souvenirData = await apiService.getSouvenirs(frog.tokenId);
+                const souvenirData = await rewardFeatureApi.getSouvenirs(frog.tokenId);
                 
                 if (souvenirData && Array.isArray(souvenirData)) {
                     souvenirData.forEach((souvenir: any) => {
@@ -71,7 +71,7 @@ export function SouvenirsPage() {
                 // 异步获取图片状态
                 allSouvenirs.forEach(async (s) => {
                     try {
-                        const statusRes = await apiService.getSouvenirImageStatus(s.id.toString());
+                        const statusRes = await rewardFeatureApi.getSouvenirImageStatus(s.id.toString());
                         if (statusRes.success && statusRes.record) {
                             const displayUrl = statusRes.record.gatewayUrl || statusRes.record.imageUrl;
                             if (displayUrl) {

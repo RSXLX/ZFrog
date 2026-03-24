@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLilyBalance } from '../../hooks/useFrogNurture';
-import { apiService } from '../../services/api';
+import { lifeFeatureApi } from '../../features/life/api';
 
 interface LilyWalletProps {
   ownerAddress: string;
@@ -80,7 +80,7 @@ export function LilyWallet({ ownerAddress, refreshTrigger = 0 }: LilyWalletProps
     if (!ownerAddress) return;
     setHistoryLoading(true);
     try {
-      const response = await apiService.get(`/nurture/transactions/${ownerAddress}?limit=20`);
+      const response = await lifeFeatureApi.getLegacyTransactions(ownerAddress, 20);
       if (response.success) {
         setTransactions(response.data);
       }

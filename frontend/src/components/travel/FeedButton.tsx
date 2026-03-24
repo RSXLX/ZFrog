@@ -2,7 +2,7 @@
 // V2.0 投喂按钮组件
 
 import React, { useState } from 'react';
-import { travelApi } from '../../services/travel.api';
+import { travelFeatureApi } from '../../features/travel/api';
 import './FeedButton.css';
 
 interface FeedButtonProps {
@@ -38,7 +38,7 @@ export const FeedButton: React.FC<FeedButtonProps> = ({
     setMessage(null);
 
     try {
-      const result = await travelApi.feedTravel(travelId, feederId, feedType);
+      const result = await travelFeatureApi.feedTravel(travelId, feederId, feedType);
       
       if (result.success) {
         setMessage({

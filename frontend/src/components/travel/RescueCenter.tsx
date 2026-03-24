@@ -2,7 +2,7 @@
 // V2.0 救援中心组件
 
 import React, { useState, useEffect } from 'react';
-import { travelApi, RescueRequest } from '../../services/travel.api';
+import { travelFeatureApi, type TravelRescueRequestReadModel } from '../../features/travel/api';
 import './RescueCenter.css';
 
 interface RescueCenterProps {
@@ -12,8 +12,8 @@ interface RescueCenterProps {
 
 export const RescueCenter: React.FC<RescueCenterProps> = ({ myFrogId, onRescueSuccess }) => {
   const [activeTab, setActiveTab] = useState<'friends' | 'public'>('friends');
-  const [friendRequests, setFriendRequests] = useState<RescueRequest[]>([]);
-  const [publicRequests, setPublicRequests] = useState<RescueRequest[]>([]);
+  const [friendRequests, setFriendRequests] = useState<TravelRescueRequestReadModel[]>([]);
+  const [publicRequests, setPublicRequests] = useState<TravelRescueRequestReadModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [rescuingId, setRescuingId] = useState<number | null>(null);
 
@@ -25,10 +25,10 @@ export const RescueCenter: React.FC<RescueCenterProps> = ({ myFrogId, onRescueSu
     setIsLoading(true);
     try {
       if (activeTab === 'friends') {
-        const data = await travelApi.getFriendRescueRequests(myFrogId);
+        const data = await travelFeatureApi.getFriendRescueRequests(myFrogId);
         setFriendRequests(data);
       } else {
-        const data = await travelApi.getPublicRescueRequests(20);
+        const data = await travelFeatureApi.getPublicRescueRequests(20);
         setPublicRequests(data);
       }
     } catch (error) {
@@ -41,7 +41,7 @@ export const RescueCenter: React.FC<RescueCenterProps> = ({ myFrogId, onRescueSu
   const handleRescue = async (requestId: number) => {
     setRescuingId(requestId);
     try {
-      const result = await travelApi.performRescue(requestId, myFrogId);
+      const result = await travelFeatureApi.performRescue(requestId, myFrogId);
       if (result.success) {
         alert(`🎉 ${result.message}\n获得 ${result.xpEarned} XP 和 ${result.reputationEarned} 信誉分！`);
         onRescueSuccess?.(result.xpEarned || 0);

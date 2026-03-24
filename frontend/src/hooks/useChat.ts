@@ -1,7 +1,7 @@
 // frontend/src/hooks/useChat.ts
 
 import { useState, useCallback } from 'react';
-import { chatApi } from '../services/chat.api';
+import { chatFeatureApi } from '../features/chat/api';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -21,7 +21,7 @@ export function useChat(frogId: number) {
     setIsLoading(true);
 
     try {
-      const response = await chatApi.sendMessage(frogId, text, sessionId);
+      const response = await chatFeatureApi.sendMessage(frogId, text, sessionId);
       
       // 更新 sessionId
       if (!sessionId) {

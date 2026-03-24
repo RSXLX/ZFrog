@@ -7,11 +7,11 @@
  * - 沉睡状态显示唤醒按钮
  */
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { HibernationStatus } from '../../services/hibernation.api';
+import { motion } from 'framer-motion';
+import type { LifeHibernationStatus as HibernationStatus } from '../../lib/api/contracts';
 
 interface HibernationBadgeProps {
-  status: HibernationStatus;
+  status?: HibernationStatus | string | null;
   onClick?: () => void;
   size?: 'sm' | 'md' | 'lg';
 }
@@ -54,16 +54,29 @@ const SIZE_CONFIG = {
   lg: 'px-4 py-1.5 text-base gap-2',
 };
 
+const normalizeStatus = (status?: HibernationStatus | string | null): HibernationStatus => {
+  switch ((status || '').toString().toUpperCase()) {
+    case 'DROWSY':
+      return 'DROWSY';
+    case 'SLEEPING':
+      return 'SLEEPING';
+    case 'ACTIVE':
+    default:
+      return 'ACTIVE';
+  }
+};
+
 export const HibernationBadge: React.FC<HibernationBadgeProps> = ({
   status,
   onClick,
   size = 'md',
 }) => {
-  const config = STATUS_CONFIG[status];
+  const resolvedStatus = normalizeStatus(status);
+  const config = STATUS_CONFIG[resolvedStatus];
   const sizeClass = SIZE_CONFIG[size];
   
   // 不显示活跃状态徽章
-  if (status === 'ACTIVE') return null;
+  if (resolvedStatus === 'ACTIVE') return null;
   
   return (
     <motion.button
@@ -86,7 +99,7 @@ export const HibernationBadge: React.FC<HibernationBadgeProps> = ({
     >
       <span className="text-base">{config.icon}</span>
       <span>{config.label}</span>
-      {status === 'SLEEPING' && (
+      {resolvedStatus === 'SLEEPING' && (
         <span className="ml-1 text-xs opacity-75">点击唤醒</span>
       )}
     </motion.button>

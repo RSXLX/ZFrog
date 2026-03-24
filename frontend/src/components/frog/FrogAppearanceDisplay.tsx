@@ -11,10 +11,10 @@ import { FrogSvgGenerated } from './FrogSvgGenerated';
 import { RarityBorder } from './RarityBorder';
 import { 
   FrogAppearanceParams, 
-  getAppearance, 
+  appearanceFeatureApi,
   getRarityDisplayText, 
   getRarityColor 
-} from '../../services/appearance.api';
+} from '../../features/appearance/api';
 
 interface FrogAppearanceDisplayProps {
   tokenId: number;
@@ -41,7 +41,7 @@ export const FrogAppearanceDisplay: React.FC<FrogAppearanceDisplayProps> = ({
     const fetchAppearance = async () => {
       try {
         setIsLoading(true);
-        const response = await getAppearance(tokenId);
+        const response = await appearanceFeatureApi.getAppearance(tokenId);
         if (response.success && response.params) {
           setParams(response.params);
         }

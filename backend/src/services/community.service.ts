@@ -1,7 +1,6 @@
-import { PrismaClient, CommunityCredentialType } from '@prisma/client';
+import { CommunityCredentialType } from '@prisma/client';
 import { ethers } from 'ethers';
-
-const prisma = new PrismaClient();
+import { prisma } from '../database';
 
 interface VerifyCredentialResult {
   success: boolean;

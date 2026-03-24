@@ -13,7 +13,7 @@ import { dormancyService } from '../../modules/life/dormancy.service';
 import { lifeCommandService } from '../../modules/life/life.command';
 import { lifeQueryService } from '../../modules/life/life.query';
 
-const router = Router();
+const router: Router = Router();
 
 const parseFrogId = (raw: string): number => {
   const frogId = Number(raw);

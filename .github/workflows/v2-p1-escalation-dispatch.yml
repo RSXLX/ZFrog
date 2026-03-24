@@ -1,0 +1,114 @@
+name: v2-p1-escalation-dispatch
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '55 20 * * 1'
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+jobs:
+  dispatch:
+    name: V2 P1 Escalation Dispatch
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Generate weekly release health summary input
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          node ./scripts/ci/v2-release-health-summary.mjs
+          --summary-config ./.github/release-gates/v2-release-health-summary.json
+          --rc-config ./.github/release-gates/v2-rc-gate.json
+          --fallback-config ./.github/release-gates/v2-cutover-fallback-gate.json
+          --fallback-log ./reports/cutover/dev-entry.log
+          --report ./reports/v2-release-health-summary.md
+          --summary-json ./reports/v2-release-health-summary.json
+
+      - name: Dispatch P1 escalation cards
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          node ./scripts/ci/v2-p1-escalation-dispatch.mjs
+          --config ./.github/release-gates/v2-p1-escalation-dispatch.json
+          --summary-json ./reports/v2-release-health-summary.json
+          --report ./reports/v2-p1-escalation-dispatch.md
+          --out-json ./reports/v2-p1-escalation-dispatch.json
+          --workflow-run-url ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          --workflow-artifacts-url ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts
+          --run-id ${{ github.run_id }}
+          --run-attempt ${{ github.run_attempt }}
+          --apply
+
+      - name: Evaluate dispatch quality gate
+        run: >
+          node ./scripts/ci/v2-p1-dispatch-quality-gate.mjs
+          --config ./.github/release-gates/v2-p1-dispatch-quality-gate.json
+          --dispatch-json ./reports/v2-p1-escalation-dispatch.json
+          --report ./reports/v2-p1-dispatch-quality-gate.md
+          --out-json ./reports/v2-p1-dispatch-quality-gate.json
+
+      - name: Evaluate escalation timeout gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          node ./scripts/ci/v2-p1-escalation-timeout-gate.mjs
+          --config ./.github/release-gates/v2-p1-escalation-timeout-gate.json
+          --summary-json ./reports/v2-release-health-summary.json
+          --report ./reports/v2-p1-escalation-timeout-gate.md
+          --out-json ./reports/v2-p1-escalation-timeout-gate.json
+          --workflow-run-url ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          --workflow-artifacts-url ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts
+          --run-id ${{ github.run_id }}
+          --run-attempt ${{ github.run_attempt }}
+          --apply-reminder
+
+      - name: Evaluate timeout stability observation gate
+        run: >
+          node ./scripts/ci/v2-p1-timeout-stability-observation-gate.mjs
+          --config ./.github/release-gates/v2-p1-timeout-stability-observation-gate.json
+          --summary-json ./reports/v2-release-health-summary.json
+          --timeout-gate-json ./reports/v2-p1-escalation-timeout-gate.json
+          --report ./reports/v2-p1-timeout-stability-observation-gate.md
+          --out-json ./reports/v2-p1-timeout-stability-observation-gate.json
+
+      - name: Publish dispatch report
+        if: always()
+        run: |
+          cat reports/v2-p1-escalation-dispatch.md >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          cat reports/v2-p1-dispatch-quality-gate.md >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          cat reports/v2-p1-escalation-timeout-gate.md >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          cat reports/v2-p1-timeout-stability-observation-gate.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload dispatch artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-p1-escalation-dispatch-report
+          path: |
+            reports/v2-release-health-summary.md
+            reports/v2-release-health-summary.json
+            reports/v2-p1-escalation-dispatch.md
+            reports/v2-p1-escalation-dispatch.json
+            reports/v2-p1-escalation-dispatch-idempotency.jsonl
+            reports/v2-p1-dispatch-quality-gate.md
+            reports/v2-p1-dispatch-quality-gate.json
+            reports/v2-p1-escalation-timeout-gate.md
+            reports/v2-p1-escalation-timeout-gate.json
+            reports/v2-p1-timeout-stability-observation-gate.md
+            reports/v2-p1-timeout-stability-observation-gate.json

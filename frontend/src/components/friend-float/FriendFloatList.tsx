@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Frog } from '../../types';
-import { apiService } from '../../services/api';
+import { socialFeatureApi } from '../../features/social/api';
 import { useMyFrog } from '../../hooks/useMyFrog';
 
 interface FriendFloatListProps {
@@ -28,8 +28,8 @@ export const FriendFloatList: React.FC<FriendFloatListProps> = ({
     
     try {
       setLoading(true);
-      const response = await apiService.get(`/friends/list/${frog.tokenId}`);
-      setFriends(response.success ? response.data : []);
+      const list = await socialFeatureApi.listFriends(frog.tokenId);
+      setFriends(list as any);
     } catch (err) {
       console.error('Error fetching friends:', err);
     } finally {
@@ -192,7 +192,7 @@ export const FriendFloatList: React.FC<FriendFloatListProps> = ({
                     e.stopPropagation();
                     onVisitClick?.(friend);
                   }}
-                  title="访问家园"
+                  title="访问空间"
                 >
                   🏠
                 </button>

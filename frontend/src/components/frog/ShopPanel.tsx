@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { apiService } from '../../services/api';
+import { rewardFeatureApi } from '../../features/reward/api';
 import { useLilyBalance } from '../../hooks/useFrogNurture';
 
 type ShopCategory = 'FOOD' | 'MEDICINE' | 'BOOST' | 'DECORATION' | 'SPECIAL';
@@ -52,16 +52,10 @@ export function ShopPanel({ ownerAddress, onPurchase }: ShopPanelProps) {
   const fetchItems = async () => {
     try {
       setLoading(true);
-      const params: any = { ownerAddress };
-      if (selectedCategory) {
-        params.category = selectedCategory;
-      }
-      const response = await apiService.get('/shop/items', { params });
-      if (response.success) {
-        setItems(response.data.items);
-        if (categories.length === 0) {
-          setCategories(response.data.categories);
-        }
+      const data = await rewardFeatureApi.getShopItems(ownerAddress, selectedCategory || undefined);
+      setItems(data.items || []);
+      if (categories.length === 0) {
+        setCategories(data.categories || []);
       }
     } catch (err) {
       console.error('Failed to fetch shop items:', err);
@@ -83,15 +77,12 @@ export function ShopPanel({ ownerAddress, onPurchase }: ShopPanelProps) {
       setPurchasing(itemId);
       setMessage(null);
       
-      const response = await apiService.post('/shop/purchase', {
-        ownerAddress,
-        itemId,
-      });
+      const response = await rewardFeatureApi.purchaseShopItem(ownerAddress, itemId);
 
       if (response.success) {
         setMessage({
           type: 'success',
-          text: `成功购买 ${response.item.name}！`,
+          text: `成功购买 ${response.data?.item?.name || '道具'}！`,
         });
         // 刷新数据
         await fetchItems();

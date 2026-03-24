@@ -2,6 +2,9 @@
 
 const STORAGE_KEYS = {
   WALLET_ADDRESS: 'zfrog_wallet_address',
+  AUTH_TOKEN: 'zfrog_auth_token',
+  ACTIVE_FROG_ID: 'zfrog_active_frog_id',
+  DESKTOP_NOTIFICATIONS: 'zfrog_desktop_notifications',
   FROG_STATS: 'zfrog_frog_stats',
   LAST_SAVE: 'zfrog_last_save',
   SETTINGS: 'zfrog_settings',
@@ -10,18 +13,36 @@ const STORAGE_KEYS = {
 export interface StoredSettings {
   apiUrl: string;
   notifications: boolean;
+  relationshipAwareReminders: boolean;
+  relationshipReminderThrottleMs: number;
+  councilBriefNotifications: boolean;
+  councilBriefThrottleMs: number;
   startWithSystem: boolean;
   alwaysOnTop: boolean;
+}
+
+interface DesktopNotificationCacheItem {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  timestamp: number;
 }
 
 const defaultSettings: StoredSettings = {
   apiUrl: 'http://localhost:3001/api',
   notifications: true,
+  relationshipAwareReminders: true,
+  relationshipReminderThrottleMs: 10 * 60 * 1000,
+  councilBriefNotifications: true,
+  councilBriefThrottleMs: 15 * 60 * 1000,
   startWithSystem: false,
   alwaysOnTop: true,
 };
 
 export const storage = {
+  getStorageKeys: () => STORAGE_KEYS,
+
   // Wallet
   getWalletAddress: (): string | null => {
     return localStorage.getItem(STORAGE_KEYS.WALLET_ADDRESS);
@@ -29,6 +50,48 @@ export const storage = {
   
   setWalletAddress: (address: string) => {
     localStorage.setItem(STORAGE_KEYS.WALLET_ADDRESS, address);
+  },
+
+  getAuthToken: (): string | null => {
+    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+  },
+
+  setAuthToken: (token: string) => {
+    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+  },
+
+  clearAuthToken: () => {
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+  },
+
+  getActiveFrogId: (): number | null => {
+    const raw = localStorage.getItem(STORAGE_KEYS.ACTIVE_FROG_ID);
+    if (!raw) return null;
+    const parsed = Number(raw);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  },
+
+  setActiveFrogId: (frogId: number) => {
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_FROG_ID, String(frogId));
+  },
+
+  clearActiveFrogId: () => {
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_FROG_ID);
+  },
+
+  getDesktopNotifications: (): DesktopNotificationCacheItem[] => {
+    const raw = localStorage.getItem(STORAGE_KEYS.DESKTOP_NOTIFICATIONS);
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  },
+
+  setDesktopNotifications: (items: DesktopNotificationCacheItem[]) => {
+    localStorage.setItem(STORAGE_KEYS.DESKTOP_NOTIFICATIONS, JSON.stringify(items.slice(0, 200)));
   },
 
   // Frog Stats
@@ -64,7 +127,10 @@ export const storage = {
   exportData: (): string => {
     const data = {
       walletAddress: storage.getWalletAddress(),
+      authToken: storage.getAuthToken(),
+      activeFrogId: storage.getActiveFrogId(),
       frogStats: storage.getFrogStats(),
+      desktopNotifications: storage.getDesktopNotifications(),
       settings: storage.getSettings(),
       exportTime: Date.now(),
     };
@@ -75,7 +141,10 @@ export const storage = {
     try {
       const data = JSON.parse(jsonString);
       if (data.walletAddress) storage.setWalletAddress(data.walletAddress);
+      if (data.authToken) storage.setAuthToken(data.authToken);
+      if (typeof data.activeFrogId === 'number') storage.setActiveFrogId(data.activeFrogId);
       if (data.frogStats) storage.setFrogStats(data.frogStats);
+      if (Array.isArray(data.desktopNotifications)) storage.setDesktopNotifications(data.desktopNotifications);
       if (data.settings) storage.setSettings(data.settings);
       return true;
     } catch (e) {

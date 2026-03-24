@@ -9,6 +9,8 @@ export interface HibernationState {
   hibernatedAt: number | null;
   wakeProgress: number;
   dormantHours: number;
+  blessingsReceived: number;
+  lastBlessingAt: number | null;
 }
 
 interface UseHibernationOptions {
@@ -43,7 +45,18 @@ export function useHibernation(
   const [state, setState] = useState<HibernationState>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<HibernationState>;
+        return {
+          status: parsed.status || 'ACTIVE',
+          lastInteractionAt: parsed.lastInteractionAt || Date.now(),
+          hibernatedAt: parsed.hibernatedAt || null,
+          wakeProgress: parsed.wakeProgress || 0,
+          dormantHours: parsed.dormantHours || 0,
+          blessingsReceived: parsed.blessingsReceived || 0,
+          lastBlessingAt: parsed.lastBlessingAt || null,
+        };
+      }
     } catch {}
 
     return {
@@ -52,6 +65,8 @@ export function useHibernation(
       hibernatedAt: null,
       wakeProgress: 0,
       dormantHours: 0,
+      blessingsReceived: 0,
+      lastBlessingAt: null,
     } satisfies HibernationState;
   });
 
@@ -86,6 +101,8 @@ export function useHibernation(
       hibernatedAt: prev.hibernatedAt ?? now,
       wakeProgress: 0,
       dormantHours: prev.hibernatedAt ? prev.dormantHours : 0,
+      blessingsReceived: 0,
+      lastBlessingAt: null,
     }));
   }, [frogState]);
 
@@ -110,6 +127,8 @@ export function useHibernation(
       hibernatedAt: null,
       wakeProgress: 100,
       dormantHours: 0,
+      blessingsReceived: 0,
+      lastBlessingAt: null,
     });
   }, [frogState]);
 
@@ -145,6 +164,22 @@ export function useHibernation(
 
     return () => clearInterval(interval);
   }, [enabled, state.lastInteractionAt, state.status, inactivityThresholdMs, enterHibernation]);
+
+  useEffect(() => {
+    const onBlessingCompleted = () => {
+      setState(prev => ({
+        ...prev,
+        blessingsReceived: prev.blessingsReceived + 1,
+        lastBlessingAt: Date.now(),
+        wakeProgress: prev.status === 'WAKING' ? Math.min(100, prev.wakeProgress + 20) : prev.wakeProgress,
+      }));
+    };
+
+    window.addEventListener('ritual:blessingCompleted', onBlessingCompleted);
+    return () => {
+      window.removeEventListener('ritual:blessingCompleted', onBlessingCompleted);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {

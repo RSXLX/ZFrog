@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useCommunityStore, Community, CredentialType } from '../../stores/communityStore';
-import { apiService } from '../../services/api';
+import { socialFeatureApi } from '../../features/social/api';
 
 interface JoinCommunityModalProps {
   isOpen: boolean;
@@ -28,9 +28,7 @@ export const JoinCommunityModal: React.FC<JoinCommunityModalProps> = ({
 
     try {
       // 调用后端验证凭证
-      const response = await apiService.post('/communities/verify-credential', {
-        credential: credential.trim(),
-      });
+      const response = await socialFeatureApi.verifyCommunityCredential(credential.trim());
 
       if (response.success && response.data) {
         const community: Community = response.data.community;
@@ -47,12 +45,17 @@ export const JoinCommunityModal: React.FC<JoinCommunityModalProps> = ({
         
         setStep('success');
       } else {
-        setErrorMessage(response.message || '凭证验证失败');
+        setErrorMessage(response.message || response.error || '凭证验证失败');
         setStep('error');
       }
     } catch (error) {
       console.error('Verify credential error:', error);
-      setErrorMessage('验证失败，请检查凭证是否正确');
+      const apiError = error as any;
+      const message =
+        apiError?.response?.data?.message ||
+        apiError?.response?.data?.error ||
+        '验证失败，请检查凭证是否正确';
+      setErrorMessage(message);
       setStep('error');
     }
   };
@@ -77,12 +80,12 @@ export const JoinCommunityModal: React.FC<JoinCommunityModalProps> = ({
           <>
             <h3 className="join-community-title">🏘️ 加入新社区</h3>
             <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>
-              输入社区凭证（邀请码或 NFT 合约地址）
+              输入社区凭证（邀请码/NFT 合约地址），或 `v2:communityId:frogId[:role]`
             </p>
             <input
               type="text"
               className="join-community-input"
-              placeholder="输入邀请码或合约地址..."
+              placeholder="邀请码、合约地址，或 v2:communityId:frogId"
               value={credential}
               onChange={(e) => setCredential(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}

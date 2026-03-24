@@ -44,6 +44,8 @@ import shopRoutes from './api/routes/shop.routes'; // 🆕 宠物蛋系统 - 商
 import breedRoutes from './api/routes/breed.routes'; // 🆕 P5 繁殖系统
 import hibernationRoutes from './api/routes/hibernation.routes'; // 🆕 冬眠系统
 import v1Routes from './api/routes/v1';
+import v2Routes from './api/routes/v2';
+import v3Routes from './api/routes/v3';
 
 
 const app = express();
@@ -69,6 +71,8 @@ app.use((req, res, next) => {
 
 // Routes
 app.use('/api/v1', v1Routes);
+app.use('/api/v2', v2Routes);
+app.use('/api/v3', v3Routes);
 app.use('/api/frogs', frogRoutes);
 app.use('/api/travels', travelRoutes);
 app.use('/api/friends', friendsRoutes);
@@ -106,6 +110,9 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/api/health',
       healthV1: '/api/v1/health',
+      healthV2: '/api/v2/health',
+      healthV3: '/api/v3/health',
+      runtimeV3: '/api/v3/runtime/status',
       frogs: '/api/frogs/:tokenId',
       travels: '/api/travels/:frogId',
     },

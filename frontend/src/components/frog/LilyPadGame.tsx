@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiService } from '../../services/api';
+import { lifeFeatureApi } from '../../features/life/api';
 
 interface LilyPadGameProps {
   frogId: number;
@@ -61,7 +61,7 @@ export function LilyPadGame({ frogId, ownerAddress, onComplete }: LilyPadGamePro
   // 检查剩余游戏次数
   const checkRemaining = async () => {
     try {
-      const response: any = await apiService.get(`/nurture/${frogId}/game-remaining?game=lily_pad`);
+      const response: any = await lifeFeatureApi.getLegacyGameRemaining(frogId, 'lily_pad');
       if (response.success) {
         setRemaining(response.remaining);
       }
@@ -241,7 +241,7 @@ export function LilyPadGame({ frogId, ownerAddress, onComplete }: LilyPadGamePro
   const submitScore = async (score: number) => {
     try {
       setLoading(true);
-      const response: any = await apiService.post(`/nurture/${frogId}/play/lily-pad`, {
+      const response: any = await lifeFeatureApi.playLilyPadLegacy(frogId, {
         score,
       });
       

@@ -6,13 +6,15 @@ import { motion } from 'framer-motion';
 import { decodeEventLog } from 'viem';
 import { ZETAFROG_ADDRESS, ZETAFROG_ABI } from '../../config/contracts';
 import { Button } from '../common/Button';
-import { apiService } from '../../services/api';
+import { frogFeatureApi } from '../../features/frog/api';
+import { useI18n } from '../../i18n';
 
 interface FrogMintProps {
     onSuccess?: () => void;
 }
 
 export function FrogMint({ onSuccess }: FrogMintProps) {
+    const { tr } = useI18n();
     const [name, setName] = useState('');
     const [error, setError] = useState('');
     const { isConnected } = useAccount();
@@ -31,15 +33,16 @@ export function FrogMint({ onSuccess }: FrogMintProps) {
     const handleMint = async () => {
         setError('');
 
-        // 验证名字
-        if (name.length < 2 || name.length > 16) {
-            setError('名字需要 2-16 个字符');
+        // 验证名字（合约用 bytes 长度校验，需与链上一致）
+        const nameBytes = new TextEncoder().encode(name).length;
+        if (nameBytes < 2 || nameBytes > 16) {
+            setError(tr('名字需要 2-16 字节（中文字符占 3 字节）', 'Name must be 2-16 bytes (Chinese chars count as 3 bytes)'));
             return;
         }
 
         // 检查合约地址是否配置
         if (!ZETAFROG_ADDRESS) {
-            setError('合约地址未配置，请检查环境变量');
+            setError(tr('合约地址未配置，请检查环境变量', 'Contract address is missing. Please check environment variables.'));
             return;
         }
 
@@ -52,7 +55,7 @@ export function FrogMint({ onSuccess }: FrogMintProps) {
                 args: [name],
             });
         } catch (e) {
-            setError('铸造失败，请重试');
+            setError(tr('铸造失败，请重试', 'Mint failed, please try again.'));
         }
     };
 
@@ -87,7 +90,7 @@ export function FrogMint({ onSuccess }: FrogMintProps) {
                             const tokenId = Number(args.tokenId);
                             console.log('Syncing frog:', tokenId);
                             // Trigger backend sync
-                            await apiService.syncFrog(tokenId);
+                            await frogFeatureApi.syncFrog(tokenId);
                         }
                     }
                 } catch (e) {
@@ -105,7 +108,7 @@ export function FrogMint({ onSuccess }: FrogMintProps) {
     if (!isConnected) {
         return (
             <div className="text-center p-8">
-                <p className="text-gray-500">请先连接钱包</p>
+                <p className="text-gray-500">{tr('请先连接钱包', 'Please connect your wallet first')}</p>
             </div>
         );
     }
@@ -114,7 +117,10 @@ export function FrogMint({ onSuccess }: FrogMintProps) {
     if (!ZETAFROG_ADDRESS) {
         return (
             <div className="text-center p-8">
-                <p className="text-red-500">合约地址未配置，请检查 .env 文件中的 VITE_ZETAFROG_ADDRESS</p>
+                <p className="text-red-500">{tr(
+                    '合约地址未配置，请检查 .env 文件中的 VITE_ZETAFROG_ADDRESS',
+                    'Contract address is missing. Please check VITE_ZETAFROG_ADDRESS in .env'
+                )}</p>
             </div>
         );
     }
@@ -125,18 +131,18 @@ export function FrogMint({ onSuccess }: FrogMintProps) {
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-2xl shadow-lg p-6 max-w-md mx-auto"
         >
-            <h2 className="text-2xl font-bold text-center mb-6">🐸 铸造你的 ZetaFrog</h2>
+            <h2 className="text-2xl font-bold text-center mb-6">{tr('🐸 铸造你的 ZetaFrog', '🐸 Mint Your ZetaFrog')}</h2>
 
             <div className="space-y-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                        给你的青蛙起个名字
+                        {tr('给你的青蛙起个名字', 'Give your frog a name')}
                     </label>
                     <input
                         type="text"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="2-16 个字符"
+                        placeholder={tr('2-16 字节（英文1字节，中文3字节）', '2-16 bytes (English 1 byte, Chinese 3 bytes)')}
                         maxLength={16}
                         className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 outline-none transition-all"
                         disabled={isPending || isConfirming}
@@ -156,9 +162,9 @@ export function FrogMint({ onSuccess }: FrogMintProps) {
                     disabled={!name || isPending || isConfirming}
                     className="w-full"
                 >
-                    {isPending ? '确认交易中...' :
-                        isConfirming ? '铸造中...' :
-                            '🐸 铸造青蛙'}
+                    {isPending ? tr('确认交易中...', 'Confirming transaction...') :
+                        isConfirming ? tr('铸造中...', 'Minting...') :
+                            tr('🐸 铸造青蛙', '🐸 Mint Frog')}
                 </Button>
 
                 {isSuccess && (
@@ -167,15 +173,15 @@ export function FrogMint({ onSuccess }: FrogMintProps) {
                         animate={{ opacity: 1, scale: 1 }}
                         className="text-center p-4 bg-green-50 rounded-xl"
                     >
-                        <p className="text-green-600 font-medium">🎉 恭喜！</p>
+                        <p className="text-green-600 font-medium">{tr('🎉 恭喜！', '🎉 Success!')}</p>
                         <p className="text-sm text-green-500">
-                            你的 ZetaFrog "{name}" 已经铸造成功！
+                            {tr('你的 ZetaFrog "{name}" 已经铸造成功！', 'Your ZetaFrog "{name}" has been minted!', { name })}
                         </p>
                     </motion.div>
                 )}
 
                 <p className="text-xs text-gray-400 text-center">
-                    铸造免费！只需支付 Gas 费用。
+                    {tr('铸造免费！只需支付 Gas 费用。', 'Minting is free. You only pay gas fees.')}
                 </p>
             </div>
         </motion.div>

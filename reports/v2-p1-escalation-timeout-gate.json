@@ -1,0 +1,101 @@
+{
+  "generatedAt": "2026-03-23T06:01:42.517Z",
+  "configPath": "/tmp/v2-p1-escalation-timeout-gate-pass.json",
+  "issueSource": "fixture:./scripts/ci/fixtures/v2-p1-open-issues-timeout.sample.json",
+  "repository": "",
+  "runtimeContext": {
+    "serverUrl": "https://github.com",
+    "workflowRunId": "",
+    "workflowRunAttempt": "",
+    "workflowRunUrl": "",
+    "workflowArtifactsUrl": ""
+  },
+  "passed": true,
+  "checks": [
+    {
+      "id": "overdue-issue-budget",
+      "name": "Overdue issue budget",
+      "expected": "<= 0",
+      "actual": "0",
+      "pass": true
+    },
+    {
+      "id": "reminder-failure-budget",
+      "name": "Reminder failure budget",
+      "expected": "<= 0",
+      "actual": "0",
+      "pass": true
+    }
+  ],
+  "metrics": {
+    "issueCandidates": 2,
+    "overdueIssues": 0,
+    "overdueByOpenTimeout": 0,
+    "overdueByIdleTimeout": 0,
+    "reasonsFromMarker": 2,
+    "reasonsFromTitle": 0
+  },
+  "issues": [
+    {
+      "issueNumber": 201,
+      "title": "[V2-W15-06][P1 Escalation] workspace-startup-failed",
+      "reason": "workspace-startup-failed",
+      "reasonFrom": "marker",
+      "url": "https://example.test/zfrog/issues/201",
+      "createdAtIso": "2026-03-18T00:00:00.000Z",
+      "updatedAtIso": "2026-03-20T00:00:00.000Z",
+      "openHours": 126.03,
+      "idleHours": 78.03,
+      "labels": [
+        "p1",
+        "v2",
+        "release-health",
+        "need-triage"
+      ],
+      "overdueReasons": [],
+      "overdue": false
+    },
+    {
+      "issueNumber": 202,
+      "title": "[V2-W15-06][P1 Escalation] manual-debug",
+      "reason": "manual-debug",
+      "reasonFrom": "marker",
+      "url": "https://example.test/zfrog/issues/202",
+      "createdAtIso": "2026-03-22T06:00:00.000Z",
+      "updatedAtIso": "2026-03-23T09:30:00.000Z",
+      "openHours": 24.03,
+      "idleHours": null,
+      "labels": [
+        "p1",
+        "v2",
+        "release-health"
+      ],
+      "overdueReasons": [],
+      "overdue": false
+    }
+  ],
+  "overdueIssues": [],
+  "meta": {
+    "gateId": "v2-p1-escalation-timeout-gate",
+    "titlePrefixes": [
+      "[V2-W15-06][P1 Escalation]"
+    ],
+    "requiredLabels": [
+      "p1",
+      "v2",
+      "release-health"
+    ],
+    "maxOpenHours": 200,
+    "maxIdleHours": 200,
+    "maxOverdueIssues": 0
+  },
+  "reminder": {
+    "enabled": false,
+    "attempted": 0,
+    "posted": 0,
+    "skipped": 0,
+    "failed": 0,
+    "maxPerRun": 10,
+    "maxReminderFailures": 0
+  }
+}

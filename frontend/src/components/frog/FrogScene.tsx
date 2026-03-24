@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FrogPet } from './FrogPet';
 import { Frog } from '../../types';
 import { FrogState } from '../../types/frogAnimation';
-import { apiService } from '../../services/api';
+import { socialFeatureApi } from '../../features/social/api';
 
 interface FrogSceneProps {
   /** 主青蛙 tokenId (NFT ID) */
@@ -46,10 +46,8 @@ export const FrogScene: React.FC<FrogSceneProps> = ({
     if (!frogId) return;
     setIsLoadingFriends(true);
     try {
-      const response = await apiService.get(`/friends/list/${frogId}`);
-      if (response.success) {
-        setFriendsList(response.data);
-      }
+      const list = await socialFeatureApi.listFriends(frogId);
+      setFriendsList(list as Frog[]);
     } catch (error) {
       console.error('Failed to load friends:', error);
     } finally {

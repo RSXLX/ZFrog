@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiService } from '../../services/api';
+import { lifeFeatureApi } from '../../features/life/api';
 
 interface MemoryGameProps {
   frogId: number;
@@ -43,7 +43,7 @@ export function MemoryGame({ frogId, ownerAddress, onComplete }: MemoryGameProps
   // 检查剩余游戏次数
   const checkRemaining = async () => {
     try {
-      const response: any = await apiService.get(`/nurture/${frogId}/game-remaining?game=memory`);
+      const response: any = await lifeFeatureApi.getLegacyGameRemaining(frogId, 'memory');
       if (response.success) {
         setRemaining(response.remaining);
       }
@@ -177,7 +177,7 @@ export function MemoryGame({ frogId, ownerAddress, onComplete }: MemoryGameProps
     try {
       setLoading(true);
       const score = calculateScore();
-      const response: any = await apiService.post(`/nurture/${frogId}/play/memory`, {
+      const response: any = await lifeFeatureApi.playMemoryLegacy(frogId, {
         score,
         moves,
         time: elapsedTime,

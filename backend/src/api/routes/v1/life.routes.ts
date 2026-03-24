@@ -7,7 +7,7 @@ import { lifeCommandService } from '../../../modules/life/life.command';
 import { dormancyService } from '../../../modules/life/dormancy.service';
 import { respondError, respondSuccess } from '../../response';
 
-const router = Router();
+const router: Router = Router();
 
 const parseFrogId = (raw: string): number => {
   const frogId = Number(raw);
@@ -243,7 +243,7 @@ router.post(
       return respondError(req, res, 400, 'INVALID_INPUT', 'verificationId is required');
     }
 
-    const result = await lifeCommandService.blessDormant({
+    const result = await dormancyService.blessDormant({
       blesserFrogId,
       targetFrogId,
       walletAddress,

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '../components/common/Button';
-import { apiService } from '../services/api';
+import { travelFeatureApi } from '../features/travel/api';
+import { getSessionWalletAddress } from '../lib/auth/session';
 import { ExplorationList } from '../components/travel/ExplorationList';
 import { 
     ArrowLeft, 
@@ -104,7 +105,7 @@ export function TravelDetailPage() {
                          ((travel as any).souvenirData ? `p0-${travel.id}` : null);
             
             if (sId) {
-                apiService.getSouvenirImageStatus(sId.toString())
+                travelFeatureApi.getSouvenirImageStatus(sId.toString())
                     .then(res => {
                         if (res.success && res.record) {
                             setSouvenirImageUrl(res.record.gatewayUrl || res.record.imageUrl);
@@ -119,30 +120,36 @@ export function TravelDetailPage() {
         try {
             setLoading(true);
             // 先尝试获取P0旅行详情
-            const response = await apiService.get(`/travels/p0/${id}`);
-            if (response.success && response.data) {
-                // P0数据已经包含了解析后的journal和souvenir
-                setTravel(response.data);
-            } else {
-                // 如果P0失败，尝试获取普通旅行详情
-                const journalResponse = await apiService.get(`/travels/journal/${id}`);
-                if (journalResponse.success) {
-                    // 获取基础旅行信息
-                    const historyResponse = await apiService.get(`/travels/history?limit=100`);
-                    if (historyResponse.success) {
-                        const baseTravel = historyResponse.data.travels.find((t: any) => t.id === parseInt(id));
-                        if (baseTravel) {
-                            setTravel({
-                                ...baseTravel,
-                                journal: journalResponse.data.journal,
-                                souvenir: journalResponse.data.souvenir,
-                            });
-                        }
-                    }
+            const p0Travel = await travelFeatureApi.getP0Detail(id);
+            setTravel(p0Travel as TravelDetail);
+        } catch (primaryError) {
+            try {
+                const journalDetail = await travelFeatureApi.getJournal(id);
+                const walletAddress = getSessionWalletAddress();
+                if (!walletAddress) {
+                    throw primaryError;
                 }
+
+                const history = await travelFeatureApi.getHistory({
+                    address: walletAddress,
+                    limit: 100,
+                    offset: 0,
+                });
+                const baseTravel = history.travels.find((t) => t.id === parseInt(id, 10));
+                if (!baseTravel) {
+                    throw primaryError;
+                }
+
+                setTravel({
+                    ...baseTravel,
+                    startTime: baseTravel.completedAt || new Date().toISOString(),
+                    endTime: baseTravel.completedAt || new Date().toISOString(),
+                    journal: journalDetail.journal || undefined,
+                    souvenir: journalDetail.souvenir || undefined,
+                } as TravelDetail);
+            } catch (fallbackError) {
+                console.error('Failed to fetch travel detail:', fallbackError);
             }
-        } catch (error) {
-            console.error('Failed to fetch travel detail:', error);
         } finally {
             setLoading(false);
         }

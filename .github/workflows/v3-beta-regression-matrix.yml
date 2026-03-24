@@ -1,0 +1,384 @@
+name: v3-beta-regression-matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run release gate in dry-run mode (waive strict failure).'
+        type: boolean
+        required: false
+        default: false
+  schedule:
+    - cron: '0 20 * * *'
+
+concurrency:
+  group: v3-beta-regression-matrix
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Contract Layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - id: contract-tests
+        name: Run shared/client-sdk contract tests
+        continue-on-error: true
+        run: |
+          npm install --prefix packages/shared
+          npm install --prefix packages/client-sdk
+          npm --prefix packages/shared run type-check
+          npm --prefix packages/shared run test:contract
+          npm --prefix packages/client-sdk run type-check
+          npm --prefix packages/client-sdk run test:contract
+
+      - name: Generate contract layer report
+        if: always()
+        env:
+          STATUS: ${{ steps.contract-tests.outcome }}
+        run: |
+          mkdir -p reports/v3/layers
+          generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          cat > reports/v3/layers/contract.json <<EOF_JSON
+          {"layer":"contract","status":"${STATUS}","generatedAt":"${generated_at}","command":"shared+client-sdk contract/type-check"}
+          EOF_JSON
+
+      - name: Upload contract report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-regression-layer-report-contract
+          path: reports/v3/layers/contract.json
+
+  integration:
+    name: Integration Layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - id: integration-tests
+        name: Run backend integration tests
+        continue-on-error: true
+        run: |
+          npm ci --prefix backend
+          npm --prefix backend run db:generate
+          npm --prefix backend run type-check
+          npm --prefix backend run test:integration
+
+      - name: Generate integration layer report
+        if: always()
+        env:
+          STATUS: ${{ steps.integration-tests.outcome }}
+        run: |
+          mkdir -p reports/v3/layers
+          generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          cat > reports/v3/layers/integration.json <<EOF_JSON
+          {"layer":"integration","status":"${STATUS}","generatedAt":"${generated_at}","command":"backend type-check + integration"}
+          EOF_JSON
+
+      - name: Upload integration report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-regression-layer-report-integration
+          path: reports/v3/layers/integration.json
+
+  e2e:
+    name: E2E Layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - id: e2e-tests
+        name: Run backend V3/admin-v3 e2e routes
+        continue-on-error: true
+        run: |
+          npm ci --prefix backend
+          npm --prefix backend run db:generate
+          npm --prefix backend run test -- --runInBand --testPathPattern="(v3-.*-routes\\.e2e\\.test\\.ts|admin-v3-.*-routes\\.e2e\\.test\\.ts)"
+
+      - name: Generate e2e layer report
+        if: always()
+        env:
+          STATUS: ${{ steps.e2e-tests.outcome }}
+        run: |
+          mkdir -p reports/v3/layers
+          generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          cat > reports/v3/layers/e2e.json <<EOF_JSON
+          {"layer":"e2e","status":"${STATUS}","generatedAt":"${generated_at}","command":"backend v3/admin-v3 e2e route suites"}
+          EOF_JSON
+
+      - name: Upload e2e report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-regression-layer-report-e2e
+          path: reports/v3/layers/e2e.json
+
+  playwright:
+    name: Playwright Layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - id: playwright-tests
+        name: Run frontend V3 Playwright smoke flows
+        continue-on-error: true
+        run: |
+          npm ci --prefix frontend
+          npm ci --prefix admin
+          npm --prefix frontend exec playwright install --with-deps chromium
+          npm --prefix frontend run test:e2e -- council-inbox-alpha.e2e.ts creator-pipeline-alpha.e2e.ts memory-world-contribution-flow.e2e.ts
+          npm --prefix frontend run test:e2e:admin:v3-dashboard
+
+      - name: Generate playwright layer report
+        if: always()
+        env:
+          STATUS: ${{ steps.playwright-tests.outcome }}
+        run: |
+          mkdir -p reports/v3/layers
+          generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          cat > reports/v3/layers/playwright.json <<EOF_JSON
+          {"layer":"playwright","status":"${STATUS}","generatedAt":"${generated_at}","command":"frontend v3 smoke flows + admin v3-dashboard dual-state smoke"}
+          EOF_JSON
+
+      - name: Upload playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-regression-layer-report-playwright
+          path: reports/v3/layers/playwright.json
+
+  summary:
+    name: Matrix Gate Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - contract
+      - integration
+      - e2e
+      - playwright
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download layer reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: v3-regression-layer-report-*
+          merge-multiple: true
+          path: reports/v3/layers
+
+      - name: Evaluate gate (fallback dry-run rehearsal)
+        run: |
+          node ./scripts/ci/v3-beta-release-gate.mjs \
+            --config ./.github/release-gates/v3-beta-release-gate.json \
+            --reports-dir ./reports/v3/layers \
+            --dry-run \
+            --report ./reports/v3/v3-beta-release-gate-dry-run.md \
+            --out-json ./reports/v3/v3-beta-release-gate-dry-run.json
+
+      - id: gate-enforce
+        name: Evaluate gate (enforced)
+        continue-on-error: true
+        env:
+          MATRIX_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+        run: |
+          dry_flag=""
+          if [ "${MATRIX_DRY_RUN}" = "true" ]; then
+            dry_flag="--dry-run"
+          fi
+
+          node ./scripts/ci/v3-beta-release-gate.mjs \
+            --config ./.github/release-gates/v3-beta-release-gate.json \
+            --reports-dir ./reports/v3/layers \
+            ${dry_flag} \
+            --report ./reports/v3/v3-beta-release-gate-report.md \
+            --out-json ./reports/v3/v3-beta-release-gate.json
+
+      - name: Generate V3Dashboard freeze/rollback drill report
+        if: always()
+        run: |
+          node ./scripts/ci/v3-dashboard-drill-report.mjs \
+            --playwright-layer-report ./reports/v3/layers/playwright.json \
+            --environment ci \
+            --owner "QA Owner + Admin Owner" \
+            --trigger-reason "v3-beta-regression-matrix (${GITHUB_EVENT_NAME})" \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --report ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}.md \
+            --out-json ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}.json
+
+      - name: Generate V3Dashboard backlog update snippet
+        if: always()
+        run: |
+          node ./scripts/ci/v3-dashboard-drill-backlog.mjs \
+            --drill-json ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}.json \
+            --report-md ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}.md \
+            --out-md ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-backlog.md \
+            --task-id V3-RC-02 \
+            --expected-run-id "${GITHUB_RUN_ID}" \
+            --environment ci
+
+      - name: Generate V3 backlog apply preview
+        if: always()
+        run: |
+          node ./scripts/ci/v3-dashboard-drill-backlog-apply.mjs \
+            --snippet-md ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-backlog.md \
+            --backlog-doc ./docs/02_开发计划/ZFrog_V3_Issue_Backlog_可开工版.md \
+            --task-id V3-RC-02 \
+            --expected-run-id "${GITHUB_RUN_ID}" \
+            --out-doc ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-backlog-applied.md
+
+      - name: Generate V3Dashboard run manifest
+        if: always()
+        run: |
+          node ./scripts/ci/v3-dashboard-drill-run-manifest.mjs \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --server-url "${GITHUB_SERVER_URL}" \
+            --reports-dir ./reports/v3 \
+            --drill-report-md-path ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}.md \
+            --drill-json-path ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}.json \
+            --backlog-snippet-path ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-backlog.md \
+            --backlog-applied-path ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-backlog-applied.md \
+            --workflow-name "${GITHUB_WORKFLOW}" \
+            --workflow-file ".github/workflows/v3-beta-regression-matrix.yml" \
+            --event-name "${GITHUB_EVENT_NAME}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --ref "${GITHUB_REF}" \
+            --sha "${GITHUB_SHA}" \
+            --run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --out-json ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-run-manifest.json
+
+      - id: evidence-gate
+        name: Verify V3Dashboard evidence + manifest digest consistency
+        if: always()
+        continue-on-error: true
+        run: |
+          node ./scripts/ci/v3-dashboard-drill-evidence-gate.mjs \
+            --run-id "${GITHUB_RUN_ID}" \
+            --reports-dir ./reports/v3 \
+            --task-id V3-RC-02 \
+            --run-manifest ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-run-manifest.json \
+            --expected-server-url "${GITHUB_SERVER_URL}" \
+            --expected-repository "${GITHUB_REPOSITORY}" \
+            --expected-run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --expected-ref "${GITHUB_REF}" \
+            --expected-sha "${GITHUB_SHA}" \
+            --max-manifest-age-hours 72 \
+            --report ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-evidence-gate.md \
+            --out-json ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-evidence-gate.json
+
+      - id: closeout-preview
+        name: Generate V3 backlog closeout preview (strict by default)
+        if: always()
+        continue-on-error: true
+        env:
+          MATRIX_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+        run: |
+          require_publishable=true
+          if [ "${MATRIX_DRY_RUN}" = "true" ]; then
+            require_publishable=false
+          fi
+
+          node ./scripts/ci/v3-dashboard-drill-closeout.mjs \
+            --run-id "${GITHUB_RUN_ID}" \
+            --reports-dir ./reports/v3 \
+            --run-manifest ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-run-manifest.json \
+            --backlog-doc ./docs/02_开发计划/ZFrog_V3_Issue_Backlog_可开工版.md \
+            --out-doc ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-backlog-closeout.md \
+            --expected-server-url "${GITHUB_SERVER_URL}" \
+            --expected-repository "${GITHUB_REPOSITORY}" \
+            --expected-run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --expected-ref "${GITHUB_REF}" \
+            --expected-sha "${GITHUB_SHA}" \
+            --max-manifest-age-hours 72 \
+            --require-publishable "${require_publishable}"
+
+      - name: Append markdown summaries
+        if: always()
+        run: |
+          echo "## V3 Beta Gate (strict)" >> "$GITHUB_STEP_SUMMARY"
+          cat ./reports/v3/v3-beta-release-gate-report.md >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## V3 Beta Gate (fallback dry-run rehearsal)" >> "$GITHUB_STEP_SUMMARY"
+          cat ./reports/v3/v3-beta-release-gate-dry-run.md >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## V3 Dashboard Freeze/Rollback Drill" >> "$GITHUB_STEP_SUMMARY"
+          cat ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}.md >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## V3 RC-02 Backlog Update Snippet" >> "$GITHUB_STEP_SUMMARY"
+          cat ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-backlog.md >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backlog apply preview: \`reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-backlog-applied.md\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Run manifest: \`reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-run-manifest.json\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backlog closeout preview: \`reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-backlog-closeout.md\`（non-dry-run strict；dry-run rehearsal 自动降级为 \`--require-publishable false\`）" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Publishable closeout command: \`node ./scripts/ci/v3-dashboard-drill-closeout.mjs --run-id ${GITHUB_RUN_ID} --reports-dir ./reports/v3 --run-manifest ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-run-manifest.json --backlog-doc ./docs/02_开发计划/ZFrog_V3_Issue_Backlog_可开工版.md --out-doc ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-backlog-closeout.md --expected-server-url ${GITHUB_SERVER_URL} --expected-repository ${GITHUB_REPOSITORY} --expected-run-attempt ${GITHUB_RUN_ATTEMPT} --expected-ref ${GITHUB_REF} --expected-sha ${GITHUB_SHA} --max-manifest-age-hours 72 --require-publishable true\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Publishable closeout apply command: \`node ./scripts/ci/v3-dashboard-drill-closeout-apply.mjs --run-id ${GITHUB_RUN_ID} --reports-dir ./reports/v3 --run-manifest ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-run-manifest.json --closeout-preview ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-backlog-closeout.md --backlog-doc ./docs/02_开发计划/ZFrog_V3_Issue_Backlog_可开工版.md --expected-server-url ${GITHUB_SERVER_URL} --expected-repository ${GITHUB_REPOSITORY} --expected-run-attempt ${GITHUB_RUN_ATTEMPT} --expected-ref ${GITHUB_REF} --expected-sha ${GITHUB_SHA} --max-manifest-age-hours 72 --require-publishable true\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f "./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-evidence-gate.md" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "## V3 RC-02 Evidence + Manifest Digest Gate" >> "$GITHUB_STEP_SUMMARY"
+            cat ./reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-evidence-gate.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "- V3 RC-02 evidence triad report missing: \`reports/v3/v3-dashboard-freeze-rollback-drill-${GITHUB_RUN_ID}-evidence-gate.md\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload V3 matrix reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-beta-regression-matrix-report
+          path: reports/v3
+
+      - name: Fail workflow when closeout preview gate fails
+        if: steps.closeout-preview.outcome != 'success'
+        run: exit 1
+
+      - name: Fail workflow when evidence triad gate fails
+        if: steps.evidence-gate.outcome != 'success'
+        run: exit 1
+
+      - name: Fail workflow when enforced gate fails
+        if: steps.gate-enforce.outcome != 'success'
+        run: exit 1

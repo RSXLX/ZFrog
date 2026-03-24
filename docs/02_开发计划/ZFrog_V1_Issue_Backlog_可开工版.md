@@ -1,7 +1,7 @@
 ---
 status: 执行中
 version: 1.0
-last_updated: 2026-03-21
+last_updated: 2026-03-22
 reviewer: Codex
 ---
 
@@ -37,6 +37,31 @@ reviewer: Codex
 6. `2026-03-21`：`cross-chain` 对 `omniTravelService` 的直接依赖下沉到 `travel` 模块内部 adapter，旧 websocket 事件补齐与 `travel-state-machine` 对齐（status/currentStage/progress），并新增 e2e + contract integration 回归。
 7. `2026-03-21`：`V1-I08` 开始推进，已新增 `web3` 模块（frog-wallet.service / onchain-milestone.service / frog-wallet.query），并接入 `/api/v1/frogs/:frogId/wallet` 与 `/api/v1/frogs/:frogId/milestones`。
 8. `2026-03-21`：`egg/soul/hatch` 的里程碑写入统一走 `onchainMilestoneService.record`，并统一产出 `OnchainMilestoneRecorded` domain event。
+9. `2026-03-21`：`V1-I09` 已进入开发中，新增 `memory-palace.query` 与 `GET /api/v1/memory-palaces/:id`，并在 `travel.command.completeTravel` 接入 recap + memory palace upsert，前端 `TravelResultPage/TravelResult` 已接 memory-palace 展示与旧字段 fallback。
+10. `2026-03-21`：`V1-I10` 已开始切换，新增 `frontend/src/features/travel/api.ts` 与 `frontend/src/features/memory-palace/api.ts`，`TravelResultPage` 已改为通过 feature API 调用 `/api/v1/travels/:id` 与 `/api/v1/memory-palaces/:id`。
+11. `2026-03-21`：`TravelHistoryPage` 已切到 `features/travel/api.ts`（移除页面内直接 endpoint 依赖），并新增 `frontend/src/lib/api/client.ts` 与 `frontend/src/lib/api/contracts.ts` 作为 I10 统一 API 契约层起点。
+12. `2026-03-21`：I10 统一层继续推进：新增 `frontend/src/lib/api/errors.ts`、`frontend/src/lib/auth/session.ts`、`frontend/src/features/egg/api.ts`、`frontend/src/features/life/api.ts`、`frontend/src/features/social/api.ts`；`TravelDetailPage` 与 `travel/memory` feature API 已统一走 `lib/api/client`。
+13. `2026-03-21`：I10 继续切流：`FrogDetail/Desktop` 的 travel 直连已委托 `features/travel/api.ts`；`nurture/hibernation` 前端调用已收敛到 `features/life/api.ts`；新增 `TravelDetailPage` 页面测试覆盖 `P0 -> fallback(journal+history)` 双路径。
+14. `2026-03-21`：`useFrogStatus` 中 `/travels/:frogId/active` 查询已收敛到 `travelFeatureApi.getActiveByTokenId`，travel 查询入口进一步统一。
+15. `2026-03-21`：travel 查询入口继续收口：`GardenPage` 的 `/travels/group`、`CrossChainTravelTracker` 的 `/travels/journal/:id`、`InteractionFeed/TravelTrajectoryMap/ExplorationList` 的 `/travels/*` 查询调用已全部迁移到 `features/travel/api.ts`，并通过 frontend type-check + travel 页面测试回归。
+16. `2026-03-21`：补齐同类收敛项：`DiscoveryList`、`TravelStatus`、`CrossChainTravelTracker` 中 `/cross-chain/travel/:id/discoveries` 读取已统一委托 `travelFeatureApi.getCrossChainDiscoveries`，页面/组件层不再直接依赖该 endpoint。
+17. `2026-03-21`：继续收口 travel API 入口：`TravelStatus/FeedButton/RescueCenter/GroupTravelModal` 已从 `services/travel.api.ts` 切换到 `features/travel/api.ts`（新增 address-analyze/feed/feed-history/rescue/group-confirm 统一方法），组件层 `travelApi` 直接依赖归零。
+18. `2026-03-21`：`frontend/src/services/travel.api.ts` 已退役删除；travel 相关前端调用统一由 `features/travel/api.ts` 出口承接。
+19. `2026-03-21`：`V1-I08` 前端闭环：新增 `frontend/src/features/web3/api.ts`，`FrogDetail` 已展示 Frog Wallet（TBA 地址/资产计数/里程碑摘要与最近里程碑），满足“Web 端可展示 Frog Wallet 摘要”完成定义。
+20. `2026-03-21`：`V1-I09` 闭环确认：`travel.command.completeTravel -> memoryPalaceService` integration（真实 DB 断言 `memory_palaces` upsert + `domain_events`）与 `TravelResultPage` 记忆空间展示链路已齐，I09 标记完成。
+21. `2026-03-21`：I10 持续收口：`useTravelQuery` 与 `TravelResult/TravelJournal` 的 travel 查询已统一委托 `features/travel/api.ts`，继续向页面级全面切流推进。
+22. `2026-03-22`：I10 测试适配完成：`Home/Badges/Garden` 页面测试已从旧 `apiService` mock 切换到 feature API/mock 签名并恢复回归全绿。
+23. `2026-03-22`：I10 切流继续推进：`useFrogInteraction/useGridEditor/GardenScene`、`CrossChainTravelForm/Tracker`、`MessageInbox/Badge`、`useChat/ChatPanel`、`useFrogAppearance/FrogAppearanceDisplay/FrogSvgGenerated/RarityBorder/FrogMintWithAppearance` 已迁移到 `features/*/api.ts`。
+24. `2026-03-22`：前端 `pages/components/hooks` 作用域内 `services/*.api` 直连已清零，并通过 frontend `type-check` 与核心页面测试回归。
+25. `2026-03-22`：I10 测试侧继续收口：`TravelForm` 与 `GardenPage` 测试已移除 `@/services/api` 依赖，统一改为 feature API mock；测试层旧 `services/api` mock 归零。
+26. `2026-03-22`：前端 legacy API 文件退役：`services/{appearance,chat,cross-chain,garden,hibernation,home,homestead,interaction,message,price}.api.ts` 已删除，I10 闭环完成。
+27. `2026-03-22`：I11 启动首段：新增 `EggClaimPage`，`MyFrog` 改为单一分流入口（有蛙跳详情、无蛙跳 Egg Claim），并补路由 `/egg-claim`。
+28. `2026-03-22`：I11 主链路闭环：新增 `MemoryPalacePage` + `EggIntroFlow/PetStatePanel/CareActionPanel/TravelSummaryCard/MemoryPalaceView`，`EggClaimPage/FrogDetail/TravelResultPage/App` 已接入主体验流，结果页支持自然跳转 `/memory-palace/:frogId`；并通过 frontend `type-check` 与页面测试回归（含新增 `TravelResultPage` 记忆跳转、`MemoryPalacePage` 读取测试）。
+29. `2026-03-22`：I12 安全闭环：新增 `desktop-pet/src/renderer/features/{pet-shell/life-actions/travel/notifications}` 四个统一 hooks（`useEggLifecycle/useLifeState/useTravelSync/useNotificationFeed`），`renderer/App.tsx` 主路径完成切流；旧 `useTravel/useLifeCycle/useNewLifecycle/useChainMonitor*/useQuietMode*` 已收敛为委托层，`services/api.ts` 补齐 `/api/v1` life/travel 写读方法与鉴权头，`services/storage.ts` 补 `authToken/activeFrogId/desktop notifications`。通过 `desktop-pet npm run build` 与 `npm run build:electron` 回归。
+30. `2026-03-22`：I12 补充闭环：新增桌宠登录获取 token UI（`SettingsDialog` 两步流程：nonce -> 钱包签名 -> token 交换），并打通 `storage.authToken` 持久化与 `desktop:auth-updated` 事件同步，登录后 `App` 即时刷新 wallet/frog 生命周期，不需重启桌宠。
+31. `2026-03-22`：`V1-I14` 闭环：Admin 已完成 verifications/rituals/memory-palaces 观测页面与修复动作（`recalculate-life`、`rebuild-memory`），并在 Dashboard 增加最近关键 `domain_events` 观测；新增 `docs/02_开发计划/ZFrog_V1_RC_Cutover_Checklist.md` 作为 cutover checklist。
+32. `2026-03-22`：旧接口退役阶段已启动（未编号）：旧读路径 `GET /api/nurture/:frogId/status`、`GET /api/frogs/:tokenId/status`、`GET /api/travels/journal/:travelId`、`GET /api/travels/p0/:travelId` 已统一加 `Deprecation/Sunset/Link` 响应头并补 deprecation e2e。
+33. `2026-03-22`：新增 `docs/01_需求设计/ZFrog_家园下线并入记忆空间产品方案.md`，明确产品决策：家园作为独立一级功能下线，其能力并入记忆空间；立项 `V1-I15` 作为后续切流 issue。
 
 ---
 
@@ -75,13 +100,14 @@ Version 1 必须采用 **并行引入 -> 切流 -> 退役** 的迁移方式。
 | `V1-I05` | Egg Claim / Soul Imprint / Hatch 后端主链路 | BE Owner | `V1-I03`, `V1-I04` | `已完成` |
 | `V1-I06` | Life Engine 收敛 interaction / nurture / hibernation | BE Owner | `V1-I04` | `已完成` |
 | `V1-I07` | 统一 Travel 主状态机与 V1 旅行接口 | BE Owner | `V1-I02`, `V1-I04` | `已完成` |
-| `V1-I08` | Frog Wallet 接入与链上里程碑聚合 | Contract Owner | `V1-I07` | `进行中` |
-| `V1-I09` | Memory Palace Lite 与 AI Recap 出栈 | AI Owner | `V1-I05`, `V1-I07`, `V1-I08` | `未开始` |
-| `V1-I10` | Web 端 API Client 重构与主路由切换 | FE Owner | `V1-I02`, `V1-I03` | `未开始` |
-| `V1-I11` | Web 端主体验重构 Egg / Life / Travel / Memory | FE Owner | `V1-I05`, `V1-I06`, `V1-I07`, `V1-I09` | `未开始` |
-| `V1-I12` | Desktop 主线清洗与快捷照顾/通知切换 | Desktop Owner | `V1-I02`, `V1-I06`, `V1-I07` | `未开始` |
-| `V1-I13` | Social Rituals + Dormancy Beta | BE Owner | `V1-I03`, `V1-I04`, `V1-I06`, `V1-I07` | `未开始` |
-| `V1-I14` | Admin 观测面与发布前 cutover | Admin Owner | `V1-I03`, `V1-I04`, `V1-I13` | `未开始` |
+| `V1-I08` | Frog Wallet 接入与链上里程碑聚合 | Contract Owner | `V1-I07` | `已完成` |
+| `V1-I09` | Memory Palace Lite 与 AI Recap 出栈 | AI Owner | `V1-I05`, `V1-I07`, `V1-I08` | `已完成` |
+| `V1-I10` | Web 端 API Client 重构与主路由切换 | FE Owner | `V1-I02`, `V1-I03` | `已完成` |
+| `V1-I11` | Web 端主体验重构 Egg / Life / Travel / Memory | FE Owner | `V1-I05`, `V1-I06`, `V1-I07`, `V1-I09` | `已完成` |
+| `V1-I12` | Desktop 主线清洗与快捷照顾/通知切换 | Desktop Owner | `V1-I02`, `V1-I06`, `V1-I07` | `已完成` |
+| `V1-I13` | Social Rituals + Dormancy Beta | BE Owner | `V1-I03`, `V1-I04`, `V1-I06`, `V1-I07` | `已完成` |
+| `V1-I14` | Admin 观测面与发布前 cutover | Admin Owner | `V1-I03`, `V1-I04`, `V1-I13` | `已完成` |
+| `V1-I15` | 家园下线并入记忆空间 | Product Owner + FE Owner + BE Owner | `V1-I09`, `V1-I10`, `V1-I11`, `V1-I13` | `待开工` |
 
 ---
 
@@ -855,7 +881,7 @@ Response:
 
 ---
 
-## V1-I08 Frog Wallet 接入与链上里程碑聚合
+## V1-I08 Frog Wallet 接入与链上里程碑聚合（已完成）
 
 ### 主负责人
 
@@ -949,7 +975,7 @@ Response:
 
 ---
 
-## V1-I09 Memory Palace Lite 与 AI Recap 出栈
+## V1-I09 Memory Palace Lite 与 AI Recap 出栈（已完成）
 
 ### 主负责人
 
@@ -1105,7 +1131,7 @@ Response:
 
 ---
 
-## V1-I11 Web 端主体验重构 Egg / Life / Travel / Memory
+## V1-I11 Web 端主体验重构 Egg / Life / Travel / Memory（已完成）
 
 ### 主负责人
 
@@ -1182,7 +1208,7 @@ Response:
 
 ---
 
-## V1-I12 Desktop 主线清洗与快捷照顾/通知切换
+## V1-I12 Desktop 主线清洗与快捷照顾/通知切换（已完成）
 
 ### 主负责人
 
@@ -1261,7 +1287,7 @@ Response:
 
 ---
 
-## V1-I13 Social Rituals + Dormancy Beta
+## V1-I13 Social Rituals + Dormancy Beta（已完成）
 
 ### 主负责人
 
@@ -1361,7 +1387,7 @@ Request:
 
 ---
 
-## V1-I14 Admin 观测面与发布前 cutover
+## V1-I14 Admin 观测面与发布前 cutover（已完成）
 
 ### 主负责人
 
@@ -1382,6 +1408,7 @@ Request:
 1. `admin/src/pages/Verifications/index.tsx`
 2. `admin/src/pages/Rituals/index.tsx`
 3. `admin/src/pages/MemoryPalaces/index.tsx`
+4. `docs/02_开发计划/ZFrog_V1_RC_Cutover_Checklist.md`
 
 ### 修改文件
 
@@ -1399,6 +1426,8 @@ Request:
 #### `GET /api/admin/rituals`
 
 #### `GET /api/admin/memory-palaces`
+
+#### `GET /api/admin/domain-events`
 
 #### `POST /api/admin/frogs/:tokenId/recalculate-life`
 
@@ -1432,6 +1461,105 @@ Request:
 1. 后台能看验证、冬眠、记忆空间和关键事件
 2. 主链路有 repair 操作
 3. cutover checklist 完整
+
+### 闭环结论（2026-03-22）
+
+1. I14 所有接口与页面已落地：`verifications/rituals/memory-palaces/domain-events`。
+2. repair 操作已落地并挂到 admin 页面：`recalculate-life`、`rebuild-memory`。
+3. checklist 已沉淀在 `docs/02_开发计划/ZFrog_V1_RC_Cutover_Checklist.md`。
+
+---
+
+## V1-I15 家园下线并入记忆空间（已完成）
+
+### 主负责人
+
+`Product Owner`
+
+### 协作人
+
+1. `FE Owner`
+2. `BE Owner`
+3. `Design Owner`
+4. `QA Owner`
+
+### 目标
+
+把“家园”从独立一级产品概念和独立入口中下线，统一并入“记忆空间”，收敛用户心智、页面入口和社交承接路径。
+
+### 完成记录
+
+`2026-03-22`
+
+1. 顶部导航、详情 CTA、好友访问、AI 导航已全部切到记忆空间。
+2. 记忆空间已承接留言、礼物、照片、成就、布置、访客列表、邀请和场景互动。
+3. `GET /api/v1/memory-palaces/:id` 已改为可公开访问，并补充 frog 元信息供前端场景层使用。
+4. `/garden` 与 `/visit/:address` 已退化为兼容解析路由，只负责跳转到 `/memory-palace/:frogId`。
+
+### 创建文件
+
+1. `docs/01_需求设计/ZFrog_家园下线并入记忆空间产品方案.md`
+
+### 修改文件
+
+1. `docs/01_需求设计/ZFrog_超级融合版完整需求分析.md`
+2. `frontend/src/components/common/Navbar.tsx`
+3. `frontend/src/pages/FrogDetail.tsx`
+4. `frontend/src/pages/GardenPage.tsx`
+5. `frontend/src/pages/MemoryPalacePage.tsx`
+6. `frontend/src/pages/TravelResultPage.tsx`
+7. `frontend/src/components/frog/FriendsList.tsx`
+8. `frontend/src/components/friend-float/FriendFloatList.tsx`
+9. `backend/src/services/ai/chat.service.ts`
+10. `backend/src/services/ai/intent.service.ts`
+
+### 接口契约
+
+产品层要求如下：
+
+1. 记忆空间成为空间类能力的统一主入口。
+2. `/garden` 与 `/visit/:address` 仅作为兼容跳转保留，不再承载独立页面壳。
+3. AI 导航与好友访问类入口不再把“家园”作为主目标概念。
+4. 留言、礼物、照片、成就、布置能力必须在记忆空间中可达。
+
+### 表结构
+
+本 issue 不要求立即新增表或删除表。
+
+允许继续复用现有：
+
+1. `memory_palaces`
+2. `friend_interactions`
+3. `gifts`
+4. `photos`
+5. `achievements`
+6. `decoration_layouts` 及相关布局表
+
+### 事件
+
+优先复用现有事件：
+
+1. `MemoryPalaceCreated`
+2. `RelationshipMilestoneRecorded`
+3. `FriendshipCreated`
+
+本 issue 不强制新增领域事件。
+
+### 迁移顺序
+
+1. 冻结新增“家园专属”需求，后续统一记到记忆空间名下。
+2. 先做文案与入口收敛：导航、详情页、好友访问、AI 导航统一改口径。
+3. 再做能力收敛：留言、礼物、照片、成就、布置迁入记忆空间主视图。
+4. 保留兼容路由与兼容跳转，避免老链接立即失效。
+5. 旧家园壳退役，兼容路由只负责解析和跳转。
+
+### 完成定义
+
+1. Web 顶部导航不再存在“家园”一级入口。
+2. 青蛙详情页不再存在“进入家园”独立 CTA。
+3. 好友访问和 AI 导航默认落到记忆空间，而不是独立家园。
+4. 用户可以在记忆空间中完成原家园核心操作：访问、留言、礼物、照片、成就、布置。
+5. 用户不再需要理解“家园”和“记忆空间”是两个不同模块。
 
 ---
 
