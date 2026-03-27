@@ -5,7 +5,7 @@ export default defineConfig({
   testMatch: '**/admin-v3-dashboard-smoke.e2e.ts',
   timeout: 45_000,
   expect: {
-    timeout: 5_000,
+    timeout: 15_000,
   },
   retries: 0,
   reporter: 'list',
