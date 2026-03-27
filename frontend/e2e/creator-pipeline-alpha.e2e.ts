@@ -228,6 +228,5 @@ test('@creator-alpha mocked upload and pack draft flow', async ({ page }) => {
   await page.getByRole('button', { name: 'Create Pack Draft' }).click();
 
   await expect(page.getByText('Pack drafted: cpk_001')).toBeVisible();
-  await expect(page.getByText('Pack ID:')).toBeVisible();
-  await expect(page.getByText('cpk_001')).toBeVisible();
+  await expect(page.getByText('Pack ID: cpk_001')).toBeVisible();
 });

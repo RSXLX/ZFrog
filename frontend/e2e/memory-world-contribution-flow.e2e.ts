@@ -40,6 +40,20 @@ test('@memory-world-alpha mocked contribution flow', async ({ page }) => {
     window.localStorage.setItem('zfrog.v3.integrationApiKey', 'test-key');
   });
 
+  await page.route('**/api/v3/memory-palaces/templates*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          total: 0,
+          items: [],
+        },
+      }),
+    });
+  });
+
   await page.route('**/api/v3/memory-palaces', async (route) => {
     const payload = route.request().postDataJSON() as {
       journeyId: string;

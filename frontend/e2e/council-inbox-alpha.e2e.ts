@@ -127,7 +127,7 @@ test('@council-alpha mocked inbox detail respond flow', async ({ page }) => {
   await expect(page.getByTestId('council-inbox-item-csg_001')).toBeVisible();
 
   await page.getByTestId('council-inbox-item-csg_001').click();
-  await expect(page.getByText('Council Plan: Totem Repair Sprint')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Council Plan: Totem Repair Sprint' })).toBeVisible();
 
   await page.getByTestId('council-response-note').fill('Proceed now');
   await page.getByRole('button', { name: 'Accept' }).click();

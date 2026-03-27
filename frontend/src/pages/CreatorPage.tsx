@@ -5,11 +5,11 @@ import type {
   V3CreatorCreateAssetPayload,
   V3CreatorPackReadModel,
   V3CreatorPackStatus,
-} from '../../../packages/shared/src';
+} from '../../../packages/shared/src/types/creator';
 import {
   V3_CREATOR_ASSET_TYPES,
   V3_CREATOR_PACK_STATUSES,
-} from '../../../packages/shared/src';
+} from '../../../packages/shared/src/types/creator';
 import { FeatureGateState } from '../components/common/FeatureGateState';
 import { creatorFeatureApi } from '../features/creator/api';
 import {

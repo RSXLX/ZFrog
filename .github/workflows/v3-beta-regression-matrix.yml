@@ -158,6 +158,7 @@ jobs:
         name: Run frontend V3 Playwright smoke flows
         continue-on-error: true
         run: |
+          npm install --prefix packages/shared
           npm ci --prefix frontend
           npm ci --prefix admin
           npm --prefix frontend exec playwright install --with-deps chromium
