@@ -45,7 +45,7 @@ test('@creator-alpha mocked upload and pack draft flow', async ({ page }) => {
     };
   }> = [];
 
-  await page.addInitScript(() => {
+  await page.context().addInitScript(() => {
     (window as any).__ZFROG_V3_CREATOR_BETA__ = true;
     window.localStorage.setItem('zfrog.v3.integrationApiKey', 'test-key');
   });
@@ -207,6 +207,9 @@ test('@creator-alpha mocked upload and pack draft flow', async ({ page }) => {
   });
 
   await page.goto('/creator');
+  if (await page.getByRole('heading', { name: 'Creator Pipeline 正在灰度' }).isVisible().catch(() => false)) {
+    await page.reload();
+  }
   await expect(page.getByRole('heading', { name: 'V3 Creator Pipeline Alpha' })).toBeVisible();
 
   await page

@@ -34,7 +34,7 @@ test('@memory-world-alpha mocked contribution flow', async ({ page }) => {
     },
   };
 
-  await page.addInitScript(() => {
+  await page.context().addInitScript(() => {
     (window as any).__ZFROG_V3_MEMORY_WORLD_BETA__ = true;
     (window as any).__ZFROG_V3_MEMORY_WORLD_OWNER__ = true;
     window.localStorage.setItem('zfrog.v3.integrationApiKey', 'test-key');
@@ -125,6 +125,9 @@ test('@memory-world-alpha mocked contribution flow', async ({ page }) => {
   });
 
   await page.goto('/memory-world');
+  if (await page.getByRole('heading', { name: 'Memory World Builder 正在灰度' }).isVisible().catch(() => false)) {
+    await page.reload();
+  }
   await expect(page.getByRole('heading', { name: 'V3 Memory World Builder Alpha' })).toBeVisible();
 
   await page.getByPlaceholder('jrn_story_001').fill('jrn_story_001');

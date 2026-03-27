@@ -55,7 +55,7 @@ test('@council-alpha mocked inbox detail respond flow', async ({ page }) => {
     },
   });
 
-  await page.addInitScript(() => {
+  await page.context().addInitScript(() => {
     (window as any).__ZFROG_V3_COUNCIL_BETA__ = true;
     window.localStorage.setItem('zfrog.v3.integrationApiKey', 'test-key');
   });
@@ -121,6 +121,9 @@ test('@council-alpha mocked inbox detail respond flow', async ({ page }) => {
   });
 
   await page.goto('/council');
+  if (await page.getByRole('heading', { name: 'Council Inbox 正在灰度' }).isVisible().catch(() => false)) {
+    await page.reload();
+  }
   await expect(page.getByRole('heading', { name: 'V3 Council Inbox Alpha' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Load Inbox' }).click();
