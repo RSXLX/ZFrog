@@ -36,6 +36,11 @@ export const isRelationshipGraphBetaEnabled = (): boolean => {
     return parsedWindow;
   }
 
+  const parsedImportMeta = readBooleanFlag(import.meta.env.VITE_V3_RELATIONSHIP_GRAPH_BETA_ENABLED);
+  if (parsedImportMeta !== null) {
+    return parsedImportMeta;
+  }
+
   const fromProcess =
     typeof process !== 'undefined' && process.env
       ? process.env.VITE_V3_RELATIONSHIP_GRAPH_BETA_ENABLED
@@ -52,6 +57,11 @@ export const isRelationshipGraphAnchorBetaEnabled = (): boolean => {
   const parsedWindow = readBooleanFlag(fromWindow);
   if (parsedWindow !== null) {
     return parsedWindow;
+  }
+
+  const parsedImportMeta = readBooleanFlag(import.meta.env.VITE_V3_RELATIONSHIP_GRAPH_ANCHOR_BETA_ENABLED);
+  if (parsedImportMeta !== null) {
+    return parsedImportMeta;
   }
 
   const fromProcess =
@@ -80,6 +90,14 @@ export const getRelationshipGraphIntegrationApiKeySeed = (): string | null => {
   const parsedWindow = readStringValue(fromWindow);
   if (parsedWindow) {
     return parsedWindow;
+  }
+
+  const parsedImportMeta = readStringValue(
+    import.meta.env.VITE_V3_RELATIONSHIP_GRAPH_INTEGRATION_API_KEY ||
+      import.meta.env.VITE_V3_INTEGRATION_API_KEY
+  );
+  if (parsedImportMeta) {
+    return parsedImportMeta;
   }
 
   const fromProcess =

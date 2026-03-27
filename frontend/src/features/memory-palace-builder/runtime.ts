@@ -36,6 +36,11 @@ export const isMemoryWorldBetaEnabled = (): boolean => {
     return parsedWindow;
   }
 
+  const parsedImportMeta = readBooleanFlag(import.meta.env.VITE_V3_MEMORY_WORLD_BETA_ENABLED);
+  if (parsedImportMeta !== null) {
+    return parsedImportMeta;
+  }
+
   const fromProcess =
     typeof process !== 'undefined' && process.env
       ? process.env.VITE_V3_MEMORY_WORLD_BETA_ENABLED
@@ -54,6 +59,11 @@ export const isMemoryWorldOwnerEntryEnabled = (): boolean => {
     return parsedWindow;
   }
 
+  const parsedImportMeta = readBooleanFlag(import.meta.env.VITE_V3_MEMORY_WORLD_OWNER_ENABLED);
+  if (parsedImportMeta !== null) {
+    return parsedImportMeta;
+  }
+
   const fromProcess =
     typeof process !== 'undefined' && process.env
       ? process.env.VITE_V3_MEMORY_WORLD_OWNER_ENABLED
@@ -70,6 +80,13 @@ export const getMemoryWorldIntegrationApiKeySeed = (): string | null => {
   const parsedWindow = readStringValue(fromWindow);
   if (parsedWindow) {
     return parsedWindow;
+  }
+
+  const parsedImportMeta = readStringValue(
+    import.meta.env.VITE_V3_MEMORY_WORLD_INTEGRATION_API_KEY || import.meta.env.VITE_V3_INTEGRATION_API_KEY
+  );
+  if (parsedImportMeta) {
+    return parsedImportMeta;
   }
 
   const fromProcess =

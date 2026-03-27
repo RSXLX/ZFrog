@@ -35,6 +35,11 @@ export const isJourneyBetaEnabled = (): boolean => {
     return parsedWindow;
   }
 
+  const parsedImportMeta = readBooleanFlag(import.meta.env.VITE_V3_JOURNEY_BETA_ENABLED);
+  if (parsedImportMeta !== null) {
+    return parsedImportMeta;
+  }
+
   const fromProcess =
     typeof process !== 'undefined' && process.env
       ? process.env.VITE_V3_JOURNEY_BETA_ENABLED
@@ -51,6 +56,11 @@ export const getJourneyIntegrationApiKeySeed = (): string | null => {
   const parsedWindow = readStringValue(fromWindow);
   if (parsedWindow) {
     return parsedWindow;
+  }
+
+  const parsedImportMeta = readStringValue(import.meta.env.VITE_V3_INTEGRATION_API_KEY);
+  if (parsedImportMeta) {
+    return parsedImportMeta;
   }
 
   const fromProcess =
