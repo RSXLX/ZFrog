@@ -25,6 +25,20 @@ const readStringValue = (value: unknown): string | null => {
   return trimmed ? trimmed : null;
 };
 
+const readLocalQueryFlag = (queryKey: string): boolean | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const host = window.location.hostname;
+  if (host !== '127.0.0.1' && host !== 'localhost') {
+    return null;
+  }
+
+  const queryValue = new URLSearchParams(window.location.search).get(queryKey);
+  return readBooleanFlag(queryValue);
+};
+
 export const isMemoryWorldBetaEnabled = (): boolean => {
   const fromWindow =
     typeof window !== 'undefined'
@@ -34,6 +48,11 @@ export const isMemoryWorldBetaEnabled = (): boolean => {
   const parsedWindow = readBooleanFlag(fromWindow);
   if (parsedWindow !== null) {
     return parsedWindow;
+  }
+
+  const parsedQuery = readLocalQueryFlag('v3MemoryWorldBeta');
+  if (parsedQuery !== null) {
+    return parsedQuery;
   }
 
   const parsedImportMeta = readBooleanFlag(import.meta.env.VITE_V3_MEMORY_WORLD_BETA_ENABLED);
@@ -57,6 +76,11 @@ export const isMemoryWorldOwnerEntryEnabled = (): boolean => {
   const parsedWindow = readBooleanFlag(fromWindow);
   if (parsedWindow !== null) {
     return parsedWindow;
+  }
+
+  const parsedQuery = readLocalQueryFlag('v3MemoryWorldOwner');
+  if (parsedQuery !== null) {
+    return parsedQuery;
   }
 
   const parsedImportMeta = readBooleanFlag(import.meta.env.VITE_V3_MEMORY_WORLD_OWNER_ENABLED);

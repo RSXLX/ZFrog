@@ -124,7 +124,7 @@ test('@memory-world-alpha mocked contribution flow', async ({ page }) => {
     });
   });
 
-  await page.goto('/memory-world');
+  await page.goto('/memory-world?v3MemoryWorldBeta=1&v3MemoryWorldOwner=1');
   if (await page.getByRole('heading', { name: 'Memory World Builder 正在灰度' }).isVisible().catch(() => false)) {
     await page.reload();
   }

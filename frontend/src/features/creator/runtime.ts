@@ -25,6 +25,20 @@ const readStringValue = (value: unknown): string | null => {
   return trimmed ? trimmed : null;
 };
 
+const readLocalQueryFlag = (queryKey: string): boolean | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const host = window.location.hostname;
+  if (host !== '127.0.0.1' && host !== 'localhost') {
+    return null;
+  }
+
+  const queryValue = new URLSearchParams(window.location.search).get(queryKey);
+  return readBooleanFlag(queryValue);
+};
+
 export const isCreatorBetaEnabled = (): boolean => {
   const fromWindow =
     typeof window !== 'undefined'
@@ -33,6 +47,11 @@ export const isCreatorBetaEnabled = (): boolean => {
   const parsedWindow = readBooleanFlag(fromWindow);
   if (parsedWindow !== null) {
     return parsedWindow;
+  }
+
+  const parsedQuery = readLocalQueryFlag('v3CreatorBeta');
+  if (parsedQuery !== null) {
+    return parsedQuery;
   }
 
   const parsedImportMeta = readBooleanFlag(import.meta.env.VITE_V3_CREATOR_BETA_ENABLED);

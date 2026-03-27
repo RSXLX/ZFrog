@@ -120,7 +120,7 @@ test('@council-alpha mocked inbox detail respond flow', async ({ page }) => {
     });
   });
 
-  await page.goto('/council');
+  await page.goto('/council?v3CouncilBeta=1');
   if (await page.getByRole('heading', { name: 'Council Inbox 正在灰度' }).isVisible().catch(() => false)) {
     await page.reload();
   }

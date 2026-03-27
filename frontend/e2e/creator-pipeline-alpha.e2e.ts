@@ -206,7 +206,7 @@ test('@creator-alpha mocked upload and pack draft flow', async ({ page }) => {
     });
   });
 
-  await page.goto('/creator');
+  await page.goto('/creator?v3CreatorBeta=1');
   if (await page.getByRole('heading', { name: 'Creator Pipeline 正在灰度' }).isVisible().catch(() => false)) {
     await page.reload();
   }
