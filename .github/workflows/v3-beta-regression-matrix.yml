@@ -162,7 +162,11 @@ jobs:
           npm ci --prefix frontend
           npm ci --prefix admin
           npm --prefix frontend exec playwright install --with-deps chromium
-          npm --prefix frontend run test:e2e -- council-inbox-alpha.e2e.ts creator-pipeline-alpha.e2e.ts memory-world-contribution-flow.e2e.ts
+          VITE_V3_COUNCIL_BETA_ENABLED=true \
+          VITE_V3_CREATOR_BETA_ENABLED=true \
+          VITE_V3_MEMORY_WORLD_BETA_ENABLED=true \
+          VITE_V3_MEMORY_WORLD_OWNER_ENABLED=true \
+          npm --prefix frontend run test:e2e -- --workers=1 council-inbox-alpha.e2e.ts creator-pipeline-alpha.e2e.ts memory-world-contribution-flow.e2e.ts
           npm --prefix frontend run test:e2e:admin:v3-dashboard
 
       - name: Generate playwright layer report
